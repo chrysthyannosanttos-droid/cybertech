@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { MOCK_EMPLOYEES, MOCK_CERTIFICATES } from '@/data/mockData';
 import { PayrollEntry } from '@/types';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
 export default function Payroll() {
