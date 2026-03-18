@@ -44,10 +44,11 @@ export default function Employees() {
         const json = XLSX.utils.sheet_to_json<any>(ws);
 
         const imported: Employee[] = json.map((row: any, i: number) => ({
+          const store = MOCK_STORES.find(s => s.id === importStoreId) || MOCK_STORES[0];
           id: `imp_${Date.now()}_${i}`,
           tenantId: 't1',
-          storeId: MOCK_STORES[0].id,
-          storeName: MOCK_STORES[0].name,
+          storeId: store.id,
+          storeName: store.name,
           name: row['Nome'] || row['name'] || `Funcionário ${i + 1}`,
           cpf: String(row['CPF'] || row['cpf'] || ''),
           gender: (row['Sexo'] || row['gender'] || 'M').charAt(0).toUpperCase() === 'F' ? 'F' as const : 'M' as const,
