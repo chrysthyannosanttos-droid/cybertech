@@ -43,8 +43,8 @@ export default function Employees() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json<any>(ws);
 
+        const store = MOCK_STORES.find(s => s.id === importStoreId) || MOCK_STORES[0];
         const imported: Employee[] = json.map((row: any, i: number) => ({
-          const store = MOCK_STORES.find(s => s.id === importStoreId) || MOCK_STORES[0];
           id: `imp_${Date.now()}_${i}`,
           tenantId: 't1',
           storeId: store.id,
