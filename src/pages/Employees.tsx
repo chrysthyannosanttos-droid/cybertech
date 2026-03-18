@@ -68,7 +68,7 @@ export default function Employees() {
       }
     };
     reader.readAsArrayBuffer(file);
-  }, [toast]);
+  }, [toast, importStoreId]);
 
   const handleAdd = () => {
     if (!form.name || !form.cpf) return;
