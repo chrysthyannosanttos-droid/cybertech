@@ -108,7 +108,16 @@ export default function Employees() {
             </DialogTrigger>
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle className="text-[15px]">Importar Funcionários</DialogTitle></DialogHeader>
-              <p className="text-[13px] text-muted-foreground mb-3">Selecione um arquivo .xlsx com as colunas: Nome, CPF, Sexo, Cargo, Salário</p>
+              <p className="text-[13px] text-muted-foreground mb-3">Selecione a loja e o arquivo .xlsx com as colunas: Nome, CPF, Sexo, Cargo, Salário</p>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground block mb-1">Loja de destino</label>
+                <Select value={importStoreId} onValueChange={setImportStoreId}>
+                  <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
+                  <SelectContent>
+                    {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <Input type="file" accept=".xlsx,.xls" onChange={handleImport} className="text-[13px]" />
             </DialogContent>
           </Dialog>
