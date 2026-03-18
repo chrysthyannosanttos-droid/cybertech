@@ -16,6 +16,7 @@ export default function Employees() {
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [importStoreId, setImportStoreId] = useState('');
   const { toast } = useToast();
   const perPage = 15;
 
