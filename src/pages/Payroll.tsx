@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
 import { MOCK_EMPLOYEES, MOCK_CERTIFICATES, MOCK_STORES } from '@/data/mockData';
 import { PayrollEntry } from '@/types';
-import { Download, FileText, CalendarIcon } from 'lucide-react';
+import { Download, FileText, CalendarIcon, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { addAuditLog } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -33,6 +36,11 @@ export default function Payroll() {
   const [exportEndDate, setExportEndDate] = useState<Date>();
   const [includeCpf, setIncludeCpf] = useState(false);
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [payrollData, setPayrollData] = useState<any[]>([]);
+  
+  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
 
   const payroll: PayrollEntry[] = useMemo(() => {
     return MOCK_EMPLOYEES
@@ -55,6 +63,50 @@ export default function Payroll() {
         };
       });
   }, [storeFilter]);
+
+  // Use a local state to allow deletions
+  useMemo(() => {
+    setPayrollData(payroll);
+  }, [payroll]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === payrollData.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(payrollData.map(p => p.employeeId));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleDeleteSelected = () => {
+    if (!isCristiano) return;
+    const count = selectedIds.length;
+    setPayrollData(prev => prev.filter(p => !selectedIds.includes(p.employeeId)));
+    addAuditLog({
+      userId: currentUser?.id || 'unknown',
+      userName: currentUser?.name || 'Cristiano',
+      action: 'DELETE',
+      details: `[Payroll] Excluiu ${count} registro(s) da folha em massa.`
+    });
+    setSelectedIds([]);
+    toast({ title: `${count} registro(s) removido(s) da visualização` });
+  };
+
+  const handleDeleteOne = (id: string, name: string) => {
+    if (!isCristiano) return;
+    setPayrollData(prev => prev.filter(p => p.employeeId !== id));
+    addAuditLog({
+      userId: currentUser?.id || 'unknown',
+      userName: currentUser?.name || 'Cristiano',
+      action: 'DELETE',
+      details: `[Payroll] Removeu ${name} da folha atual.`
+    });
+    setSelectedIds(prev => prev.filter(x => x !== id));
+    toast({ title: 'Registro removido da folha' });
+  };
 
   const totalNet = payroll.reduce((s, p) => s + p.netSalary, 0);
 
@@ -131,22 +183,27 @@ export default function Payroll() {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="animate-fade-in-up stagger-1">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-lg font-semibold">Folha de Pagamento</h1>
-          <p className="text-[13px] text-muted-foreground">Total líquido: <span className="font-mono-data font-semibold text-foreground">R$ {totalNet.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+          <h1 className="text-2xl font-black text-white tracking-tighter">Fluxo de Pagamentos</h1>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Total líquido consolidado: <span className="text-primary font-black ml-2">R$ {totalNet.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
+          {isCristiano && selectedIds.length > 0 && (
+            <Button variant="destructive" size="sm" className="h-10 px-6 rounded-xl font-bold text-[12px] gap-2 animate-in fade-in zoom-in duration-200 mr-2" onClick={handleDeleteSelected}>
+              <Trash2 className="w-4 h-4" /> Excluir Selecionados ({selectedIds.length})
+            </Button>
+          )}
           <Select value={storeFilter} onValueChange={setStoreFilter}>
-            <SelectTrigger className="w-[200px] h-8 text-[13px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-[200px] h-10 bg-white/5 border-white/10 rounded-xl text-white"><SelectValue /></SelectTrigger>
+            <SelectContent className="glass-card border-white/10 text-white">
               <SelectItem value="all">Todas as Lojas</SelectItem>
               {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="h-8 text-[13px] gap-1.5" onClick={exportExcel}>
-            <Download className="w-3.5 h-3.5" /> Excel
+          <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl text-white/60 hover:text-white hover:bg-white/10 font-bold text-[12px] gap-2 transition-all" onClick={exportExcel}>
+            <Download className="w-4 h-4" /> Excel
           </Button>
 
           <Dialog open={exportOpen} onOpenChange={setExportOpen}>
@@ -253,29 +310,77 @@ export default function Payroll() {
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-lg shadow-card overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border/50">
-              {['Funcionário', 'Loja', 'Salário Base', 'Faltas', 'Atestado', 'Descontos', 'Líquido'].map(h => (
-                <th key={h} className={`text-${['Salário Base', 'Faltas', 'Atestado', 'Descontos', 'Líquido'].includes(h) ? 'right' : 'left'} text-[11px] font-medium text-muted-foreground uppercase tracking-wider px-4 py-3`}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {payroll.slice(0, 20).map(p => (
-              <tr key={p.employeeId} className="border-b border-border/30 last:border-0 hover:bg-accent/50 transition-colors duration-150">
-                <td className="px-4 py-2.5 text-[13px] font-medium">{p.employeeName}</td>
-                <td className="px-4 py-2.5 text-[12px] text-muted-foreground">{p.storeName.replace('SUPER ', '')}</td>
-                <td className="px-4 py-2.5 text-right font-mono-data text-[13px]">R$ {p.salary.toLocaleString('pt-BR')}</td>
-                <td className="px-4 py-2.5 text-right text-[13px] tabular-nums">{p.absences}</td>
-                <td className="px-4 py-2.5 text-right text-[13px] tabular-nums">{p.certificateDays}d</td>
-                <td className="px-4 py-2.5 text-right font-mono-data text-[13px] text-destructive">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                <td className="px-4 py-2.5 text-right font-mono-data text-[13px] font-semibold">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-white/5 border-b border-white/5 text-[11px] font-bold text-primary uppercase tracking-widest leading-none">
+                <th className="px-6 py-4 w-[40px]">
+                  <Checkbox 
+                    checked={payrollData.length > 0 && selectedIds.length === payrollData.length} 
+                    onCheckedChange={toggleSelectAll}
+                    className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  />
+                </th>
+                <th className="px-6 py-4">Colaborador</th>
+                <th className="px-6 py-4">Unidade</th>
+                <th className="px-6 py-4 text-right">Salário Base</th>
+                <th className="px-6 py-4 text-center">Intercorrências</th>
+                <th className="px-6 py-4 text-right">Total Descontos</th>
+                <th className="px-6 py-4 text-right">Saldo Líquido</th>
+                {isCristiano && <th className="px-6 py-4 text-center">Ações</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {payrollData.slice(0, 20).map(p => (
+                <tr key={p.employeeId} className={cn("hover:bg-white/[0.02] transition-colors group", selectedIds.includes(p.employeeId) && "bg-primary/5")}>
+                  <td className="px-6 py-4">
+                    <Checkbox 
+                      checked={selectedIds.includes(p.employeeId)} 
+                      onCheckedChange={() => toggleSelect(p.employeeId)}
+                      className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{p.employeeName}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{p.storeName.replace('SUPER ', '')}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-mono-data text-[13px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className="text-[11px] font-black text-rose-500">{p.absences}</span>
+                        <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Faltas</span>
+                      </div>
+                      <div className="w-px h-4 bg-white/10" />
+                      <div className="flex flex-col items-center">
+                        <span className="text-[11px] font-black text-blue-400">{p.certificateDays}d</span>
+                        <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Atest.</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-mono-data text-[13px] text-rose-500/80 font-medium">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="font-mono-data text-[14px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </td>
+                  {isCristiano && (
+                    <td className="px-6 py-4 text-center">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

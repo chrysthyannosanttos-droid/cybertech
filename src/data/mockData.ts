@@ -1,4 +1,4 @@
-import { Tenant, Store, Employee, Certificate } from '@/types';
+import { Tenant, Store, Employee, Certificate, Benefit, EmployeeBenefit, User, ServiceProvider, AuditLog, Rescission } from '@/types';
 
 export const MOCK_STORES: Store[] = [
   { id: 's1', name: 'SUPER ATACADO ANTARES', cnpj: '38.313.674/0001-19', tenantId: 't1' },
@@ -68,7 +68,68 @@ export const MOCK_TENANTS: Tenant[] = [
 
 const firstNames = ['Ana', 'Carlos', 'Maria', 'João', 'Fernanda', 'Pedro', 'Juliana', 'Lucas', 'Patrícia', 'Roberto', 'Camila', 'Marcos', 'Aline', 'Felipe', 'Bruna'];
 const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Lima', 'Pereira', 'Costa', 'Ferreira', 'Almeida', 'Rodrigues'];
-const roles = ['Operador de Caixa', 'Repositor', 'Gerente', 'Subgerente', 'Fiscal de Loja', 'Açougueiro', 'Padeiro', 'Conferente', 'Auxiliar Administrativo'];
+export const ROLES = [
+  'FISCAL PREVENCAO DE PERDAS',
+  'CONFERENTE DE CARGAS E DESCARGA',
+  'BALCONISTA DE FRIOS',
+  'BALCONISTA DE ACOUGUE',
+  'FISCAL DE PREVENCAO DE PERDAS',
+  'ASSISTENTE DE MARKETING',
+  'REPOSITOR DE HORTI',
+  'ESTOQUISTA',
+  'TESOUREIRA',
+  'GERENTE FINANCEIRO',
+  'OPERADOR DE HIPERMERCADO',
+  'ASSISTENTE DE PRECIFICAÇÃO',
+  'JOVEM APRENDIZ',
+  'COMPRADOR',
+  'FISCAL DE CAIXA',
+  'SUPERVISOR DE LOJA',
+  'AUX DE COZINHA',
+  'ANALISTA FISCAL',
+  'REPOSITOR DE FRIOS',
+  'ANALISTA DE RECURSOS HUMANOS',
+  'GERENTE DE COMPRAS',
+  'SUPERVISOR DE HORTI',
+  'ANALISTA DE TECNOLOGIA DA INFORMAÇÃO',
+  'BALCONISTA DE PADARIA',
+  'REPOSITOR',
+  'COZINHEIRO SENIOR',
+  'OPERADOR DE CÂMARA FRIA',
+  'COMPRADOR SENIOR',
+  'ATENDIMENTO AO CLIENTE',
+  'ANALISTA ADMINISTRATIVO',
+  'SUPERVISOR DE FRIOS',
+  'AUXILIAR DE PADARIA',
+  'CHAPEIRO',
+  'BALCONISTA DE RESTAURANTE',
+  'REPOSITORA',
+  'FISCAL PREVENÇÃO DE PERDAS',
+  'AÇOUGUEIRO',
+  'SEGURANÇA',
+  'BALCONISTA AÇOUGUE',
+  'PADEIRO',
+  'TÉCNICO DE MANUTENÇÃO',
+  'ASSISTENTE DE TI',
+  'AUX. DE COZINHA',
+  'MOTORISTA',
+  'SUPERVISOR DE LOGÍSTICA',
+  'COZINHEIRO',
+  'JOVEM APRENDIZ ADMINISTRATIVO',
+  'CONFEITEIRO',
+  'GERENTE DE LOJA',
+  'BALCONISTA DE AÇOUGUE',
+  'PADEIRO/PASTELEIRO',
+  'COMPRADOR SÊNIOR',
+  'SUB GERENTE',
+  'GERENTE DE AÇOUGUE',
+  'REPOSITOR HORTI',
+  'ASSISTENTE DE CADASTRO',
+  'AUXILIAR DE CONFEITARIA',
+  'ASSISTENTE FISCAL',
+  'BALCONISTA DE FRIOS/NGS'
+];
+const departments = ['Vendas', 'Açougue', 'Padaria', 'Estoque', 'Frente de Caixa', 'Administrativo', 'Gerência'];
 
 function randomCPF() {
   const n = () => Math.floor(Math.random() * 10);
@@ -89,8 +150,21 @@ export const MOCK_EMPLOYEES: Employee[] = Array.from({ length: 48 }, (_, i) => {
     cpf: randomCPF(),
     gender,
     birthDate: `19${80 + Math.floor(Math.random() * 20)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    role: roles[Math.floor(Math.random() * roles.length)],
+    admissionDate: `202${Math.floor(Math.random() * 4)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+    department: departments[Math.floor(Math.random() * departments.length)],
+    role: ROLES[Math.floor(Math.random() * ROLES.length)],
+    status: Math.random() > 0.1 ? 'ACTIVE' : 'INACTIVE',
     salary: 1500 + Math.floor(Math.random() * 3500),
+    cbo: '4211-25',
+    contaItau: '00000-0',
+    insalubridade: Math.random() > 0.5 ? 260.40 : 0,
+    periculosidade: Math.random() > 0.8 ? (1500 + Math.floor(Math.random() * 3500)) * 0.3 : 0,
+    gratificacao: Math.floor(Math.random() * 500),
+    valeTransporte: 250,
+    valeRefeicao: 450,
+    flexivel: Math.floor(Math.random() * 200),
+    mobilidade: Math.floor(Math.random() * 100),
+    valeFlexivel: Math.floor(Math.random() * 150),
     customFields: {},
   };
 });
@@ -109,6 +183,11 @@ export const MOCK_CERTIFICATES: Certificate[] = Array.from({ length: 18 }, (_, i
   };
 });
 
+export const MOCK_USERS: User[] = [
+  { id: 'u1', name: 'Administrador TI', email: 'admin@superatacado.com', role: 'superadmin' },
+  { id: 'u2', name: 'João Silva', email: 'joao.hr@superatacado.com', role: 'tenant', tenantId: 't1' },
+];
+
 export const MOCK_MRR_DATA = [
   { month: 'Out', value: 5200 },
   { month: 'Nov', value: 5500 },
@@ -117,3 +196,77 @@ export const MOCK_MRR_DATA = [
   { month: 'Fev', value: 6400 },
   { month: 'Mar', value: 6400 },
 ];
+
+export const MOCK_BENEFITS: Benefit[] = [
+  { id: 'b1', tenantId: 't1', name: 'Vale Transporte', type: 'FIXED_VALUE', defaultValue: 250, isActive: true },
+  { id: 'b2', tenantId: 't1', name: 'Vale Refeição', type: 'FIXED_VALUE', defaultValue: 450, isActive: true },
+  { id: 'b3', tenantId: 't1', name: 'Insalubridade', type: 'PERCENTAGE', defaultValue: 0.20, isActive: true },
+  { id: 'b4', tenantId: 't1', name: 'Periculosidade', type: 'PERCENTAGE', defaultValue: 0.30, isActive: true },
+  { id: 'b5', tenantId: 't1', name: 'Plano de Saúde', type: 'FIXED_VALUE', defaultValue: 150, isActive: true },
+];
+
+export const MOCK_EMPLOYEE_BENEFITS: EmployeeBenefit[] = [];
+
+// Generate random benefits for employees
+MOCK_EMPLOYEES.forEach(emp => {
+  if (Math.random() > 0.2) {
+    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b1`, employeeId: emp.id, benefitId: 'b1' });
+  }
+  if (Math.random() > 0.1) {
+    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b2`, employeeId: emp.id, benefitId: 'b2' });
+  }
+  if (emp.role === 'Açougueiro') {
+    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b3`, employeeId: emp.id, benefitId: 'b3' });
+  }
+});
+
+export const MOCK_SERVICE_PROVIDERS: ServiceProvider[] = [
+  {
+    id: 'sp1',
+    tenantId: 't1',
+    name: 'Limpeza & Cia',
+    cnpj: '11.222.333/0001-44',
+    email: 'contato@limpezacia.com.br',
+    phone: '(11) 99999-8888',
+    startDate: '2024-01-01',
+    endDate: '2026-03-25', // Near expiry for testing alert
+    contractValue: 5000,
+    duties: 'Limpeza das áreas comuns e banheiros',
+    observations: 'Frequência: Diária (Seg-Sex)',
+    additionalCosts: [],
+  },
+  {
+    id: 'sp2',
+    tenantId: 't1',
+    name: 'Segurança Total',
+    cnpj: '55.666.777/0001-88',
+    email: 'comercial@segurancatotal.com',
+    phone: '(11) 97777-6666',
+    startDate: '2024-02-01',
+    endDate: '2025-12-31',
+    contractValue: 12000,
+    duties: 'Monitoramento 24h e vigilância armada',
+    observations: 'Equipamentos inclusos: 5 câmeras e sensores de movimento',
+    additionalCosts: [
+      { desc: 'Taxa extra de instalação', value: 500, date: '2025-01-10' },
+    ],
+  },
+];
+
+export const MOCK_RESCISSIONS: Rescission[] = [];
+
+export const getAuditLogs = (): AuditLog[] => {
+  const logs = localStorage.getItem('audit_logs');
+  return logs ? JSON.parse(logs) : [];
+};
+
+export const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp'>) => {
+  const logs = getAuditLogs();
+  const newLog: AuditLog = {
+    ...log,
+    id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+  };
+  localStorage.setItem('audit_logs', JSON.stringify([newLog, ...logs]));
+};
+

@@ -12,6 +12,10 @@ import Employees from "@/pages/Employees";
 import Certificates from "@/pages/Certificates";
 import Payroll from "@/pages/Payroll";
 import Reports from "@/pages/Reports";
+import ServiceProviders from "@/pages/ServiceProviders";
+import Rescissions from "@/pages/Rescissions";
+import Settings from "@/pages/Settings";
+import AuditLogs from "@/pages/AuditLogs";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +41,10 @@ function AppRoutes() {
         <Route path="/certificates" element={<Certificates />} />
         <Route path="/payroll" element={<Payroll />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/service-providers" element={<ServiceProviders />} />
+        <Route path="/rescissions" element={<Rescissions />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/logs" element={<AuditLogs />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -12,20 +12,25 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const MOCK_USERS: Array<{ email: string; password: string; user: User }> = [
   {
-    email: 'admin@nexushr.com',
-    password: 'admin123',
-    user: { id: 'u1', email: 'admin@nexushr.com', role: 'superadmin', name: 'Admin Nexus' },
+    email: 'cristiano',
+    password: '91126395',
+    user: { id: 'u1', email: 'cristiano', role: 'superadmin', name: 'Cristiano Admin' },
   },
   {
-    email: 'tenant@superatacado.com',
-    password: 'tenant123',
-    user: { id: 'u2', email: 'tenant@superatacado.com', role: 'tenant', tenantId: 't1', name: 'Gestão Super Atacado' },
+    email: 'teste',
+    password: '123',
+    user: { id: 'u2', email: 'teste', role: 'tenant', tenantId: 't1', name: 'Usuário Teste' },
+  },
+  {
+    email: 'tayna',
+    password: '123',
+    user: { id: 'u3', email: 'tayna', role: 'tenant', tenantId: 't1', name: 'Tayna Gomes da Silva' },
   },
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('nexus_user');
+    const stored = sessionStorage.getItem('nexus_user');
     return stored ? JSON.parse(stored) : null;
   });
 
@@ -33,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const found = MOCK_USERS.find(u => u.email === email && u.password === password);
     if (found) {
       setUser(found.user);
-      localStorage.setItem('nexus_user', JSON.stringify(found.user));
+      sessionStorage.setItem('nexus_user', JSON.stringify(found.user));
       return true;
     }
     return false;
@@ -41,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('nexus_user');
+    sessionStorage.removeItem('nexus_user');
   }, []);
 
   return (

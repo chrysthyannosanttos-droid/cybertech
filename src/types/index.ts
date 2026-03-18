@@ -26,11 +26,57 @@ export interface Employee {
   storeName: string;
   name: string;
   cpf: string;
-  gender: 'M' | 'F';
+  gender: 'M' | 'F' | 'OTHER';
   birthDate: string;
+  admissionDate: string;
+  department: string;
   role: string;
+  status: 'ACTIVE' | 'INACTIVE';
   salary: number;
-  customFields: Record<string, any>;
+  cbo?: string;
+  contaItau?: string;
+  insalubridade?: number;
+  periculosidade?: number;
+  gratificacao?: number;
+  valeTransporte?: number;
+  valeRefeicao?: number;
+  flexivel?: number;
+  mobilidade?: number;
+  valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
+  customFields: Record<string, unknown>;
+}
+
+export interface ServiceProvider {
+  id: string;
+  tenantId: string;
+  name: string;
+  cnpj: string;
+  email: string;
+  phone: string;
+  startDate: string;
+  endDate: string;
+  contractValue: number;
+  duties?: string;
+  observations?: string;
+  additionalCosts: Array<{ desc: string; value: number; date: string }>;
+  contractUrl?: string;
+  contractFileName?: string;
+}
+
+export interface Benefit {
+  id: string;
+  tenantId: string;
+  name: string;
+  type: 'FIXED_VALUE' | 'PERCENTAGE';
+  defaultValue: number;
+  isActive: boolean;
+}
+
+export interface EmployeeBenefit {
+  id: string;
+  employeeId: string;
+  benefitId: string;
+  overrideValue?: number;
 }
 
 export interface Certificate {
@@ -63,4 +109,24 @@ export interface User {
   role: UserRole;
   tenantId?: string;
   name: string;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: string;
+  tenantId?: string;
+}
+
+export interface Rescission {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  terminationDate: string;
+  fgtsValue: number;
+  rescissionValue: number;
+  type: 'PEDIDO' | 'INDENIZADO' | 'ACORDO' | 'TRABALHADO' | 'JUSTA_CAUSA' | 'TERMINO_CONTRATO';
 }
