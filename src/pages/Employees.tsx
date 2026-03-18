@@ -16,6 +16,7 @@ export default function Employees() {
   const [page, setPage] = useState(1);
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [importStoreId, setImportStoreId] = useState('');
   const { toast } = useToast();
   const perPage = 15;
 
@@ -42,11 +43,12 @@ export default function Employees() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json<any>(ws);
 
+        const store = MOCK_STORES.find(s => s.id === importStoreId) || MOCK_STORES[0];
         const imported: Employee[] = json.map((row: any, i: number) => ({
           id: `imp_${Date.now()}_${i}`,
           tenantId: 't1',
-          storeId: MOCK_STORES[0].id,
-          storeName: MOCK_STORES[0].name,
+          storeId: store.id,
+          storeName: store.name,
           name: row['Nome'] || row['name'] || `Funcionário ${i + 1}`,
           cpf: String(row['CPF'] || row['cpf'] || ''),
           gender: (row['Sexo'] || row['gender'] || 'M').charAt(0).toUpperCase() === 'F' ? 'F' as const : 'M' as const,
@@ -66,7 +68,7 @@ export default function Employees() {
       }
     };
     reader.readAsArrayBuffer(file);
-  }, [toast]);
+  }, [toast, importStoreId]);
 
   const handleAdd = () => {
     if (!form.name || !form.cpf) return;
@@ -106,7 +108,16 @@ export default function Employees() {
             </DialogTrigger>
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle className="text-[15px]">Importar Funcionários</DialogTitle></DialogHeader>
-              <p className="text-[13px] text-muted-foreground mb-3">Selecione um arquivo .xlsx com as colunas: Nome, CPF, Sexo, Cargo, Salário</p>
+              <p className="text-[13px] text-muted-foreground mb-3">Selecione a loja e o arquivo .xlsx com as colunas: Nome, CPF, Sexo, Cargo, Salário</p>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground block mb-1">Loja de destino</label>
+                <Select value={importStoreId} onValueChange={setImportStoreId}>
+                  <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
+                  <SelectContent>
+                    {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <Input type="file" accept=".xlsx,.xls" onChange={handleImport} className="text-[13px]" />
             </DialogContent>
           </Dialog>
