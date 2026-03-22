@@ -49,13 +49,9 @@ export default function AppSidebar() {
       return ['/ponto', '/holerites', '/dashboard'].includes(link.to);
     }
 
-    // Cristiano não vê dados de funcionários/folha/etc
-    if (isCristiano && ['employees', 'certificates', 'payroll', 'rescissions'].includes(link.module)) {
-      return false;
-    }
     // Links exclusivos de superadmin só aparecem para cristiano/superadmin
     if (link.superadminOnly && !isSuperAdmin) return false;
-    // Se cristiano ou superadmin: acesso total
+    // Se cristiano ou superadmin: acesso total a todos os módulos
     if (isCristiano || currentPermissions === undefined) return true;
     // Para outros: verificar permissões
     return currentPermissions.includes(link.module);
