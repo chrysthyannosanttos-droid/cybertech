@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { MOCK_STORES, MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
@@ -39,6 +39,9 @@ export default function Employees() {
   const [importLoading, setImportLoading] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Photo capture modal refs
+  const photoVideoRef = useRef<HTMLVideoElement>(null);
+  const photoCanvasRef = useRef<HTMLCanvasElement>(null);
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   // States for Filters
@@ -251,6 +254,13 @@ export default function Employees() {
   const [page, setPage] = useState(1);
   const perPage = 15;
 
+  // Photo Capture Modal
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [photoTargetEmpId, setPhotoTargetEmpId] = useState<string | null>(null);
+  const [photoCameraActive, setPhotoCameraActive] = useState(false);
+  const [photoCapture, setPhotoCapture] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+
   // Add/Edit Employee Modal
   const [addOpen, setAddOpen] = useState(false);
   const [addStep, setAddStep] = useState(1);
@@ -365,22 +375,79 @@ export default function Employees() {
     setAddOpen(true);
   };
 
-  const handleRegisterPhoto = async (empId: string) => {
-    const photoUrl = prompt('Insira a URL da foto de referência (ou simule o upload):');
-    if (!photoUrl) return;
-    
-    const { error } = await supabase
-      .from('employees')
-      .update({ photo_reference_url: photoUrl })
-      .eq('id', empId);
-
-    if (error) {
-      toast({ title: 'Erro ao salvar foto', description: error.message, variant: 'destructive' });
-    } else {
-      toast({ title: 'Foto de referência cadastrada!' });
-      setEmployees(prev => prev.map(e => e.id === empId ? { ...e, photo_reference_url: photoUrl } : e));
-    }
+  const handleRegisterPhoto = (empId: string) => {
+    setPhotoTargetEmpId(empId);
+    setPhotoCapture(null);
+    setPhotoCameraActive(false);
+    setPhotoModalOpen(true);
   };
+
+  const startPhotoCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+      if (photoVideoRef.current) {
+        photoVideoRef.current.srcObject = stream;
+        setPhotoCameraActive(true);
+      }
+    } catch {
+      toast({ title: 'Erro na câmera', description: 'Não foi possível acessar a câmera.', variant: 'destructive' });
+    }
+  }, [toast]);
+
+  const capturePhotoRef = useCallback(() => {
+    if (!photoVideoRef.current || !photoCanvasRef.current) return;
+    const ctx = photoCanvasRef.current.getContext('2d');
+    if (!ctx) return;
+    photoCanvasRef.current.width = photoVideoRef.current.videoWidth;
+    photoCanvasRef.current.height = photoVideoRef.current.videoHeight;
+    ctx.drawImage(photoVideoRef.current, 0, 0);
+    setPhotoCapture(photoCanvasRef.current.toDataURL('image/jpeg', 0.9));
+    const stream = photoVideoRef.current.srcObject as MediaStream;
+    stream?.getTracks().forEach(t => t.stop());
+    setPhotoCameraActive(false);
+  }, []);
+
+  const saveReferencePhoto = useCallback(async () => {
+    if (!photoCapture || !photoTargetEmpId) return;
+    setPhotoUploading(true);
+    try {
+      // Convert base64 to blob
+      const res = await fetch(photoCapture);
+      const blob = await res.blob();
+      const fileName = `ref_${photoTargetEmpId}_${Date.now()}.jpg`;
+
+      // Try to upload to Supabase Storage
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('employee-photos')
+        .upload(fileName, blob, { upsert: true, contentType: 'image/jpeg' });
+
+      let photoUrl: string;
+
+      if (storageError) {
+        // If bucket doesn't exist yet, use base64 as fallback (stored in DB)
+        console.warn('Storage upload failed, using base64 fallback:', storageError.message);
+        photoUrl = photoCapture; // store base64 directly
+      } else {
+        const { data: publicData } = supabase.storage.from('employee-photos').getPublicUrl(fileName);
+        photoUrl = publicData.publicUrl;
+      }
+
+      const { error: dbError } = await supabase
+        .from('employees')
+        .update({ photo_reference_url: photoUrl })
+        .eq('id', photoTargetEmpId);
+
+      if (dbError) throw dbError;
+
+      setEmployees(prev => prev.map(e => e.id === photoTargetEmpId ? { ...e, photo_reference_url: photoUrl } : e));
+      toast({ title: '✅ Foto de referência cadastrada!', description: 'Biometria facial registrada com sucesso.' });
+      setPhotoModalOpen(false);
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar foto', description: e.message, variant: 'destructive' });
+    } finally {
+      setPhotoUploading(false);
+    }
+  }, [photoCapture, photoTargetEmpId, toast]);
 
   const handleNextStep = () => {
     if (addStep === 1) {
@@ -933,6 +1000,81 @@ export default function Employees() {
           </div>
         )}
       </div>
+
+      {/* ===== MODAL DE BIOMETRIA FACIAL ===== */}
+      <Dialog open={photoModalOpen} onOpenChange={(v) => {
+        if (!v) {
+          // Stop camera on close
+          if (photoVideoRef.current?.srcObject) {
+            (photoVideoRef.current.srcObject as MediaStream)?.getTracks().forEach(t => t.stop());
+          }
+          setPhotoCameraActive(false);
+          setPhotoCapture(null);
+        }
+        setPhotoModalOpen(v);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[15px]">
+              <Camera className="w-5 h-5 text-primary" />
+              Cadastro de Biometria Facial
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Camera / Preview Area */}
+            <div className="relative aspect-square rounded-2xl overflow-hidden bg-black border-2 border-white/10 flex items-center justify-center">
+              {photoCapture ? (
+                <>
+                  <img src={photoCapture} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 border-4 border-emerald-500 flex items-center justify-center bg-emerald-500/10">
+                    <div className="glass p-3 rounded-full bg-emerald-500/20">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                    </div>
+                  </div>
+                </>
+              ) : photoCameraActive ? (
+                <video ref={photoVideoRef} autoPlay playsInline className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                  <Camera className="w-12 h-12 opacity-20" />
+                  <p className="text-[11px] font-bold uppercase tracking-widest opacity-50">Câmera desativada</p>
+                </div>
+              )}
+            </div>
+
+            <canvas ref={photoCanvasRef} className="hidden" />
+
+            <p className="text-[12px] text-muted-foreground text-center leading-relaxed">
+              Posicione o rosto do funcionário no centro da câmera e tire uma foto nítida para o reconhecimento facial.
+            </p>
+
+            <div className="flex gap-2">
+              {!photoCapture ? (
+                !photoCameraActive ? (
+                  <Button className="flex-1 h-10 gap-2" onClick={startPhotoCamera}>
+                    <Camera className="w-4 h-4" /> Ativar Câmera
+                  </Button>
+                ) : (
+                  <Button className="flex-1 h-10 gap-2 bg-white text-black hover:bg-white/90" onClick={capturePhotoRef}>
+                    <div className="w-4 h-4 rounded-full border-2 border-black" />
+                    Tirar Foto
+                  </Button>
+                )
+              ) : (
+                <>
+                  <Button variant="outline" className="flex-1 h-10" onClick={() => { setPhotoCapture(null); startPhotoCamera(); }}>
+                    Repetir
+                  </Button>
+                  <Button className="flex-1 h-10 gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={saveReferencePhoto} disabled={photoUploading}>
+                    {photoUploading ? 'Salvando...' : <><CheckCircle2 className="w-4 h-4" /> Salvar</>}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ===== MODAL DE IMPORTAÇÃO ===== */}
       <Dialog open={importOpen} onOpenChange={(v) => { setImportOpen(v); if (!v) { setImportRows([]); setImportErrors([]); setImportStoreId(''); if (fileInputRef.current) fileInputRef.current.value = ''; } }}>
