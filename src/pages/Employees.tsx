@@ -490,6 +490,11 @@ export default function Employees() {
       flexivel: Number(form.flexivel || 0),
       mobilidade: Number(form.mobilidade || 0),
       vale_flexivel: Number(form.valeFlexivel || 0),
+      jornada_entrada: form.jornadaEntrada || '08:00',
+      jornada_saida_almoco: form.jornadaSaidaAlmoco || '12:00',
+      jornada_retorno_almoco: form.jornadaRetornoAlmoco || '13:00',
+      jornada_saida: form.jornadaSaida || '17:00',
+      geofence_radius: Number(form.geofenceRadius || 0),
     };
 
     if (editingId) {
@@ -749,6 +754,33 @@ export default function Employees() {
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">Mobilidade (R$)</Label>
                       <Input type="number" value={form.mobilidade || ''} onChange={e => setForm(f => ({...f, mobilidade: Number(e.target.value)}))} className="h-9" />
+                    </div>
+                  </div>
+
+                  {/* Jornada de Trabalho */}
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+                    <Label className="text-[11px] font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">⏱ Jornada de Trabalho</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Entrada</Label>
+                        <Input type="time" value={form.jornadaEntrada || '08:00'} onChange={e => setForm(f => ({...f, jornadaEntrada: e.target.value}))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Saída p/ Almoço</Label>
+                        <Input type="time" value={form.jornadaSaidaAlmoco || '12:00'} onChange={e => setForm(f => ({...f, jornadaSaidaAlmoco: e.target.value}))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Retorno Almoço</Label>
+                        <Input type="time" value={form.jornadaRetornoAlmoco || '13:00'} onChange={e => setForm(f => ({...f, jornadaRetornoAlmoco: e.target.value}))} className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Saída Final</Label>
+                        <Input type="time" value={form.jornadaSaida || '17:00'} onChange={e => setForm(f => ({...f, jornadaSaida: e.target.value}))} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="space-y-1 pt-1">
+                      <Label className="text-[11px] text-muted-foreground">Raio Geofence (metros, 0 = desativado)</Label>
+                      <Input type="number" value={form.geofenceRadius || 0} onChange={e => setForm(f => ({...f, geofenceRadius: Number(e.target.value)}))} className="h-9" placeholder="Ex: 200" />
                     </div>
                   </div>
                 </div>

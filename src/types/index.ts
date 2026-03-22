@@ -44,7 +44,32 @@ export interface Employee {
   mobilidade?: number;
   valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
   photo_reference_url?: string;
+  photo_references?: string[]; // Multiple face reference images
+  // Work schedule (Jornada)
+  jornadaEntrada?: string;      // e.g. "08:00"
+  jornadaSaidaAlmoco?: string;  // e.g. "12:00"
+  jornadaRetornoAlmoco?: string;// e.g. "13:00"
+  jornadaSaida?: string;        // e.g. "17:00"
+  geofenceRadius?: number;      // in meters (0 = disabled)
+  geofenceLat?: number;
+  geofenceLng?: number;
   customFields: Record<string, unknown>;
+}
+
+export interface TimeEntry {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  type: 'ENTRY' | 'EXIT' | 'INTERVAL_START' | 'INTERVAL_END';
+  timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  photo_url?: string;
+  validated: boolean;
+  tenant_id: string;
+  adjusted?: boolean;
+  adjusted_by?: string;
+  adjustment_reason?: string;
 }
 
 export interface ServiceProvider {
