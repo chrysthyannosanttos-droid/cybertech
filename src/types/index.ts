@@ -43,6 +43,7 @@ export interface Employee {
   flexivel?: number;
   mobilidade?: number;
   valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
+  photo_reference_url?: string;
   customFields: Record<string, unknown>;
 }
 

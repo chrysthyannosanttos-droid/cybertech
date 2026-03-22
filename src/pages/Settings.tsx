@@ -11,7 +11,7 @@ import { addAuditLog } from '@/data/mockData';
 export default function Settings() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   const [config, setConfig] = useState({
     remoteIp: '',
@@ -27,7 +27,7 @@ export default function Settings() {
   }, []);
 
   const handleSave = () => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
 
     localStorage.setItem('remote_connection_config', JSON.stringify(config));
     
@@ -44,7 +44,7 @@ export default function Settings() {
     });
   };
 
-  if (!isCristiano) {
+  if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in duration-500">
         <div className="p-12 glass shadow-2xl rounded-3xl border border-white/10 text-center max-w-md">

@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { MOCK_EMPLOYEES, MOCK_STORES, MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
+import { MOCK_STORES, MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
 import { Employee, Benefit, EmployeeBenefit } from '@/types';
-import { Search, Plus, Download, Users, UserCheck, UserX, DollarSign, Wallet, Edit2, CheckCircle2, Trash2 } from 'lucide-react';
+import { Search, Plus, Download, Upload, Users, UserCheck, UserX, DollarSign, Wallet, Edit2, CheckCircle2, Trash2, FileSpreadsheet, AlertCircle, Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -29,14 +30,222 @@ function isValidCPF(cpf: string) {
 }
 
 export default function Employees() {
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importStoreId, setImportStoreId] = useState('');
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user: currentUser } = useAuth();
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   // States for Filters
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Fetch initial data and setup realtime subscription
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching employees:', error);
+      } else {
+        // Map snake_case from DB to camelCase in TS
+        const mappedData = (data || []).map(emp => ({
+          ...emp,
+          storeName: MOCK_STORES.find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
+          admissionDate: emp.admission_date,
+          birthDate: emp.birth_date,
+          tenantId: emp.tenant_id,
+          storeId: emp.store_id,
+          contaItau: emp.conta_itau,
+          valeFlexivel: emp.vale_flexivel,
+          valeTransporte: emp.vale_transporte,
+          valeRefeicao: emp.vale_refeicao,
+          insalubridade: emp.insalubridade,
+          periculosidade: emp.periculosidade,
+          gratificacao: emp.gratificacao,
+          flexivel: emp.flexivel,
+          mobilidade: emp.mobilidade,
+        })) as Employee[];
+        setEmployees(mappedData);
+      }
+      setLoading(false);
+    };
+
+    fetchEmployees();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel('employees_realtime')
+      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newEmp = {
+            ...payload.new,
+            storeName: MOCK_STORES.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            admissionDate: payload.new.admission_date,
+            birthDate: payload.new.birth_date,
+            storeId: payload.new.store_id,
+            contaItau: payload.new.conta_itau,
+            valeFlexivel: payload.new.vale_flexivel,
+            valeTransporte: payload.new.vale_transporte,
+            valeRefeicao: payload.new.vale_refeicao,
+          } as Employee;
+          setEmployees(prev => [newEmp, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setEmployees(prev => prev.map(emp => emp.id === payload.new.id ? {
+            ...emp,
+            ...payload.new,
+            storeName: MOCK_STORES.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            admissionDate: payload.new.admission_date,
+            birthDate: payload.new.birth_date,
+            storeId: payload.new.store_id,
+            contaItau: payload.new.conta_itau,
+            valeFlexivel: payload.new.vale_flexivel,
+          } : emp));
+        } else if (payload.eventType === 'DELETE') {
+          setEmployees(prev => prev.filter(emp => emp.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // ============ IMPORT LOGIC ============
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      setImportRows(rows);
+      setImportErrors([]);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const parseExcelDate = (val: any) => {
+    if (!val) return null;
+    if (typeof val === 'number') {
+      // Excel serial date
+      const date = new Date((val - 25569) * 86400 * 1000);
+      return date.toISOString().split('T')[0];
+    }
+    if (typeof val === 'string') {
+      const parts = val.split(/[/-]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return val; // YYYY-MM-DD
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // DD/MM/YYYY to YYYY-MM-DD
+      }
+    }
+    return null;
+  };
+
+  const parseNumeric = (val: any) => {
+    if (val === undefined || val === null || val === '') return 0;
+    const str = String(val).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.');
+    return isNaN(Number(str)) ? 0 : Number(str);
+  };
+
+  const mapRow = (row: any, store: typeof MOCK_STORES[0]) => {
+    const rawName = String(row['Nome'] || row['name'] || '').trim();
+    const rawCpf = String(row['CPF'] || row['cpf'] || '').replace(/[^\d]/g, '');
+    
+    return {
+      name: rawName.toUpperCase(),
+      cpf: rawCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+      gender: String(row['Sexo'] || row['gender'] || 'M').toUpperCase().startsWith('F') ? 'F' : 'M',
+      birth_date: parseExcelDate(row['Nascimento'] || row['birth_date']),
+      admission_date: parseExcelDate(row['Admissão'] || row['admissionDate'] || row['admission_date']),
+      department: String(row['Setor'] || row['department'] || '').trim().toUpperCase(),
+      role: String(row['Descrição cargo'] || row['Cargo'] || row['role'] || '').trim().toUpperCase(),
+      status: String(row['Status'] || 'Ativo').toLowerCase().includes('ativ') ? 'ACTIVE' : 'INACTIVE',
+      salary: parseNumeric(row['Salário'] || row['salary']),
+      cbo: String(row['CBO'] || row['cbo'] || '').trim().toUpperCase(),
+      conta_itau: String(row['conta itau'] || row['contaItau'] || '').trim().toUpperCase(),
+      insalubridade: parseNumeric(row['Insa'] || row['insalubridade']),
+      periculosidade: parseNumeric(row['Peric'] || row['periculosidade']),
+      gratificacao: parseNumeric(row['Grat'] || row['gratificacao']),
+      vale_transporte: parseNumeric(row['VT'] || row['valeTransporte']),
+      vale_refeicao: parseNumeric(row['Vale Refeição'] || row['valeRefeicao']),
+      flexivel: parseNumeric(row['Flexível'] || row['flexivel']),
+      mobilidade: parseNumeric(row['Mobilidade'] || row['mobilidade']),
+      vale_flexivel: parseNumeric(row['FLEXIVEL'] || row['valeFlexivel']),
+      tenant_id: 't1',
+      store_id: store.id,
+    };
+  };
+
+  const handleImport = async () => {
+    if (!importStoreId) { toast({ title: 'Selecione a loja', variant: 'destructive' }); return; }
+    if (importRows.length === 0) { toast({ title: 'Nenhum dado na planilha', variant: 'destructive' }); return; }
+    const store = MOCK_STORES.find(s => s.id === importStoreId)!;
+    const validationErrors: string[] = [];
+    const mapped = importRows.map((row, i) => {
+      const r = mapRow(row, store);
+      if (!r.name || r.name.length < 3) validationErrors.push(`Linha ${i + 2}: Nome inválido ou ausente`);
+      if (!r.cpf || r.cpf.length < 11) validationErrors.push(`Linha ${i + 2}: CPF inválido para ${r.name || 'Desconhecido'}`);
+      return r;
+    });
+
+    if (validationErrors.length > 0) {
+      setImportErrors(validationErrors);
+      toast({ title: 'Erros na planilha', description: 'Corrija os campos destacados.', variant: 'destructive' });
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const { error } = await supabase.from('employees').insert(mapped);
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'Erro de Duplicidade', description: 'Um ou mais CPFs já estão cadastrados.', variant: 'destructive' });
+        } else {
+          toast({ title: 'Erro ao importar', description: error.message, variant: 'destructive' });
+        }
+        setImportErrors([`Erro no banco: ${error.message}`]);
+      } else {
+        addAuditLog({ userId: currentUser?.id || 'unknown', userName: currentUser?.name || 'Sistema', action: 'IMPORT_EMPLOYEES', details: `Importou ${mapped.length} funcionários na loja ${store.name}` });
+        toast({ title: 'Importação bem-sucedida!', description: `${mapped.length} funcionários cadastrados.` });
+        setImportOpen(false);
+        setImportRows([]);
+        setImportStoreId('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro inesperado', description: e.message, variant: 'destructive' });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = [[
+      'Nome', 'CPF', 'Sexo', 'Nascimento', 'Admissão', 'Descrição cargo', 'CBO',
+      'Setor', 'Salário', 'conta itau', 'Insa', 'Peric', 'Grat', 'VT', 'Vale Refeição', 'Flexível', 'Mobilidade', 'FLEXIVEL', 'Status'
+    ]];
+    const ws = XLSX.utils.aoa_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Funcionarios');
+    XLSX.writeFile(wb, 'modelo_importacao.xlsx');
+  };
+  // ============ END IMPORT ============
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -75,14 +284,31 @@ export default function Employees() {
   };
 
   const filtered = useMemo(() => {
-    return employees.filter(e => {
+    let result = employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) || e.cpf.includes(search);
       const matchStore = storeFilter === 'all' || e.storeId === storeFilter;
       const matchStatus = statusFilter === 'all' || e.status === statusFilter;
       const matchDept = departmentFilter === 'all' || e.department === departmentFilter;
       return matchSearch && matchStore && matchStatus && matchDept;
     });
-  }, [employees, search, storeFilter, statusFilter, departmentFilter]);
+
+    // Apply Sorting
+    result.sort((a, b) => {
+      if (sortBy === 'name') {
+        return sortOrder === 'asc' 
+          ? a.name.localeCompare(b.name) 
+          : b.name.localeCompare(a.name);
+      }
+      if (sortBy === 'admission_date') {
+        const dateA = new Date(a.admissionDate || 0).getTime();
+        const dateB = new Date(b.admissionDate || 0).getTime();
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [employees, search, storeFilter, statusFilter, departmentFilter, sortBy, sortOrder]);
 
   // Dashboard Stats
   const activeEmployees = employees.filter(e => e.status === 'ACTIVE');
@@ -139,6 +365,23 @@ export default function Employees() {
     setAddOpen(true);
   };
 
+  const handleRegisterPhoto = async (empId: string) => {
+    const photoUrl = prompt('Insira a URL da foto de referência (ou simule o upload):');
+    if (!photoUrl) return;
+    
+    const { error } = await supabase
+      .from('employees')
+      .update({ photo_reference_url: photoUrl })
+      .eq('id', empId);
+
+    if (error) {
+      toast({ title: 'Erro ao salvar foto', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Foto de referência cadastrada!' });
+      setEmployees(prev => prev.map(e => e.id === empId ? { ...e, photo_reference_url: photoUrl } : e));
+    }
+  };
+
   const handleNextStep = () => {
     if (addStep === 1) {
       if (!form.name || !form.cpf || !form.storeId) {
@@ -155,15 +398,43 @@ export default function Employees() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const store = MOCK_STORES.find(s => s.id === form.storeId) || MOCK_STORES[0];
     
+    const dbData = {
+      name: form.name,
+      cpf: form.cpf,
+      gender: form.gender,
+      birth_date: form.birthDate,
+      admission_date: form.admissionDate,
+      department: form.department,
+      role: form.role,
+      status: form.status,
+      salary: Number(form.salary || 0),
+      tenant_id: 't1',
+      store_id: form.storeId,
+      cbo: form.cbo,
+      conta_itau: form.contaItau,
+      insalubridade: Number(form.insalubridade || 0),
+      periculosidade: Number(form.periculosidade || 0),
+      gratificacao: Number(form.gratificacao || 0),
+      vale_transporte: Number(form.valeTransporte || 0),
+      vale_refeicao: Number(form.valeRefeicao || 0),
+      flexivel: Number(form.flexivel || 0),
+      mobilidade: Number(form.mobilidade || 0),
+      vale_flexivel: Number(form.valeFlexivel || 0),
+    };
+
     if (editingId) {
-      setEmployees(prev => prev.map(e => e.id === editingId ? {
-        ...e,
-          ...form,
-          storeName: store.name,
-        } as Employee : e));
+      const { error } = await supabase
+        .from('employees')
+        .update(dbData)
+        .eq('id', editingId);
+
+      if (error) {
+        toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+        return;
+      }
 
       addAuditLog({
         userId: currentUser?.id || 'unknown',
@@ -173,54 +444,16 @@ export default function Employees() {
         tenantId: store.tenantId
       });
 
-      // Update benefits for existing employee
-      // 1. Remove old
-      const otherBenefits = MOCK_EMPLOYEE_BENEFITS.filter(eb => eb.employeeId !== editingId);
-      MOCK_EMPLOYEE_BENEFITS.length = 0;
-      MOCK_EMPLOYEE_BENEFITS.push(...otherBenefits);
-      
-      // 2. Add new
-      Object.entries(selectedBenefits).forEach(([benefitId, active]) => {
-        if (active) {
-          MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${editingId}_${benefitId}`, employeeId: editingId, benefitId });
-        }
-      });
-
       toast({ title: 'Funcionário atualizado com sucesso!' });
     } else {
-      const newEmp: Employee = {
-        id: `e_${Date.now()}`,
-        tenantId: 't1',
-        storeId: store.id,
-        storeName: store.name,
-        name: form.name as string,
-        cpf: form.cpf as string,
-        gender: form.gender as 'M' | 'F' | 'OTHER',
-        birthDate: form.birthDate || '',
-        admissionDate: form.admissionDate || '',
-        department: form.department || '',
-        role: form.role || '',
-        status: form.status as 'ACTIVE' | 'INACTIVE',
-        salary: Number(form.salary) || 0,
-        cbo: form.cbo || '',
-        contaItau: form.contaItau || '',
-        insalubridade: Number(form.insalubridade) || 0,
-        periculosidade: Number(form.periculosidade) || 0,
-        gratificacao: Number(form.gratificacao) || 0,
-        valeTransporte: Number(form.valeTransporte) || 0,
-        valeRefeicao: Number(form.valeRefeicao) || 0,
-        flexivel: Number(form.flexivel) || 0,
-        mobilidade: Number(form.mobilidade) || 0,
-        valeFlexivel: Number(form.valeFlexivel) || 0,
-        customFields: {},
-      };
-      
-      // Save chosen benefits
-      Object.entries(selectedBenefits).forEach(([benefitId, active]) => {
-        if (active) {
-          MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${newEmp.id}_${benefitId}`, employeeId: newEmp.id, benefitId });
-        }
-      });
+      const { error } = await supabase
+        .from('employees')
+        .insert([dbData]);
+
+      if (error) {
+        toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
+        return;
+      }
       
       addAuditLog({
         userId: currentUser?.id || 'unknown',
@@ -230,7 +463,6 @@ export default function Employees() {
         tenantId: store.tenantId
       });
 
-      setEmployees(prev => [newEmp, ...prev]);
       toast({ title: 'Funcionário cadastrado com sucesso!' });
     }
     
@@ -254,7 +486,7 @@ export default function Employees() {
   };
 
   const handleDeleteSelected = () => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.length} funcionário(s)?`)) return;
     setEmployees(prev => prev.filter(e => !selectedIds.includes(e.id)));
@@ -270,16 +502,27 @@ export default function Employees() {
     toast({ title: 'Exclusão concluída', description: `${selectedIds.length} funcionário(s) removido(s) com sucesso.` });
   };
 
-  const handleDeleteOne = (id: string, name: string) => {
-    if (!isCristiano) return;
+  const handleDeleteOne = async (id: string, name: string) => {
+    if (!isAdmin) return;
     if (!window.confirm(`Deseja excluir o colaborador ${name}?`)) return;
-    setEmployees(prev => prev.filter(e => e.id !== id));
+    
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
       action: 'DELETE_EMPLOYEE',
       details: `[Employees] Excluiu funcionário ${name}`
     });
+    
     setSelectedIds(prev => prev.filter(x => x !== id));
     toast({ title: 'Funcionário excluído' });
   };
@@ -292,7 +535,7 @@ export default function Employees() {
           <p className="text-[13px] text-muted-foreground mt-1">Cadastro e controle de colaboradores, benefícios e custos.</p>
         </div>
         <div className="flex gap-2.5">
-          {isCristiano && selectedIds.length > 0 && (
+          {isAdmin && selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" className="h-9 gap-1.5" onClick={handleDeleteSelected}>
               Excluir ({selectedIds.length})
             </Button>
@@ -300,10 +543,14 @@ export default function Employees() {
           <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportExcel}>
             <Download className="w-4 h-4" /> Exportar Planilha
           </Button>
-          <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if(!v) { setAddStep(1); setEditingId(null); setForm({status: 'ACTIVE', gender: 'M', salary: 0}); setSelectedBenefits({}) } }}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-9 gap-1.5"><Plus className="w-4 h-4" /> Novo Funcionário</Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setImportOpen(true)}>
+              <Upload className="w-4 h-4" /> Importar
+            </Button>
+            <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if(!v) { setAddStep(1); setEditingId(null); setForm({status: 'ACTIVE', gender: 'M', salary: 0}); setSelectedBenefits({}) } }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-9 gap-1.5"><Plus className="w-4 h-4" /> Novo Funcionário</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-xl">
               <DialogHeader>
                 <DialogTitle className="text-base">{editingId ? 'Editar Funcionário' : 'Cadastrar Funcionário'}</DialogTitle>
@@ -325,7 +572,7 @@ export default function Employees() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">Nome Completo *</Label>
-                      <Input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="h-9" />
+                      <Input value={form.name || ''} onChange={e => setForm(f => ({...f, name: e.target.value.toUpperCase()}))} className="h-9" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">CPF *</Label>
@@ -366,7 +613,7 @@ export default function Employees() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">Setor / Departamento</Label>
-                      <Input value={form.department || ''} onChange={e => setForm(f => ({...f, department: e.target.value}))} className="h-9" />
+                      <Input value={form.department || ''} onChange={e => setForm(f => ({...f, department: e.target.value.toUpperCase()}))} className="h-9" />
                     </div>
                   </div>
 
@@ -382,14 +629,14 @@ export default function Employees() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">CBO</Label>
-                      <Input value={form.cbo || ''} onChange={e => setForm(f => ({...f, cbo: e.target.value}))} className="h-9" />
+                      <Input value={form.cbo || ''} onChange={e => setForm(f => ({...f, cbo: e.target.value.toUpperCase()}))} className="h-9" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">Conta Itaú</Label>
-                      <Input value={form.contaItau || ''} onChange={e => setForm(f => ({...f, contaItau: e.target.value}))} placeholder="Ag/Conta" className="h-9" />
+                      <Input value={form.contaItau || ''} onChange={e => setForm(f => ({...f, contaItau: e.target.value.toUpperCase()}))} placeholder="Ag/Conta" className="h-9" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[12px] text-muted-foreground">Salário Base (R$)</Label>
@@ -495,6 +742,7 @@ export default function Employees() {
           </Dialog>
         </div>
       </div>
+    </div>
 
       {/* Dashboard KPI's */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -549,6 +797,24 @@ export default function Employees() {
             <SelectItem value="INACTIVE">Inativos</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="w-px h-8 bg-white/10 mx-1" />
+
+        <Select value={`${sortBy}-${sortOrder}`} onValueChange={v => {
+          const [field, order] = v.split('-');
+          setSortBy(field);
+          setSortOrder(order as 'asc' | 'desc');
+        }}>
+          <SelectTrigger className="w-[180px] h-10 bg-white/5 border-white/10 rounded-xl">
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent className="glass-card border-white/10 text-white">
+            <SelectItem value="name-asc">Nome (A-Z)</SelectItem>
+            <SelectItem value="name-desc">Nome (Z-A)</SelectItem>
+            <SelectItem value="admission_date-asc">Admissão (Antigos)</SelectItem>
+            <SelectItem value="admission_date-desc">Admissão (Novos)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Modern Data Table */}
@@ -596,12 +862,15 @@ export default function Employees() {
                       />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-[11px] group-hover:scale-110 transition-transform">
+                      <div 
+                        className="flex items-center gap-4 cursor-pointer group/name"
+                        onClick={() => handleOpenEdit(emp)}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-[11px] group-hover/name:scale-110 transition-transform">
                           {emp.name.charAt(0)}{emp.name.split(' ')[1]?.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{emp.name}</p>
+                          <p className="text-[13px] font-bold text-white group-hover/name:text-primary transition-colors">{emp.name}</p>
                           <p className="text-[10px] text-muted-foreground font-mono-data tracking-tighter mt-0.5">{emp.cpf}</p>
                         </div>
                       </div>
@@ -632,10 +901,13 @@ export default function Employees() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="icon" className={cn("h-9 w-9 rounded-xl transition-colors", emp.photo_reference_url ? "text-emerald-500 hover:bg-emerald-500/10" : "text-white/20 hover:text-primary hover:bg-primary/10")} onClick={() => handleRegisterPhoto(emp.id)} title="Biometria Facial">
+                          <Camera className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-white/40 hover:text-white hover:bg-white/10" onClick={() => handleOpenEdit(emp)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
-                        {isCristiano && (
+                        {isAdmin && (
                           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(emp.id, emp.name)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -661,6 +933,101 @@ export default function Employees() {
           </div>
         )}
       </div>
+
+      {/* ===== MODAL DE IMPORTAÇÃO ===== */}
+      <Dialog open={importOpen} onOpenChange={(v) => { setImportOpen(v); if (!v) { setImportRows([]); setImportErrors([]); setImportStoreId(''); if (fileInputRef.current) fileInputRef.current.value = ''; } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+              Importar Funcionários por Planilha
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">1. Loja de Destino</Label>
+              <Select value={importStoreId} onValueChange={setImportStoreId}>
+                <SelectTrigger className="h-10 bg-white/5 border-white/10">
+                  <SelectValue placeholder="Selecione a loja..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">2. Arquivo de Planilha</Label>
+              <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-emerald-500/40 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-[13px] font-medium text-muted-foreground">Clique para selecionar <span className="text-white">.xlsx</span> ou <span className="text-white">.xls</span></p>
+                {importRows.length > 0 && <p className="text-[12px] text-emerald-400 font-bold mt-2">✓ {importRows.length} linhas carregadas</p>}
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+              </div>
+              <Button variant="ghost" size="sm" className="text-[11px] text-muted-foreground hover:text-white gap-1.5" onClick={downloadTemplate}>
+                <Download className="w-3.5 h-3.5" /> Baixar modelo de planilha
+              </Button>
+            </div>
+
+            {importErrors.length > 0 && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <p className="text-[12px] font-bold text-rose-400 flex items-center gap-2 mb-2"><AlertCircle className="w-4 h-4" /> {importErrors.length} erro(s):</p>
+                <ul className="space-y-1 max-h-32 overflow-y-auto">
+                  {importErrors.map((e, i) => <li key={i} className="text-[11px] text-rose-300 font-mono">{e}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {importRows.length > 0 && importStoreId && (
+              <div className="space-y-2">
+                <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">3. Prévia — {importRows.length} funcionários</Label>
+                <div className="rounded-xl border border-white/10 overflow-hidden max-h-[280px] overflow-y-auto">
+                  <table className="w-full text-left text-[12px]">
+                    <thead className="bg-white/5 sticky top-0">
+                      <tr className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                        <th className="px-4 py-2">#</th>
+                        <th className="px-4 py-2">Nome</th>
+                        <th className="px-4 py-2">CPF</th>
+                        <th className="px-4 py-2 text-right">Salário</th>
+                        <th className="px-4 py-2">Cargo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {importRows.map((row, i) => {
+                        const store = MOCK_STORES.find(s => s.id === importStoreId)!;
+                        const r = mapRow(row, store);
+                        const hasError = !r.name || r.cpf.length < 11;
+                        return (
+                          <tr key={i} className={cn('hover:bg-white/[0.02]', hasError && 'bg-rose-500/5')}>
+                            <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
+                            <td className="px-4 py-2 font-medium text-white">{r.name || <span className="text-rose-400">—</span>}</td>
+                            <td className="px-4 py-2 font-mono text-muted-foreground text-[11px]">{r.cpf || <span className="text-rose-400">inválido</span>}</td>
+                            <td className="px-4 py-2 text-muted-foreground truncate max-w-[120px]">{r.role || '—'}</td>
+                            <td className="px-4 py-2 text-primary font-bold">R$ {Number(r.salary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td className="px-4 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {r.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-white/5 pt-4 gap-2">
+            <Button variant="ghost" onClick={() => setImportOpen(false)}>Cancelar</Button>
+            <Button onClick={handleImport} disabled={importLoading || importRows.length === 0 || !importStoreId} className="bg-emerald-600 hover:bg-emerald-700 font-bold gap-2">
+              {importLoading ? 'Importando...' : <><Upload className="w-4 h-4" /> Confirmar Importação ({importRows.length})</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

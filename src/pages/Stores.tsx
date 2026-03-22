@@ -17,7 +17,7 @@ export default function Stores() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   const [form, setForm] = useState({ name: '', cnpj: '', tenantId: MOCK_TENANTS[0]?.id || '' });
 
@@ -49,7 +49,7 @@ export default function Stores() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     if (!window.confirm(`Deseja excluir a unidade ${name}?`)) return;
     setStores(prev => prev.filter(s => s.id !== id));
     addAuditLog({
@@ -127,7 +127,7 @@ export default function Stores() {
                   <p className="text-[15px] font-black text-white truncate drop-shadow-sm group-hover:text-primary transition-colors" title={store.name}>{store.name}</p>
                   <p className="text-[10px] font-mono-data text-muted-foreground tracking-tighter mt-1">{store.cnpj}</p>
                 </div>
-                {isCristiano && (
+                {isAdmin && (
                   <Button 
                     variant="ghost" 
                     size="icon" 

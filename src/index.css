@@ -149,4 +149,13 @@
   .stagger-4 { animation-delay: 120ms; }
   .stagger-5 { animation-delay: 160ms; }
   .stagger-6 { animation-delay: 200ms; }
+
+  @keyframes scan {
+    0%, 100% { top: 0%; }
+    50% { top: 100%; }
+  }
+
+  .mirror {
+    transform: scaleX(-1);
+  }
 }

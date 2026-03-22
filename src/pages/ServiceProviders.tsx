@@ -17,7 +17,7 @@ export default function ServiceProviders() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   const [form, setForm] = useState({
     name: '',
@@ -144,7 +144,7 @@ export default function ServiceProviders() {
   };
 
   const handleDeleteProvider = (id: string, name: string) => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     if (!window.confirm(`Tem certeza que deseja excluir o prestador ${name}?`)) return;
     const provider = providers.find(p => p.id === id);
     setProviders(prev => prev.filter(p => p.id !== id));
@@ -367,7 +367,7 @@ export default function ServiceProviders() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/40 hover:text-white hover:bg-white/10" onClick={() => handleOpenEdit(p)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
-                        {isCristiano && (
+                        {isAdmin && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-rose-500/40 hover:text-rose-400 hover:bg-rose-500/10" onClick={() => handleDeleteProvider(p.id, p.name)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>

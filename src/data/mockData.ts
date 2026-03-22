@@ -1,4 +1,5 @@
 import { Tenant, Store, Employee, Certificate, Benefit, EmployeeBenefit, User, ServiceProvider, AuditLog, Rescission } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 export const MOCK_STORES: Store[] = [
   { id: 's1', name: 'SUPER ATACADO ANTARES', cnpj: '38.313.674/0001-19', tenantId: 't1' },
@@ -136,52 +137,9 @@ function randomCPF() {
   return `${n()}${n()}${n()}.${n()}${n()}${n()}.${n()}${n()}${n()}-${n()}${n()}`;
 }
 
-export const MOCK_EMPLOYEES: Employee[] = Array.from({ length: 48 }, (_, i) => {
-  const store = MOCK_STORES[i % MOCK_STORES.length];
-  const gender = Math.random() > 0.45 ? 'M' as const : 'F' as const;
-  const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
-  const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
-  return {
-    id: `e${i + 1}`,
-    tenantId: 't1',
-    storeId: store.id,
-    storeName: store.name,
-    name: `${fn} ${ln}`,
-    cpf: randomCPF(),
-    gender,
-    birthDate: `19${80 + Math.floor(Math.random() * 20)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    admissionDate: `202${Math.floor(Math.random() * 4)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    department: departments[Math.floor(Math.random() * departments.length)],
-    role: ROLES[Math.floor(Math.random() * ROLES.length)],
-    status: Math.random() > 0.1 ? 'ACTIVE' : 'INACTIVE',
-    salary: 1500 + Math.floor(Math.random() * 3500),
-    cbo: '4211-25',
-    contaItau: '00000-0',
-    insalubridade: Math.random() > 0.5 ? 260.40 : 0,
-    periculosidade: Math.random() > 0.8 ? (1500 + Math.floor(Math.random() * 3500)) * 0.3 : 0,
-    gratificacao: Math.floor(Math.random() * 500),
-    valeTransporte: 250,
-    valeRefeicao: 450,
-    flexivel: Math.floor(Math.random() * 200),
-    mobilidade: Math.floor(Math.random() * 100),
-    valeFlexivel: Math.floor(Math.random() * 150),
-    customFields: {},
-  };
-});
+export const MOCK_EMPLOYEES: Employee[] = [];
 
-const cids = ['J06', 'M54', 'K29', 'R10', 'S62', 'J11', 'G43', 'F32', 'K59', 'M79'];
-
-export const MOCK_CERTIFICATES: Certificate[] = Array.from({ length: 18 }, (_, i) => {
-  const emp = MOCK_EMPLOYEES[Math.floor(Math.random() * MOCK_EMPLOYEES.length)];
-  return {
-    id: `c${i + 1}`,
-    employeeId: emp.id,
-    employeeName: emp.name,
-    date: `2026-${String(Math.floor(Math.random() * 3) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    cid: cids[Math.floor(Math.random() * cids.length)],
-    days: Math.floor(Math.random() * 5) + 1,
-  };
-});
+export const MOCK_CERTIFICATES: Certificate[] = [];
 
 export const MOCK_USERS: User[] = [
   { id: 'u1', name: 'Administrador TI', email: 'admin@superatacado.com', role: 'superadmin' },
@@ -206,19 +164,6 @@ export const MOCK_BENEFITS: Benefit[] = [
 ];
 
 export const MOCK_EMPLOYEE_BENEFITS: EmployeeBenefit[] = [];
-
-// Generate random benefits for employees
-MOCK_EMPLOYEES.forEach(emp => {
-  if (Math.random() > 0.2) {
-    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b1`, employeeId: emp.id, benefitId: 'b1' });
-  }
-  if (Math.random() > 0.1) {
-    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b2`, employeeId: emp.id, benefitId: 'b2' });
-  }
-  if (emp.role === 'Açougueiro') {
-    MOCK_EMPLOYEE_BENEFITS.push({ id: `eb_${emp.id}_b3`, employeeId: emp.id, benefitId: 'b3' });
-  }
-});
 
 export const MOCK_SERVICE_PROVIDERS: ServiceProvider[] = [
   {
@@ -260,13 +205,19 @@ export const getAuditLogs = (): AuditLog[] => {
   return logs ? JSON.parse(logs) : [];
 };
 
-export const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp'>) => {
-  const logs = getAuditLogs();
-  const newLog: AuditLog = {
-    ...log,
-    id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    timestamp: new Date().toISOString(),
-  };
-  localStorage.setItem('audit_logs', JSON.stringify([newLog, ...logs]));
+export const addAuditLog = async (log: Omit<AuditLog, 'id' | 'timestamp'>) => {
+  const { error } = await supabase
+    .from('audit_logs')
+    .insert([{
+      user_id: log.userId,
+      user_name: log.userName,
+      action: log.action,
+      details: log.details,
+      tenant_id: log.tenantId
+    }]);
+
+  if (error) {
+    console.error('Error adding audit log:', error);
+  }
 };
 

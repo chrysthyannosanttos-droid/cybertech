@@ -16,6 +16,10 @@ import ServiceProviders from "@/pages/ServiceProviders";
 import Rescissions from "@/pages/Rescissions";
 import Settings from "@/pages/Settings";
 import AuditLogs from "@/pages/AuditLogs";
+import UserManagement from "@/pages/UserManagement";
+import PointTracking from "@/pages/PointTracking";
+import Holerites from "@/pages/Holerites";
+import EmailSettings from "@/pages/EmailSettings";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,7 +48,11 @@ function AppRoutes() {
         <Route path="/service-providers" element={<ServiceProviders />} />
         <Route path="/rescissions" element={<Rescissions />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/email" element={<EmailSettings />} />
         <Route path="/logs" element={<AuditLogs />} />
+        <Route path="/users" element={<UserManagement />} />
+        <Route path="/ponto" element={<PointTracking />} />
+        <Route path="/holerites" element={<Holerites />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

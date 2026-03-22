@@ -1,6 +1,6 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, AppModule } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Building2,
@@ -14,37 +14,52 @@ import {
   History,
   UserMinus,
   Settings,
+  UserCog,
+  Clock,
+  FileText,
+  Mail,
 } from 'lucide-react';
 
-const superAdminLinks = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/tenants', icon: Building2, label: 'Empresas' },
-];
-
-const tenantLinks = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/stores', icon: Store, label: 'Lojas' },
-  { to: '/employees', icon: Users, label: 'Funcionários' },
-  { to: '/certificates', icon: FileHeart, label: 'Atestados' },
-  { to: '/payroll', icon: DollarSign, label: 'Folha' },
-  { to: '/reports', icon: BarChart3, label: 'Relatórios' },
-  { to: '/service-providers', icon: Briefcase, label: 'Prestadores' },
-  { to: '/rescissions', icon: UserMinus, label: 'Rescisões' },
+const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentType<{ className?: string }>; label: string; superadminOnly?: boolean }> = [
+  { to: '/dashboard',         module: 'dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/tenants',           module: 'tenants',           icon: Building2,       label: 'Empresas',     superadminOnly: true },
+  { to: '/stores',            module: 'stores',            icon: Store,           label: 'Lojas' },
+  { to: '/employees',         module: 'employees',         icon: Users,           label: 'Funcionários' },
+  { to: '/certificates',      module: 'certificates',      icon: FileHeart,       label: 'Atestados' },
+  { to: '/payroll',           module: 'payroll',           icon: DollarSign,      label: 'Folha' },
+  { to: '/reports',           module: 'reports',           icon: BarChart3,       label: 'Relatórios' },
+  { to: '/service-providers', module: 'service-providers', icon: Briefcase,       label: 'Prestadores' },
+  { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
+  { to: '/logs',              module: 'logs',              icon: History,         label: 'Audit Logs',   superadminOnly: true },
+  { to: '/ponto',             module: 'dashboard',         icon: Clock,           label: 'Ponto Digital' },
+  { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
+  { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
+  { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
 ];
 
 export default function AppSidebar() {
-  const { user, logout } = useAuth();
-  
-  const isCristiano = user?.email === 'cristiano' || user?.name?.toLowerCase() === 'cristiano';
+  const { user, logout, currentPermissions, isEmployeeView } = useAuth();
 
-  const baseLinks = user?.role === 'superadmin' ? [...superAdminLinks, ...tenantLinks.slice(1)] : tenantLinks;
-  
-  const links = isCristiano 
-    ? [...baseLinks, 
-        { to: '/logs', icon: History, label: 'Audit Logs' },
-        { to: '/settings', icon: Settings, label: 'Configurações' }
-      ]
-    : baseLinks;
+  const isCristiano = user?.email === 'cristiano' || user?.name?.toLowerCase() === 'cristiano';
+  const isSuperAdmin = user?.role === 'superadmin';
+
+  const links = ALL_LINKS.filter(link => {
+    // Se visão de colaborador estiver ativa, mostrar apenas Ponto e Holerites
+    if (user?.email === 'teste' && isEmployeeView) {
+      return ['/ponto', '/holerites', '/dashboard'].includes(link.to);
+    }
+
+    // Cristiano não vê dados de funcionários/folha/etc
+    if (isCristiano && ['employees', 'certificates', 'payroll', 'rescissions'].includes(link.module)) {
+      return false;
+    }
+    // Links exclusivos de superadmin só aparecem para cristiano/superadmin
+    if (link.superadminOnly && !isSuperAdmin) return false;
+    // Se cristiano ou superadmin: acesso total
+    if (isCristiano || currentPermissions === undefined) return true;
+    // Para outros: verificar permissões
+    return currentPermissions.includes(link.module);
+  });
 
   return (
     <aside className="relative flex flex-col w-[240px] min-h-screen glass border-r border-white/5 shadow-2xl z-50">
@@ -61,7 +76,9 @@ export default function AppSidebar() {
       {/* Role badge */}
       <div className="px-5 py-3">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          {user?.role === 'superadmin' ? 'Super Admin' : 'Empresa'}
+          {user?.email === 'teste' 
+            ? (isEmployeeView ? '👤 Colaborador (Teste)' : '⚡ Ambiente de Teste') 
+            : user?.role === 'superadmin' ? 'Super Admin' : 'Empresa'}
         </span>
       </div>
 
@@ -100,9 +117,9 @@ export default function AppSidebar() {
             <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={logout}
           className="w-full justify-start gap-2.5 h-9 text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 text-[13px] font-medium"
         >

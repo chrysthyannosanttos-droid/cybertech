@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { MOCK_TENANTS, MOCK_STORES, MOCK_USERS, addAuditLog, getAuditLogs } from '@/data/mockData';
 import { Tenant, Store as StoreType, User, AuditLog } from '@/types';
-import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X } from 'lucide-react';
+import { useAuth, AppModule, ManagedUser } from '@/contexts/AuthContext';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -26,15 +28,10 @@ function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
 export default function Tenants() {
   const [tenants, setTenants] = useState(MOCK_TENANTS);
   const [stores, setStores] = useState(MOCK_STORES);
-  const [users, setUsers] = useState(MOCK_USERS);
   
-  const [search, setSearch] = useState('');
-  const [open, setOpen] = useState(false);
-  const [editTenantId, setEditTenantId] = useState<string | null>(null);
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const { toast } = useToast();
-  const { user: currentUser } = useAuth();
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const { user: currentUser, getAllUsers, saveUser, deleteUser } = useAuth();
+  const [managedUsers, setManagedUsers] = useState(() => getAllUsers());
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   const [showLogs, setShowLogs] = useState(false);
 
   const [form, setForm] = useState({ name: '', cnpj: '', monthlyFee: '', startDate: '', expiryDate: '' });
@@ -43,7 +40,28 @@ export default function Tenants() {
   const [addStoreOpen, setAddStoreOpen] = useState(false);
   const [storeForm, setStoreForm] = useState({ name: '', cnpj: '' });
   const [addUserOpen, setAddUserOpen] = useState(false);
-  const [userForm, setUserForm] = useState({ name: '', email: '' });
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [showUserPassword, setShowUserPassword] = useState(false);
+  const [userForm, setUserForm] = useState({ 
+    name: '', 
+    email: '', 
+    password: '123',
+    appPermissions: { 'ponto': true } as Record<string, boolean>
+  });
+  
+  const MODULE_OPTIONS: Array<{ module: AppModule; label: string; description: string }> = [
+    { module: 'dashboard',         label: 'Dashboard',      description: 'Visão geral e indicadores' },
+    { module: 'employees',         label: 'Funcionários',   description: 'Cadastro e gestão de colaboradores' },
+    { module: 'certificates',      label: 'Atestados',      description: 'Controle de atestados médicos' },
+    { module: 'payroll',           label: 'Folha',          description: 'Folha de pagamento e cálculos' },
+    { module: 'reports',           label: 'Relatórios',     description: 'Relatórios e análises' },
+    { module: 'service-providers', label: 'Prestadores',    description: 'Controle de prestadores de serviço' },
+    { module: 'rescissions',       label: 'Rescisões',      description: 'Registro de rescisões contratuais' },
+    { module: 'stores',            label: 'Lojas',          description: 'Gestão de unidades/lojas' },
+  ];
+
+  const DEFAULT_PERMISSIONS: AppModule[] = MODULE_OPTIONS.map(m => m.module);
+  const [selectedUserPermissions, setSelectedUserPermissions] = useState<AppModule[]>(DEFAULT_PERMISSIONS);
 
   const filtered = tenants.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.cnpj.includes(search)
@@ -120,7 +138,7 @@ export default function Tenants() {
   };
 
   const handleDeleteTenant = (id: string, name: string) => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     if (!window.confirm(`ATENÇÃO: Deseja excluir permanentemente a empresa ${name} e todos os seus dados?`)) return;
     setTenants(prev => prev.filter(t => t.id !== id));
     addAuditLog({
@@ -165,22 +183,71 @@ export default function Tenants() {
 
   const handleAddUser = () => {
     if (!selectedTenant || !userForm.name || !userForm.email) return;
-    const newUser: User = {
-      id: `u_${Date.now()}`,
-      tenantId: selectedTenant.id,
-      name: userForm.name,
+    
+    const isNew = !editingEmail;
+    const currentAllUsers = getAllUsers();
+    
+    if (isNew && currentAllUsers.find(u => u.email === userForm.email)) {
+      toast({ title: 'Usuário já existe', description: `O login "${userForm.email}" já está em uso.`, variant: 'destructive' });
+      return;
+    }
+
+    const userId = editingEmail 
+      ? currentAllUsers.find(u => u.email === editingEmail)?.user.id || `u_${Date.now()}`
+      : `u_${Date.now()}`;
+
+    const existingRecord = editingEmail ? currentAllUsers.find(u => u.email === editingEmail) : undefined;
+    const passwordToSave = (editingEmail && !userForm.password) ? (existingRecord?.password || '123') : userForm.password;
+
+    const newUserData: ManagedUser = {
       email: userForm.email,
-      role: 'tenant',
+      password: passwordToSave,
+      mustChangePassword: isNew ? true : existingRecord?.mustChangePassword,
+      permissions: selectedUserPermissions,
+      appPermissions: userForm.appPermissions,
+      user: {
+        id: userId,
+        email: userForm.email,
+        name: userForm.name,
+        role: 'tenant',
+        tenantId: selectedTenant.id,
+      },
     };
-    setUsers(prev => [...prev, newUser]);
-    setUserForm({ name: '', email: '' });
+
+    saveUser(newUserData);
+    setManagedUsers(getAllUsers());
+    
+    setUserForm({ name: '', email: '', password: '123', appPermissions: { 'ponto': true } });
+    setSelectedUserPermissions(DEFAULT_PERMISSIONS);
     setAddUserOpen(false);
-    toast({ title: 'Usuário cadastrado', description: `${userForm.name} adicionado com sucesso.` });
+    setEditingEmail(null);
+    toast({ title: isNew ? 'Usuário cadastrado' : 'Usuário atualizado' });
+  };
+
+  const handleEditUser = (u: ManagedUser) => {
+    setEditingEmail(u.email);
+    setUserForm({
+      name: u.user.name,
+      email: u.email,
+      password: '',
+      appPermissions: u.appPermissions || { 'ponto': true }
+    });
+    setSelectedUserPermissions(u.permissions ?? DEFAULT_PERMISSIONS);
+    setAddUserOpen(true);
+  };
+
+  const handleDeleteUser = (email: string, name: string) => {
+    if (email === 'cristiano') return;
+    if (!window.confirm(`Deseja excluir permanentemente o acesso de "${name}"?`)) return;
+    
+    deleteUser(email);
+    setManagedUsers(getAllUsers());
+    toast({ title: 'Usuário removido' });
   };
 
   if (selectedTenant) {
     const tenantStores = stores.filter(s => s.tenantId === selectedTenant.id);
-    const tenantUsers = users.filter(u => u.tenantId === selectedTenant.id);
+    const tenantUsers = managedUsers.filter(u => u.user.tenantId === selectedTenant.id && u.user.role === 'tenant');
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -198,7 +265,7 @@ export default function Tenants() {
           <TabsList className="mb-4">
             <TabsTrigger value="stores" className="gap-2 text-[13px]"><StoreIcon className="w-4 h-4" /> Lojas da Rede</TabsTrigger>
             <TabsTrigger value="users" className="gap-2 text-[13px]"><Users className="w-4 h-4" /> Usuários Administrativos</TabsTrigger>
-            {isCristiano && (
+            {isAdmin && (
               <TabsTrigger value="logs" className="gap-2 text-[13px]"><History className="w-4 h-4" /> Logs de Auditoria</TabsTrigger>
             )}
           </TabsList>
@@ -259,28 +326,87 @@ export default function Tenants() {
 
           <TabsContent value="users" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+              <Dialog open={addUserOpen} onOpenChange={(v) => { setAddUserOpen(v); if(!v) setEditingEmail(null); }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 gap-1.5"><Plus className="w-3.5 h-3.5" /> Novo Usuário</Button>
+                  <Button size="sm" className="h-8 gap-1.5" onClick={() => {
+                    setEditingEmail(null);
+                    setUserForm({ name: '', email: '', password: '123', appPermissions: { 'ponto': true } });
+                    setSelectedUserPermissions(DEFAULT_PERMISSIONS);
+                  }}>
+                    <Plus className="w-3.5 h-3.5" /> Novo Usuário
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle className="text-[15px]">Criar Acesso: {selectedTenant.name}</DialogTitle>
+                    <DialogTitle className="text-[15px]">{editingEmail ? 'Editar Acesso' : 'Criar Acesso'}: {selectedTenant.name}</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4 py-2 mt-2">
+                  <div className="space-y-4 py-2 mt-2 max-h-[70vh] overflow-y-auto pr-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-muted-foreground">Nome do Usuário *</label>
+                        <Input value={userForm.name} onChange={e => setUserForm(f => ({ ...f, name: e.target.value }))} className="h-9 text-[13px]" placeholder="Ex: Roberto Carlos" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[12px] font-medium text-muted-foreground">Login (E-mail) *</label>
+                        <Input type="email" value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value.toLowerCase().trim() }))} className="h-9 text-[13px]" placeholder="email@empresa.com.br" disabled={!!editingEmail} />
+                      </div>
+                    </div>
+
                     <div className="space-y-1.5">
-                      <label className="text-[12px] font-medium text-muted-foreground">Nome do Usuário *</label>
-                      <Input value={userForm.name} onChange={e => setUserForm(f => ({ ...f, name: e.target.value }))} className="h-9 text-[13px]" placeholder="Ex: Roberto Carlos" />
+                      <label className="text-[12px] font-medium text-muted-foreground">{editingEmail ? 'Nova Senha (vazio p/ manter)' : 'Senha Inicial *'}</label>
+                      <div className="relative">
+                        <Input type={showUserPassword ? 'text' : 'password'} value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))} className="h-9 text-[13px] pr-10" />
+                        <button type="button" onClick={() => setShowUserPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+                          {showUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[12px] font-medium text-muted-foreground">E-mail de Acesso *</label>
-                      <Input type="email" value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))} className="h-9 text-[13px]" placeholder="email@empresa.com.br" />
+
+                    <div className="pt-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[13px] font-bold text-white">Módulos de Acesso</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => setSelectedUserPermissions(DEFAULT_PERMISSIONS)} className="text-[11px] text-primary hover:underline">Todos</button>
+                          <span className="text-muted-foreground">|</span>
+                          <button onClick={() => setSelectedUserPermissions([])} className="text-[11px] text-rose-400 hover:underline">Limpar</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {MODULE_OPTIONS.map(({ module, label, description }) => (
+                          <div
+                            key={module}
+                            onClick={() => setSelectedUserPermissions(prev => prev.includes(module) ? prev.filter(p => p !== module) : [...prev, module])}
+                            className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                              selectedUserPermissions.includes(module)
+                                ? 'bg-primary/10 border-primary/30 text-white'
+                                : 'bg-white/3 border-white/10 text-muted-foreground hover:border-white/20'
+                            }`}
+                          >
+                            <div>
+                              <p className="text-[12px] font-bold">{label}</p>
+                              <p className="text-[10px] opacity-60">{description}</p>
+                            </div>
+                            <Switch checked={selectedUserPermissions.includes(module)} onCheckedChange={() => {}} onClick={e => e.stopPropagation()} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded border border-primary/20 bg-primary/5 p-3 flex gap-3 text-primary mt-4 text-[12px]">
-                      <Key className="w-4 h-4 shrink-0 mt-0.5" />
-                      <p>O usuário receberá um e-mail com instruções para redefinição de senha e acesso aos dados desta empresa.</p>
+
+                    <div className="pt-4 border-t border-white/10">
+                      <label className="text-[13px] font-bold text-white mb-3 block">Liberação de Aplicativos</label>
+                      <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-between cursor-pointer" onClick={() => setUserForm(f => ({ ...f, appPermissions: { ...f.appPermissions, 'ponto': !f.appPermissions['ponto'] } }))}>
+                        <div>
+                          <p className="text-[12px] font-bold">App Ponto Digital</p>
+                          <p className="text-[10px] text-muted-foreground">Acesso para batida de ponto via mobile/tablet</p>
+                        </div>
+                        <Switch checked={!!userForm.appPermissions['ponto']} onCheckedChange={() => {}} />
+                      </div>
                     </div>
-                    <Button onClick={handleAddUser} className="w-full h-9 text-[13px] mt-2">Salvar Usuário</Button>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="ghost" onClick={() => { setAddUserOpen(false); setEditingEmail(null); }} className="flex-1 h-10"><X className="w-4 h-4 mr-1" /> Cancelar</Button>
+                      <Button onClick={handleAddUser} className="flex-1 h-10"><Save className="w-4 h-4 mr-1" /> {editingEmail ? 'Salvar' : 'Criar Usuário'}</Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -291,28 +417,49 @@ export default function Tenants() {
                 <thead>
                   <tr className="border-b border-white/5 bg-white/5">
                     <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">Usuário</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">E-mail</th>
-                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">Nível de Acesso</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">Login / E-mail</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest text-center">Permissões</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tenantUsers.length === 0 ? (
-                    <tr><td colSpan={3} className="px-6 py-12 text-center text-[13px] text-muted-foreground">Nenhum usuário criado para esta empresa.</td></tr>
+                    <tr><td colSpan={4} className="px-6 py-12 text-center text-[13px] text-muted-foreground">Nenhum usuário administrativo cadastrado para esta empresa.</td></tr>
                   ) : tenantUsers.map(u => (
-                    <tr key={u.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                    <tr key={u.email} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
                       <td className="px-6 py-4 text-[13px] font-medium text-white">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-black text-[10px] border border-primary/20">
-                            {u.name.charAt(0)}
+                            {u.user.name.charAt(0)}
                           </div>
-                          {u.name}
+                          <div>
+                            {u.user.name}
+                            {u.mustChangePassword && <span className="block text-[9px] text-amber-500 font-bold uppercase tracking-tighter">Troca pendente</span>}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-[13px] text-muted-foreground group-hover:text-white transition-colors">{u.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black bg-primary/10 text-primary border border-primary/20 uppercase tracking-widest">
-                          {u.role === 'tenant' ? 'Admin Cliente' : u.role}
-                        </span>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold uppercase">
+                            {(u.permissions ?? []).length} Módulos
+                          </span>
+                          {u.appPermissions?.['ponto'] && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold uppercase">
+                              + App Ponto
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10" onClick={() => handleEditUser(u)}>
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-500" onClick={() => handleDeleteUser(u.email, u.user.name)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -321,7 +468,7 @@ export default function Tenants() {
             </div>
           </TabsContent>
 
-          {isCristiano && (
+          {isAdmin && (
             <TabsContent value="logs" className="space-y-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium flex items-center gap-2">
@@ -506,7 +653,7 @@ export default function Tenants() {
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
-                    {isCristiano && (
+                    {isAdmin && (
                       <Button 
                         variant="ghost" 
                         size="icon" 

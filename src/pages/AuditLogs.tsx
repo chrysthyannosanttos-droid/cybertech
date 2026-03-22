@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { getAuditLogs } from '@/data/mockData';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { AuditLog } from '@/types';
 import { Search, History, User, Calendar, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,53 @@ import { ptBR } from 'date-fns/locale';
 export default function AuditLogs() {
   const { user: currentUser } = useAuth();
   const [search, setSearch] = useState('');
-  const logs = useMemo(() => getAuditLogs(), []);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  useEffect(() => {
+    const fetchLogs = async () => {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false });
 
-  if (!isCristiano) {
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+      } else {
+        const mappedLogs = (data || []).map(l => ({
+          ...l,
+          userId: l.user_id,
+          userName: l.user_name,
+          tenantId: l.tenant_id
+        })) as AuditLog[];
+        setLogs(mappedLogs);
+      }
+      setLoading(false);
+    };
+
+    fetchLogs();
+
+    const channel = supabase
+      .channel('audit_logs_realtime')
+      .on('postgres_changes', { event: 'INSERT', table: 'audit_logs', schema: 'public' }, (payload) => {
+        const newLog = {
+          ...payload.new,
+          userId: payload.new.user_id,
+          userName: payload.new.user_name,
+          tenantId: payload.new.tenant_id
+        } as AuditLog;
+        setLogs(prev => [newLog, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+
+  if (!isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

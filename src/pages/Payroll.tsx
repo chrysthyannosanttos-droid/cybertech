@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { MOCK_EMPLOYEES, MOCK_CERTIFICATES, MOCK_STORES } from '@/data/mockData';
-import { PayrollEntry } from '@/types';
+import { useState, useMemo, useEffect } from 'react';
+import { MOCK_CERTIFICATES, MOCK_STORES } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
+import { Employee, Certificate, PayrollEntry } from '@/types';
 import { Download, FileText, CalendarIcon, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,15 +39,42 @@ export default function Payroll() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [dbEmployees, setDbEmployees] = useState<Employee[]>([]);
+  const [dbCertificates, setDbCertificates] = useState<Certificate[]>([]);
   const [payrollData, setPayrollData] = useState<any[]>([]);
   
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: empData } = await supabase.from('employees').select('*');
+      if (empData) setDbEmployees(empData.map(e => {
+        const store = MOCK_STORES.find(s => s.id === e.store_id);
+        return {
+          ...e,
+          storeId: e.store_id,
+          storeName: store?.name || 'Unidade Geral',
+          salary: Number(e.salary),
+          role: e.role,
+          department: e.department
+        } as Employee;
+      }));
+
+      const { data: certData } = await supabase.from('certificates').select('*');
+      if (certData) setDbCertificates(certData.map(c => ({
+        ...c,
+        employeeId: c.employee_id,
+        days: c.days
+      } as unknown as Certificate)));
+    };
+    fetchData();
+  }, []);
+
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   const payroll: PayrollEntry[] = useMemo(() => {
-    return MOCK_EMPLOYEES
+    return dbEmployees
       .filter(emp => storeFilter === 'all' || emp.storeId === storeFilter)
       .map(emp => {
-        const empCerts = MOCK_CERTIFICATES.filter(c => c.employeeId === emp.id);
+        const empCerts = dbCertificates.filter(c => c.employeeId === emp.id);
         const certDays = empCerts.reduce((s, c) => s + c.days, 0);
         const dailyRate = emp.salary / 30;
         const absences = Math.floor(Math.random() * 3);
@@ -62,7 +90,7 @@ export default function Payroll() {
           netSalary: Math.round((emp.salary - deductions) * 100) / 100,
         };
       });
-  }, [storeFilter]);
+  }, [storeFilter, dbEmployees, dbCertificates]);
 
   // Use a local state to allow deletions
   useMemo(() => {
@@ -82,7 +110,7 @@ export default function Payroll() {
   };
 
   const handleDeleteSelected = () => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     const count = selectedIds.length;
     setPayrollData(prev => prev.filter(p => !selectedIds.includes(p.employeeId)));
     addAuditLog({
@@ -96,7 +124,7 @@ export default function Payroll() {
   };
 
   const handleDeleteOne = (id: string, name: string) => {
-    if (!isCristiano) return;
+    if (!isAdmin) return;
     setPayrollData(prev => prev.filter(p => p.employeeId !== id));
     addAuditLog({
       userId: currentUser?.id || 'unknown',
@@ -138,7 +166,7 @@ export default function Payroll() {
     const startStr = format(exportStartDate, 'ddMMyyyy');
     const endStr = format(exportEndDate, 'ddMMyyyy');
 
-    const storeEmployees = MOCK_EMPLOYEES.filter(e => e.storeId === exportStoreId);
+    const storeEmployees = dbEmployees.filter(e => e.storeId === exportStoreId);
 
     // Build lines
     const lines: string[] = [];
@@ -190,7 +218,7 @@ export default function Payroll() {
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Total líquido consolidado: <span className="text-primary font-black ml-2">R$ {totalNet.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
         </div>
         <div className="flex gap-3 items-center">
-          {isCristiano && selectedIds.length > 0 && (
+          {isAdmin && selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" className="h-10 px-6 rounded-xl font-bold text-[12px] gap-2 animate-in fade-in zoom-in duration-200 mr-2" onClick={handleDeleteSelected}>
               <Trash2 className="w-4 h-4" /> Excluir Selecionados ({selectedIds.length})
             </Button>
@@ -328,7 +356,7 @@ export default function Payroll() {
                 <th className="px-6 py-4 text-center">Intercorrências</th>
                 <th className="px-6 py-4 text-right">Total Descontos</th>
                 <th className="px-6 py-4 text-right">Saldo Líquido</th>
-                {isCristiano && <th className="px-6 py-4 text-center">Ações</th>}
+                {isAdmin && <th className="px-6 py-4 text-center">Ações</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -369,7 +397,7 @@ export default function Payroll() {
                   <td className="px-6 py-4 text-right">
                     <span className="font-mono-data text-[14px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </td>
-                  {isCristiano && (
+                  {isAdmin && (
                     <td className="px-6 py-4 text-center">
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
                         <Trash2 className="w-3.5 h-3.5" />

@@ -4,21 +4,42 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useAuth();
+  const [showPw, setShowPw] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const { login, mustChangePassword, changePassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (login(email, password)) {
-      navigate('/dashboard');
+      // Navigation handled after possible password change
+      if (!mustChangePassword) navigate('/dashboard');
     } else {
-      toast({ title: 'Credenciais inválidas', description: 'Verifique email e senha.', variant: 'destructive' });
+      toast({ title: 'Credenciais inválidas', description: 'Verifique o usuário e a senha.', variant: 'destructive' });
     }
+  };
+
+  const handleChangePassword = () => {
+    if (newPw.length < 4) {
+      toast({ title: 'Senha muito curta', description: 'A nova senha deve ter no mínimo 4 caracteres.', variant: 'destructive' });
+      return;
+    }
+    if (newPw !== newPw2) {
+      toast({ title: 'Senhas diferentes', description: 'As senhas digitadas não coincidem.', variant: 'destructive' });
+      return;
+    }
+    changePassword(newPw);
+    toast({ title: 'Senha criada com sucesso!', description: 'Bem-vindo ao sistema.' });
+    navigate('/dashboard');
   };
 
   return (
@@ -70,21 +91,26 @@ export default function Login() {
                 type="text"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="cristiano"
+                placeholder="Seu usuário de acesso"
                 className="h-9 text-[13px]"
                 required
               />
             </div>
             <div>
               <label className="text-[12px] font-medium text-muted-foreground mb-1 block">Senha</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-9 text-[13px]"
-                required
-              />
+              <div className="relative">
+                <Input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] pr-10"
+                  required
+                />
+                <button type="button" onClick={() => setShowPw(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full h-11 text-[13px] font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]">
               Acessar Painel
@@ -92,6 +118,34 @@ export default function Login() {
           </form>
         </div>
       </div>
+
+      {/* Modal: Troca de senha no primeiro acesso */}
+      <Dialog open={mustChangePassword} onOpenChange={() => {}}>       
+        <DialogContent className="max-w-sm" onInteractOutside={e => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Crie sua nova senha</DialogTitle>
+          </DialogHeader>
+          <p className="text-[13px] text-muted-foreground mb-2">Este é seu primeiro acesso. Por segurança, crie uma senha personalizada antes de continuar.</p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[12px] text-muted-foreground block mb-1">Nova Senha</label>
+              <div className="relative">
+                <Input type={showNewPw ? 'text' : 'password'} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Mínimo 4 caracteres" className="h-10 pr-10" />
+                <button type="button" onClick={() => setShowNewPw(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+                  {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-[12px] text-muted-foreground block mb-1">Confirmar Senha</label>
+              <Input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} placeholder="Repita a nova senha" className="h-10" />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={handleChangePassword} className="w-full font-bold">Confirmar e Entrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

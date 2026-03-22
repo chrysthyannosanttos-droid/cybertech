@@ -1,0 +1,34 @@
+# CYBERTECH RH - INSTRUÇÕES DE INSTALAÇÃO E USO
+
+Bem-vindo ao HR-HUB PLUS! Este guia ajudará você a configurar e rodar o sistema rapidamente.
+
+## 📋 Pré-requisitos
+Para rodar este sistema, você precisa do **Node.js** instalado no seu computador.
+Caso não tenha, faça o download aqui: [https://nodejs.org/](https://nodejs.org/)
+
+## 🚀 Como rodar o sistema pela primeira vez
+
+1.  **Instalação**: 
+    - Clique duas vezes no arquivo `setup.bat`.
+    - Isso instalará todas as dependências necessárias automaticamente. 
+    - Espere a mensagem "INSTALACAO CONCLUIDA COM SUCESSO".
+
+2.  **Execução**:
+    - Após a instalação, clique duas vezes no arquivo `start.bat`.
+    - O sistema abrirá automaticamente o seu navegador no endereço: [http://localhost:8080](http://localhost:8080)
+
+## 🌐 Como acessar de outros computadores (Rede Local)
+
+Este sistema pode ser usado por várias máquinas simultaneamente na mesma rede:
+
+1.  **IP do Servidor**: Verifique o IP exibido no `start.bat` (ex: `192.168.18.19`).
+2.  **Acesso**: Em outro computador no mesmo Wi-Fi, abra o navegador e digite: `http://[IP-DO-SERVIDOR]:8080`.
+3.  **FIREWALL (Importante)**: Se o acesso falhar, você precisará liberar a porta no Windows:
+    - Vá em "Segurança do Windows" > "Firewall e proteção de rede".
+    - Clique em "Configurações avançadas".
+    - Em "Regras de Entrada", clique em "Nova Regra".
+    - Selecione "Porta", digite `8080` e marque "Permitir a conexão".
+
+---
+**Desenvolvido por CyberTech RH**
+Suporte: 82 98870-1192

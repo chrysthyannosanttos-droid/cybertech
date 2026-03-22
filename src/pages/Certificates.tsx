@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { MOCK_CERTIFICATES, MOCK_EMPLOYEES } from '@/data/mockData';
-import { Certificate } from '@/types';
+import { useState, useEffect } from 'react';
+import { addAuditLog } from '@/data/mockData';
+import { Certificate, Employee } from '@/types';
 import { Plus, FileHeart, Search, Trash2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addAuditLog } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 export default function Certificates() {
-  const [certificates, setCertificates] = useState<Certificate[]>(MOCK_CERTIFICATES);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [dbEmployees, setDbEmployees] = useState<{id: string, name: string}[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
@@ -21,29 +22,64 @@ export default function Certificates() {
   const [form, setForm] = useState({ employeeId: '', date: '', cid: '', days: '' });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch Certificates
+      const { data: certData } = await supabase.from('certificates').select('*').order('date', { ascending: false });
+      if (certData) setCertificates(certData.map(c => ({
+        ...c,
+        employeeId: c.employee_id,
+        employeeName: c.employee_name,
+        date: c.date,
+        cid: c.cid,
+        days: c.days
+      } as unknown as Certificate)));
+
+      // Fetch Active Employees for the dropdown
+      const { data: empData } = await supabase.from('employees').select('id, name').eq('status', 'ACTIVE');
+      if (empData) setDbEmployees(empData);
+    };
+
+    fetchData();
+
+    // Realtime
+    const channel = supabase.channel('certs_realtime').on('postgres_changes', { event: '*', table: 'certificates', schema: 'public' }, () => {
+      fetchData();
+    }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const filtered = certificates.filter(c =>
-    c.employeeName.toLowerCase().includes(search.toLowerCase()) || c.cid.toLowerCase().includes(search.toLowerCase())
+    (c.employeeName || '').toLowerCase().includes(search.toLowerCase()) || (c.cid || '').toLowerCase().includes(search.toLowerCase())
   );
-
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.employeeId || !form.date || !form.cid || !form.days) return;
-    const emp = MOCK_EMPLOYEES.find(e => e.id === form.employeeId);
-    const newCert: Certificate = {
-      id: `c_${Date.now()}`,
-      employeeId: form.employeeId,
-      employeeName: emp?.name || '',
+    const emp = dbEmployees.find(e => e.id === form.employeeId);
+    
+    const dbData = {
+      employee_id: form.employeeId,
+      employee_name: emp?.name || '',
       date: form.date,
       cid: form.cid.toUpperCase(),
       days: Number(form.days),
+      tenant_id: 't1'
     };
-    setCertificates(prev => [newCert, ...prev]);
+
+    const { error } = await supabase.from('certificates').insert([dbData]);
+
+    if (error) {
+      toast({ title: 'Erro ao registrar', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Sistema',
-      action: 'CREATE',
-      details: `[Certificates] Lançou atestado para ${emp?.name} (CID: ${newCert.cid})`
+      action: 'CREATE_CERTIFICATE',
+      details: `[Certificates] Lançou atestado para ${emp?.name} (CID: ${dbData.cid})`
     });
     setForm({ employeeId: '', date: '', cid: '', days: '' });
     setOpen(false);
@@ -62,27 +98,41 @@ export default function Certificates() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const handleDeleteSelected = () => {
-    if (!isCristiano) return;
+  const handleDeleteSelected = async () => {
+    if (!isAdmin) return;
     const count = selectedIds.length;
-    setCertificates(prev => prev.filter(c => !selectedIds.includes(c.id)));
+    
+    const { error } = await supabase.from('certificates').delete().in('id', selectedIds);
+
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
-      action: 'DELETE',
+      action: 'DELETE_CERTIFICATES',
       details: `[Certificates] Excluiu ${count} atestado(s) em massa.`
     });
     setSelectedIds([]);
     toast({ title: `${count} atestado(s) excluído(s)` });
   };
 
-  const handleDeleteOne = (id: string, name: string) => {
-    if (!isCristiano) return;
-    setCertificates(prev => prev.filter(c => c.id !== id));
+  const handleDeleteOne = async (id: string, name: string) => {
+    if (!isAdmin) return;
+    
+    const { error } = await supabase.from('certificates').delete().eq('id', id);
+
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
-      action: 'DELETE',
+      action: 'DELETE_CERTIFICATE',
       details: `[Certificates] Excluiu atestado de ${name}`
     });
     setSelectedIds(prev => prev.filter(x => x !== id));
@@ -112,7 +162,7 @@ export default function Certificates() {
                 <Select value={form.employeeId} onValueChange={v => setForm(f => ({ ...f, employeeId: v }))}>
                   <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {MOCK_EMPLOYEES.slice(0, 20).map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                    {dbEmployees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -144,7 +194,7 @@ export default function Certificates() {
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome ou CID..." className="pl-11 h-11 bg-white/5 border-white/10 rounded-2xl focus:ring-primary/20 text-[13px] transition-all" />
         </div>
         
-        {isCristiano && selectedIds.length > 0 && (
+        {isAdmin && selectedIds.length > 0 && (
           <Button variant="destructive" size="sm" className="h-10 px-6 rounded-xl font-bold text-[12px] gap-2 animate-in fade-in zoom-in duration-200" onClick={handleDeleteSelected}>
             <Trash2 className="w-4 h-4" /> Excluir Selecionados ({selectedIds.length})
           </Button>
@@ -166,7 +216,7 @@ export default function Certificates() {
               <th className="px-6 py-4">Data Registro</th>
               <th className="px-6 py-4 text-center">CID</th>
               <th className="px-6 py-4 text-center">Dias</th>
-              {isCristiano && <th className="px-6 py-4 text-right">Ações</th>}
+              {isAdmin && <th className="px-6 py-4 text-right">Ações</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -198,7 +248,7 @@ export default function Certificates() {
                 <td className="px-6 py-4 text-center">
                   <span className="text-[13px] font-black text-white tabular-nums">{c.days} <span className="text-[10px] text-muted-foreground font-bold uppercase">dia{c.days > 1 ? 's' : ''}</span></span>
                 </td>
-                {isCristiano && (
+                {isAdmin && (
                   <td className="px-6 py-4 text-right">
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(c.id, c.employeeName)}>
                       <Trash2 className="w-3.5 h-3.5" />

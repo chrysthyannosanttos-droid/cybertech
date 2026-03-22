@@ -1,23 +1,28 @@
-import { useState } from 'react';
-import { MOCK_EMPLOYEES, MOCK_RESCISSIONS, addAuditLog } from '@/data/mockData';
-import { Rescission } from '@/types';
-import { FileX, Plus, Search, Trash2, Calendar, DollarSign, UserMinus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { addAuditLog } from '@/data/mockData';
+import { Rescission, Employee } from '@/types';
+import { FileX, Plus, Search, Trash2, Calendar, DollarSign, UserMinus, Check, ChevronsUpDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export default function Rescissions() {
-  const [rescissions, setRescissions] = useState<Rescission[]>(MOCK_RESCISSIONS);
+  const [rescissions, setRescissions] = useState<Rescission[]>([]);
+  const [dbEmployees, setDbEmployees] = useState<{id: string, name: string}[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [comboOpen, setComboOpen] = useState(false);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   const [form, setForm] = useState({
     employeeId: '',
@@ -27,30 +32,80 @@ export default function Rescissions() {
     type: 'PEDIDO' as Rescission['type']
   });
 
+  // Fetch data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch Rescissions
+      const { data: rescData, error: rescError } = await supabase
+        .from('rescissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!rescError) {
+        setRescissions((rescData || []).map(r => ({
+          ...r,
+          employeeId: r.employee_id,
+          employeeName: r.employee_name,
+          terminationDate: r.termination_date,
+          fgtsValue: Number(r.fgts_value),
+          rescissionValue: Number(r.rescission_value),
+        })));
+      }
+
+      // Fetch Active Employees for the selection
+      const { data: empData, error: empError } = await supabase
+        .from('employees')
+        .select('id, name')
+        .eq('status', 'ACTIVE');
+      
+      if (!empError) setDbEmployees(empData || []);
+    };
+
+    fetchData();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('rescissions_realtime')
+      .on('postgres_changes', { event: '*', table: 'rescissions', schema: 'public' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const filtered = rescissions.filter(r =>
     r.employeeName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.employeeId || !form.terminationDate || !form.fgtsValue || !form.rescissionValue) {
       toast({ title: 'Campos obrigatórios', description: 'Por favor, preencha todos os campos.', variant: 'destructive' });
       return;
     }
 
-    const emp = MOCK_EMPLOYEES.find(e => e.id === form.employeeId);
+    const emp = dbEmployees.find(e => e.id === form.employeeId);
     if (!emp) return;
 
-    const newRescission: Rescission = {
-      id: `r${Date.now()}`,
-      employeeId: form.employeeId,
-      employeeName: emp.name,
-      terminationDate: form.terminationDate,
-      fgtsValue: Number(form.fgtsValue),
-      rescissionValue: Number(form.rescissionValue),
-      type: form.type
+    const dbData = {
+      employee_id: form.employeeId,
+      employee_name: emp.name,
+      termination_date: form.terminationDate,
+      fgts_value: Number(form.fgtsValue),
+      rescission_value: Number(form.rescissionValue),
+      type: form.type,
+      tenant_id: 't1' // Or get from context
     };
 
-    setRescissions(prev => [newRescission, ...prev]);
+    const { error } = await supabase.from('rescissions').insert([dbData]);
+
+    if (error) {
+      toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Sistema',
@@ -63,11 +118,17 @@ export default function Rescissions() {
     toast({ title: 'Rescisão cadastrada', description: `Lançamento para ${emp.name} concluído.` });
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!isCristiano) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!isAdmin) return;
     if (!window.confirm(`Deseja excluir o lançamento de rescisão de ${name}?`)) return;
     
-    setRescissions(prev => prev.filter(r => r.id !== id));
+    const { error } = await supabase.from('rescissions').delete().eq('id', id);
+
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
@@ -109,16 +170,50 @@ export default function Rescissions() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest">Funcionário</Label>
-                <Select value={form.employeeId} onValueChange={(val) => setForm(f => ({ ...f, employeeId: val }))}>
-                  <SelectTrigger className="bg-white/5 border-white/10 h-10 text-[13px]">
-                    <SelectValue placeholder="Selecione o colaborador" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10 text-white">
-                    {MOCK_EMPLOYEES.filter(e => e.status === 'ACTIVE').map(emp => (
-                      <SelectItem key={emp.id} value={emp.id} className="text-[13px] hover:bg-primary/20">{emp.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={comboOpen} onOpenChange={setComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboOpen}
+                      className="w-full justify-between bg-white/5 border-white/10 h-10 text-[13px] font-normal"
+                    >
+                      {form.employeeId
+                        ? dbEmployees.find((emp) => emp.id === form.employeeId)?.name
+                        : "Pesquisar colaborador..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-slate-900 border-white/10">
+                    <Command className="bg-transparent text-white">
+                      <CommandInput placeholder="Digite o nome..." className="h-9 text-white" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {dbEmployees.map((emp) => (
+                            <CommandItem
+                              key={emp.id}
+                              value={emp.name}
+                              onSelect={() => {
+                                setForm(f => ({ ...f, employeeId: emp.id }));
+                                setComboOpen(false);
+                              }}
+                              className="text-[13px] hover:bg-primary/20 cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  form.employeeId === emp.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {emp.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
@@ -218,7 +313,7 @@ export default function Rescissions() {
               <th className="text-left px-6 py-4">Tipo</th>
               <th className="text-right px-6 py-4">FGTS Rec.</th>
               <th className="text-right px-6 py-4">Valor Total</th>
-              {isCristiano && <th className="text-center px-6 py-4">Ação</th>}
+              {isAdmin && <th className="text-center px-6 py-4">Ação</th>}
             </tr>
           </thead>
           <tbody>
@@ -248,7 +343,7 @@ export default function Rescissions() {
                 <td className="px-6 py-4 text-right">
                   <span className="text-[14px] font-black text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">R$ {r.rescissionValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </td>
-                {isCristiano && (
+                {isAdmin && (
                   <td className="px-6 py-4 text-center">
                     <Button 
                       variant="ghost" 
@@ -264,7 +359,7 @@ export default function Rescissions() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={isCristiano ? 6 : 5} className="px-6 py-20 text-center">
+                <td colSpan={isAdmin ? 6 : 5} className="px-6 py-20 text-center">
                   <FileX className="w-12 h-12 text-white/5 mx-auto mb-3" />
                   <p className="text-muted-foreground font-medium text-[14px]">Nenhum lançamento de rescisão encontrado.</p>
                 </td>
