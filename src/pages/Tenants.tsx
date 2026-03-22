@@ -31,6 +31,10 @@ export default function Tenants() {
   
   const { user: currentUser, getAllUsers, saveUser, deleteUser } = useAuth();
   const [managedUsers, setManagedUsers] = useState(() => getAllUsers());
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [editTenantId, setEditTenantId] = useState<string | null>(null);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   const [showLogs, setShowLogs] = useState(false);
 
