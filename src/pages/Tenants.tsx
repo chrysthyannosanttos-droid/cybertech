@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { MOCK_TENANTS, MOCK_STORES, MOCK_USERS, addAuditLog, getAuditLogs } from '@/data/mockData';
 import { Tenant, Store as StoreType, User, AuditLog } from '@/types';
-import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X } from 'lucide-react';
+import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X, Download, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import * as XLSX from 'xlsx';
 import { useAuth, AppModule, ManagedUser } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -37,6 +39,7 @@ export default function Tenants() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   const [showLogs, setShowLogs] = useState(false);
+  const [backupLoading, setBackupLoading] = useState<string | null>(null);
 
   const [form, setForm] = useState({ name: '', cnpj: '', monthlyFee: '', startDate: '', expiryDate: '' });
   
@@ -66,6 +69,53 @@ export default function Tenants() {
 
   const DEFAULT_PERMISSIONS: AppModule[] = MODULE_OPTIONS.map(m => m.module);
   const [selectedUserPermissions, setSelectedUserPermissions] = useState<AppModule[]>(DEFAULT_PERMISSIONS);
+
+  const handleBackup = async (tenant: Tenant) => {
+    setBackupLoading(tenant.id);
+    try {
+      const [{ data: employees }, { data: certs }, { data: rescissions }] = await Promise.all([
+        supabase.from('employees').select('*').eq('tenant_id', tenant.id),
+        supabase.from('certificates').select('*'),
+        supabase.from('rescissions').select('*').eq('tenant_id', tenant.id),
+      ]);
+
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Funcionários
+      const empRows = (employees || []).map(e => ({
+        'Nome': e.name, 'CPF': e.cpf, 'Sexo': e.gender, 'Nascimento': e.birth_date,
+        'Admissão': e.admission_date, 'Cargo': e.role, 'Setor': e.department,
+        'Status': e.status, 'Salário': e.salary, 'CBO': e.cbo,
+        'Insalubridade': e.insalubridade, 'Periculosidade': e.periculosidade,
+        'Gratificação': e.gratificacao, 'VT': e.vale_transporte,
+        'Vale Refeição': e.vale_refeicao, 'Flexível': e.flexivel,
+        'Mobilidade': e.mobilidade, 'Vale Flexível': e.vale_flexivel,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empRows.length ? empRows : [{ 'Sem dados': '' }]), 'Funcionários');
+
+      // Sheet 2: Atestados
+      const empIds = new Set((employees || []).map(e => e.id));
+      const certRows = (certs || []).filter(c => empIds.has(c.employee_id)).map(c => ({
+        'Funcionário': c.employee_name, 'Data': c.date, 'CID': c.cid, 'Dias': c.days,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(certRows.length ? certRows : [{ 'Sem dados': '' }]), 'Atestados');
+
+      // Sheet 3: Rescisões
+      const rescRows = (rescissions || []).map(r => ({
+        'Funcionário': r.employee_name, 'Data Saída': r.termination_date,
+        'Tipo': r.type, 'FGTS': r.fgts_value, 'Valor Total': r.rescission_value,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rescRows.length ? rescRows : [{ 'Sem dados': '' }]), 'Rescisões');
+
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `backup_${tenant.name.replace(/[^a-zA-Z0-9]/g, '_')}_${date}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    } catch (e: any) {
+      toast({ title: 'Erro no backup', description: e.message, variant: 'destructive' });
+    } finally {
+      setBackupLoading(null);
+    }
+  };
 
   const filtered = tenants.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) || t.cnpj.includes(search)
@@ -658,14 +708,28 @@ export default function Tenants() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
                     {isAdmin && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                        onClick={() => handleDeleteTenant(t.id, t.name)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Backup de dados"
+                          className="h-8 w-8 rounded-lg text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                          onClick={() => handleBackup(t)}
+                          disabled={backupLoading === t.id}
+                        >
+                          {backupLoading === t.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Download className="w-3.5 h-3.5" />}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                          onClick={() => handleDeleteTenant(t.id, t.name)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </td>
