@@ -22,20 +22,22 @@ export interface ManagedUser {
   mustChangePassword?: boolean;
   permissions?: AppModule[]; // undefined = all access (superadmin)
   appPermissions?: Record<string, boolean>; // e.g. { 'ponto': true }
+  canEditEmployees?: boolean;
+  canDeleteEmployees?: boolean;
   user: User;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   mustChangePassword: boolean;
   changePassword: (newPassword: string) => void;
-  getAllUsers: () => ManagedUser[];
+  getAllUsers: () => Promise<ManagedUser[]>;
   saveUser: (userData: ManagedUser) => void;
   deleteUser: (email: string) => void;
-  getUserPermissions: (email: string) => AppModule[] | undefined;
+  getUserPermissions: (email: string) => Promise<AppModule[] | undefined>;
   currentPermissions: AppModule[] | undefined; // undefined = all access
   isEmployeeView: boolean;
   setIsEmployeeView: (v: boolean) => void;
@@ -104,45 +106,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem('is_employee_view', v ? 'true' : 'false');
   }, []);
 
-  const login = useCallback((email: string, password: string) => {
-    const users = getStoredUsers();
-    const found = users.find(u => u.email === email && u.password === password);
-    if (found) {
-      setUser(found.user);
-      sessionStorage.setItem('nexus_user', JSON.stringify(found.user));
-      const needsChange = !!(found.mustChangePassword);
-      setMustChangePassword(needsChange);
-      sessionStorage.setItem('must_change_password', needsChange ? 'true' : 'false');
-      // superadmin (cristiano) = undefined (all access)
-      const perms = found.user.role === 'superadmin' ? undefined : (found.permissions ?? DEFAULT_PERMISSIONS);
-      setCurrentPermissions(perms);
-      sessionStorage.setItem('user_permissions', JSON.stringify(perms ?? null));
-      
-      // Store app permissions
-      sessionStorage.setItem('app_permissions', JSON.stringify(found.appPermissions || { 'ponto': true }));
-      
-      return true;
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      // 1. Tentar buscar do banco de dados (Sincronizado)
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .maybeSingle();
+
+      if (profile) {
+        const userData: User = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          tenantId: profile.tenant_id,
+          canEditEmployees: profile.can_edit_employees,
+          canDeleteEmployees: profile.can_delete_employees
+        };
+        
+        setUser(userData);
+        sessionStorage.setItem('nexus_user', JSON.stringify(userData));
+        
+        const needsChange = !!profile.must_change_password;
+        setMustChangePassword(needsChange);
+        sessionStorage.setItem('must_change_password', needsChange ? 'true' : 'false');
+        
+        const perms = profile.role === 'superadmin' ? undefined : (profile.permissions ?? DEFAULT_PERMISSIONS);
+        setCurrentPermissions(perms);
+        sessionStorage.setItem('user_permissions', JSON.stringify(perms ?? null));
+        
+        sessionStorage.setItem('app_permissions', JSON.stringify(profile.app_permissions || { 'ponto': true }));
+        
+        return true;
+      }
+
+      // 2. Fallback para localStorage (Legado)
+      const users = getStoredUsers();
+      const found = users.find(u => u.email === email && u.password === password);
+      if (found) {
+        setUser(found.user);
+        sessionStorage.setItem('nexus_user', JSON.stringify(found.user));
+        const needsChange = !!(found.mustChangePassword);
+        setMustChangePassword(needsChange);
+        sessionStorage.setItem('must_change_password', needsChange ? 'true' : 'false');
+        const perms = found.user.role === 'superadmin' ? undefined : (found.permissions ?? DEFAULT_PERMISSIONS);
+        setCurrentPermissions(perms);
+        sessionStorage.setItem('user_permissions', JSON.stringify(perms ?? null));
+        sessionStorage.setItem('app_permissions', JSON.stringify(found.appPermissions || { 'ponto': true }));
+        return true;
+      }
+    } catch (err) {
+      console.error('Erro no login:', err);
     }
     return false;
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      // Limpeza de dados teste (t1) ao sair
-      await Promise.all([
-        supabase.from('certificates').delete().eq('tenant_id', 't1'),
-        supabase.from('rescissions').delete().eq('tenant_id', 't1')
-      ]);
-    } catch (e) {
-      console.error('Erro na limpeza de logout:', e);
-    }
-
     setUser(null);
     setMustChangePassword(false);
     setCurrentPermissions(undefined);
     sessionStorage.removeItem('nexus_user');
     sessionStorage.removeItem('must_change_password');
     sessionStorage.removeItem('user_permissions');
+    sessionStorage.removeItem('app_permissions');
   }, []);
 
   // Limpeza ao fechar a aba
@@ -190,11 +219,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem('must_change_password', 'false');
   }, [user]);
 
-  const getAllUsers = useCallback((): ManagedUser[] => {
+  const getAllUsers = useCallback(async (): Promise<ManagedUser[]> => {
+    try {
+      const { data: profiles, error } = await supabase.from('profiles').select('*').order('name');
+      if (profiles && profiles.length > 0) {
+        return profiles.map(p => ({
+          email: p.email,
+          password: p.password,
+          mustChangePassword: p.must_change_password,
+          permissions: p.permissions,
+          appPermissions: p.app_permissions,
+          canEditEmployees: p.can_edit_employees,
+          canDeleteEmployees: p.can_delete_employees,
+          user: {
+            id: p.id,
+            email: p.email,
+            name: p.name,
+            role: p.role,
+            tenantId: p.tenant_id,
+            canEditEmployees: p.can_edit_employees,
+            canDeleteEmployees: p.can_delete_employees
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Erro ao buscar usuários:', err);
+    }
     return getStoredUsers();
   }, []);
 
-  const saveUser = useCallback((userData: ManagedUser) => {
+  const saveUser = useCallback(async (userData: ManagedUser) => {
+    try {
+      const dbData = {
+        id: userData.user.id || undefined,
+        email: userData.email,
+        name: userData.user.name,
+        password: userData.password,
+        role: userData.user.role,
+        tenant_id: userData.user.tenantId || null,
+        permissions: userData.permissions,
+        app_permissions: userData.appPermissions,
+        must_change_password: userData.mustChangePassword,
+        can_edit_employees: userData.canEditEmployees,
+        can_delete_employees: userData.canDeleteEmployees
+      };
+
+      await supabase.from('profiles').upsert(dbData, { onConflict: 'email' });
+    } catch (err) {
+      console.error('Erro ao salvar usuário no banco:', err);
+    }
+
+    // Mantém fallback no localStorage por enquanto
     const users = getStoredUsers();
     const index = users.findIndex(u => u.email === userData.email);
     if (index >= 0) {
@@ -205,12 +280,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('managed_users', JSON.stringify(users));
   }, []);
 
-  const deleteUser = useCallback((email: string) => {
+  const deleteUser = useCallback(async (email: string) => {
+    try {
+      await supabase.from('profiles').delete().eq('email', email);
+    } catch (err) {
+      console.error('Erro ao deletar usuário no banco:', err);
+    }
     const users = getStoredUsers().filter(u => u.email !== email);
     localStorage.setItem('managed_users', JSON.stringify(users));
   }, []);
 
-  const getUserPermissions = useCallback((email: string): AppModule[] | undefined => {
+  const getUserPermissions = useCallback(async (email: string): Promise<AppModule[] | undefined> => {
+    try {
+      const { data } = await supabase.from('profiles').select('permissions').eq('email', email).maybeSingle();
+      if (data) return data.permissions;
+    } catch {}
     const users = getStoredUsers();
     const found = users.find(u => u.email === email);
     return found?.permissions;

@@ -587,11 +587,21 @@ export default function Employees() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const handleDeleteSelected = () => {
-    if (!isAdmin) return;
+  const handleDeleteSelected = async () => {
+    const canDelete = isAdmin || currentUser?.canDeleteEmployees;
+    if (!canDelete) return;
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Tem certeza que deseja excluir ${selectedIds.length} funcionário(s)?`)) return;
-    setEmployees(prev => prev.filter(e => !selectedIds.includes(e.id)));
+    
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .in('id', selectedIds);
+
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
     
     addAuditLog({
       userId: currentUser?.id || 'unknown',
@@ -605,7 +615,8 @@ export default function Employees() {
   };
 
   const handleDeleteOne = async (id: string, name: string) => {
-    if (!isAdmin) return;
+    const canDelete = isAdmin || currentUser?.canDeleteEmployees;
+    if (!canDelete) return;
     if (!window.confirm(`Deseja excluir o colaborador ${name}?`)) return;
     
     const { error } = await supabase
@@ -637,7 +648,7 @@ export default function Employees() {
           <p className="text-[13px] text-muted-foreground mt-1">Cadastro e controle de colaboradores, benefícios e custos.</p>
         </div>
         <div className="flex gap-2.5">
-          {isAdmin && selectedIds.length > 0 && (
+          {(isAdmin || currentUser?.canDeleteEmployees) && selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" className="h-9 gap-1.5" onClick={handleDeleteSelected}>
               Excluir ({selectedIds.length})
             </Button>
@@ -1029,14 +1040,16 @@ export default function Employees() {
                       <p className="font-mono-data text-[14px] font-black text-primary drop-shadow-[0_0_8px_rgba(14,165,233,0.3)]">R$ {totalC.toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-end gap-2 group-hover:opacity-100 opacity-0 transition-opacity">
                         <Button variant="ghost" size="icon" className={cn("h-9 w-9 rounded-xl transition-colors", emp.photo_reference_url ? "text-emerald-500 hover:bg-emerald-500/10" : "text-white/20 hover:text-primary hover:bg-primary/10")} onClick={() => handleRegisterPhoto(emp.id)} title="Biometria Facial">
                           <Camera className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-white/40 hover:text-white hover:bg-white/10" onClick={() => handleOpenEdit(emp)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                        {isAdmin && (
+                        {(isAdmin || currentUser?.canEditEmployees) && (
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-white/20 hover:text-primary hover:bg-primary/10 transition-colors" onClick={() => handleOpenEdit(emp)}>
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {(isAdmin || currentUser?.canDeleteEmployees) && (
                           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(emp.id, emp.name)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>

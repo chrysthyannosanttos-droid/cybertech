@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth, AppModule, ManagedUser } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Eye, EyeOff, ShieldCheck, Building2, Save, X, ShieldAlert } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, EyeOff, ShieldCheck, Building2, Save, X, ShieldAlert, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +35,19 @@ export default function UserManagement() {
 
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
-  const [users, setUsers] = useState(() => getAllUsers());
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const data = await getAllUsers();
+    setUsers(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [getAllUsers]);
   const [open, setOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -46,11 +58,22 @@ export default function UserManagement() {
     role: 'tenant' as 'superadmin' | 'tenant',
     tenantId: '',
     appPermissions: { 'ponto': true } as Record<string, boolean>,
+    canEditEmployees: false,
+    canDeleteEmployees: false,
   });
   const [selectedPermissions, setSelectedPermissions] = useState<AppModule[]>(DEFAULT_PERMISSIONS);
 
   const resetForm = () => {
-    setForm({ email: '', password: '123', name: '', role: 'tenant', tenantId: '', appPermissions: { 'ponto': true } });
+    setForm({ 
+      email: '', 
+      password: '123', 
+      name: '', 
+      role: 'tenant', 
+      tenantId: '', 
+      appPermissions: { 'ponto': true },
+      canEditEmployees: false,
+      canDeleteEmployees: false
+    });
     setSelectedPermissions(DEFAULT_PERMISSIONS);
     setEditingEmail(null);
     setShowPassword(false);
@@ -66,6 +89,8 @@ export default function UserManagement() {
         role: userData.user.role as 'superadmin' | 'tenant',
         tenantId: userData.user.tenantId || '',
         appPermissions: userData.appPermissions || { 'ponto': true },
+        canEditEmployees: userData.canEditEmployees || false,
+        canDeleteEmployees: userData.canDeleteEmployees || false,
       });
       setSelectedPermissions(userData.permissions ?? DEFAULT_PERMISSIONS);
     } else {
@@ -80,14 +105,14 @@ export default function UserManagement() {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.email || !form.name) {
       toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
       return;
     }
 
     const isNew = !editingEmail;
-    const existingUsers = getAllUsers();
+    const existingUsers = await getAllUsers();
 
     if (isNew && existingUsers.find(u => u.email === form.email)) {
       toast({ title: 'Usuário já existe', description: `O login "${form.email}" já está em uso.`, variant: 'destructive' });
@@ -112,11 +137,15 @@ export default function UserManagement() {
         name: form.name,
         role: form.role,
         ...(form.role === 'tenant' && form.tenantId ? { tenantId: form.tenantId } : {}),
+        canEditEmployees: form.role === 'superadmin' ? true : form.canEditEmployees,
+        canDeleteEmployees: form.role === 'superadmin' ? true : form.canDeleteEmployees,
       },
+      canEditEmployees: form.role === 'superadmin' ? true : form.canEditEmployees,
+      canDeleteEmployees: form.role === 'superadmin' ? true : form.canDeleteEmployees,
     };
 
-    saveUser(newUserData);
-    setUsers(getAllUsers());
+    await saveUser(newUserData);
+    await fetchUsers();
 
     addAuditLog({
       userId: currentUser?.id || 'unknown',
@@ -130,15 +159,34 @@ export default function UserManagement() {
     resetForm();
   };
 
-  const handleDelete = (email: string, name: string) => {
+  const handleSyncAll = async () => {
+    if (!window.confirm('Deseja sincronizar todos os usuários locais com o banco de dados? Isso permitirá acesso externo para todos.')) return;
+    
+    setLoading(true);
+    // getStoredUsers é interno do AuthContext, mas podemos extrair da listagem atual
+    // Pega a lista do localStorage (fallback do getAllUsers se o banco estiver vazio)
+    // Na verdade, getAllUsers() já retorna o merge.
+    
+    let count = 0;
+    for (const u of users) {
+      await saveUser(u);
+      count++;
+    }
+    
+    await fetchUsers();
+    toast({ title: 'Sincronização Concluída', description: `${count} usuários enviados para o banco de dados.` });
+    setLoading(false);
+  };
+
+  const handleDelete = async (email: string, name: string) => {
     if (email === 'cristiano') {
       toast({ title: 'Não permitido', description: 'O usuário Cristiano não pode ser excluído.', variant: 'destructive' });
       return;
     }
     if (!window.confirm(`Deseja excluir permanentemente o usuário "${name}"?`)) return;
 
-    deleteUser(email);
-    setUsers(getAllUsers());
+    await deleteUser(email);
+    await fetchUsers();
 
     addAuditLog({
       userId: currentUser?.id || 'unknown',
@@ -154,12 +202,17 @@ export default function UserManagement() {
     <div className="animate-fade-in-up stagger-1">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tighter">Gerenciamento de Usuários</h1>
+          <h1 className="text-2xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl">Gerenciamento de Usuários <span className="text-[10px] text-emerald-400 align-top">(DATABASE SYNC)</span></h1>
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Controle de acessos e permissões por usuário</p>
         </div>
-        <Button onClick={() => handleOpen()} className="h-10 gap-2 bg-primary hover:bg-primary/90 font-bold">
-          <Plus className="w-4 h-4" /> Novo Usuário
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSyncAll} className="h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 font-black shadow-lg shadow-emerald-900/40">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Sincronizar Tudo
+          </Button>
+          <Button onClick={() => handleOpen()} className="h-10 gap-2 bg-primary hover:bg-primary/90 font-bold">
+            <Plus className="w-4 h-4" /> Novo Usuário
+          </Button>
+        </div>
       </div>
 
       <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden">
@@ -332,6 +385,35 @@ export default function UserManagement() {
                       <Switch checked={selectedPermissions.includes(module)} onCheckedChange={() => togglePermission(module)} onClick={e => e.stopPropagation()} />
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Permissões de Gestão de Funcionários */}
+            {form.role !== 'superadmin' && (
+              <div className="pt-2 pb-2 space-y-3">
+                <Label className="text-[13px] font-bold text-white block">Permissões de Gestão</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
+                    <div>
+                      <p className="text-[12px] font-bold">Editar Dados</p>
+                      <p className="text-[10px] text-muted-foreground">Permitir editar funcionários</p>
+                    </div>
+                    <Switch 
+                      checked={form.canEditEmployees} 
+                      onCheckedChange={(c) => setForm(f => ({ ...f, canEditEmployees: c }))} 
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
+                    <div>
+                      <p className="text-[12px] font-bold text-rose-400">Excluir Registro</p>
+                      <p className="text-[10px] text-muted-foreground">Permitir excluir funcionários</p>
+                    </div>
+                    <Switch 
+                      checked={form.canDeleteEmployees} 
+                      onCheckedChange={(c) => setForm(f => ({ ...f, canDeleteEmployees: c }))} 
+                    />
+                  </div>
                 </div>
               </div>
             )}

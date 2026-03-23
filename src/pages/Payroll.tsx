@@ -66,6 +66,18 @@ export default function Payroll() {
       } as unknown as Certificate)));
     };
     fetchData();
+    
+    // Subscribe to employees realtime
+    const channel = supabase
+      .channel('payroll_employees_realtime')
+      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';

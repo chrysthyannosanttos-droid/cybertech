@@ -70,8 +70,11 @@ export default function Rescissions() {
 
     // Realtime subscription
     const channel = supabase
-      .channel('rescissions_realtime')
+      .channel('rescissions_data_realtime')
       .on('postgres_changes', { event: '*', table: 'rescissions', schema: 'public' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => {
         fetchData();
       })
       .subscribe();

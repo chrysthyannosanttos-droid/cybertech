@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MOCK_TENANTS, MOCK_STORES, MOCK_USERS, addAuditLog, getAuditLogs } from '@/data/mockData';
 import { Tenant, Store as StoreType, User, AuditLog } from '@/types';
-import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X, Download, Loader2 } from 'lucide-react';
+import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X, Download, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import { useAuth, AppModule, ManagedUser } from '@/contexts/AuthContext';
@@ -235,11 +235,12 @@ export default function Tenants() {
     toast({ title: 'Loja cadastrada', description: `${storeForm.name} adicionada com sucesso.` });
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!selectedTenant || !userForm.name || !userForm.email) return;
     
+    setManagedUsers(await getAllUsers()); // Refresh count
     const isNew = !editingEmail;
-    const currentAllUsers = getAllUsers();
+    const currentAllUsers = await getAllUsers();
     
     if (isNew && currentAllUsers.find(u => u.email === userForm.email)) {
       toast({ title: 'Usuário já existe', description: `O login "${userForm.email}" já está em uso.`, variant: 'destructive' });
@@ -268,8 +269,8 @@ export default function Tenants() {
       },
     };
 
-    saveUser(newUserData);
-    setManagedUsers(getAllUsers());
+    await saveUser(newUserData);
+    setManagedUsers(await getAllUsers());
     
     setUserForm({ name: '', email: '', password: '123', appPermissions: { 'ponto': true } });
     setSelectedUserPermissions(DEFAULT_PERMISSIONS);
@@ -379,7 +380,16 @@ export default function Tenants() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 border-primary/20 text-primary hover:bg-primary/5" onClick={async () => {
+                const tenantUsers = managedUsers.filter(u => u.user.tenantId === selectedTenant.id);
+                if (!window.confirm(`Deseja sincronizar ${tenantUsers.length} usuários desta empresa com o banco de dados?`)) return;
+                for (const u of tenantUsers) await saveUser(u);
+                setManagedUsers(await getAllUsers());
+                toast({ title: 'Sincronização concluída!' });
+              }}>
+                <RefreshCw className="w-3.5 h-3.5" /> Sincronizar Tudo
+              </Button>
               <Dialog open={addUserOpen} onOpenChange={(v) => { setAddUserOpen(v); if(!v) setEditingEmail(null); }}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="h-8 gap-1.5" onClick={() => {

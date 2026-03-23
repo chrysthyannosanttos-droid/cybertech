@@ -135,6 +135,8 @@ export interface User {
   role: UserRole;
   tenantId?: string;
   name: string;
+  canEditEmployees?: boolean;
+  canDeleteEmployees?: boolean;
 }
 
 export interface AuditLog {
