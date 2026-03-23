@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOCK_TENANTS, MOCK_STORES, MOCK_USERS, addAuditLog, getAuditLogs } from '@/data/mockData';
 import { Tenant, Store as StoreType, User, AuditLog } from '@/types';
 import { Building2, Plus, Search, Store as StoreIcon, Users, ArrowLeft, Key, History, Eye, EyeOff, Edit2, PowerOff, ShieldCheck, Trash2, ShieldAlert, Save, X, Download, Loader2, RefreshCw } from 'lucide-react';
@@ -28,11 +28,12 @@ function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
 }
 
 export default function Tenants() {
-  const [tenants, setTenants] = useState(MOCK_TENANTS);
-  const [stores, setStores] = useState(MOCK_STORES);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [stores, setStores] = useState<StoreType[]>([]);
   
   const { user: currentUser, getAllUsers, saveUser, deleteUser } = useAuth();
-  const [managedUsers, setManagedUsers] = useState(() => getAllUsers());
+  const { toast } = useToast();
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [editTenantId, setEditTenantId] = useState<string | null>(null);
@@ -40,6 +41,41 @@ export default function Tenants() {
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
   const [showLogs, setShowLogs] = useState(false);
   const [backupLoading, setBackupLoading] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [{ data: tData }, { data: sData }] = await Promise.all([
+      supabase.from('tenants').select('*').order('name'),
+      supabase.from('stores').select('*').order('name')
+    ]);
+
+    if (tData) {
+      setTenants(tData.map(t => ({
+        id: t.id,
+        name: t.name,
+        cnpj: t.cnpj || '',
+        subscription: t.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
+        employeeCount: t.employee_count || 0
+      })));
+    }
+
+    if (sData) {
+      setStores(sData.map(s => ({
+        id: s.id,
+        name: s.name,
+        cnpj: s.cnpj || '',
+        tenantId: s.tenant_id
+      })));
+    }
+
+    setManagedUsers(await getAllUsers());
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const [form, setForm] = useState({ name: '', cnpj: '', monthlyFee: '', startDate: '', expiryDate: '' });
   
@@ -139,23 +175,32 @@ export default function Tenants() {
     setOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.cnpj) return;
     
+    const subscription = {
+      status: 'active' as const,
+      startDate: form.startDate || new Date().toISOString().split('T')[0],
+      expiryDate: form.expiryDate || '2027-01-01',
+      monthlyFee: Number(form.monthlyFee) || 0,
+      additionalCosts: [],
+    };
+
     if (editTenantId) {
-      setTenants(prev => prev.map(t => 
-        t.id === editTenantId ? {
-          ...t,
+      const { error } = await supabase
+        .from('tenants')
+        .update({
           name: form.name,
           cnpj: form.cnpj,
-          subscription: {
-            ...t.subscription,
-            startDate: form.startDate,
-            expiryDate: form.expiryDate,
-            monthlyFee: Number(form.monthlyFee) || 0,
-          }
-        } : t
-      ));
+          subscription
+        })
+        .eq('id', editTenantId);
+
+      if (error) {
+        toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
       addAuditLog({
         userId: currentUser?.id || 'unknown',
         userName: currentUser?.name || 'Sistema',
@@ -165,73 +210,100 @@ export default function Tenants() {
       });
       toast({ title: 'Empresa atualizada', description: `${form.name} atualizada com sucesso.` });
     } else {
-      const newTenant: Tenant = {
-        id: `t${Date.now()}`,
-        name: form.name,
-        cnpj: form.cnpj,
-        subscription: {
-          status: 'active',
-          startDate: form.startDate || new Date().toISOString().split('T')[0],
-          expiryDate: form.expiryDate || '2027-01-01',
-          monthlyFee: Number(form.monthlyFee) || 0,
-          additionalCosts: [],
-        },
-        employeeCount: 0,
-      };
-      setTenants(prev => [...prev, newTenant]);
+      const { error } = await supabase
+        .from('tenants')
+        .insert({
+          id: `t${Date.now()}`,
+          name: form.name,
+          cnpj: form.cnpj,
+          subscription
+        });
+
+      if (error) {
+        toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
       addAuditLog({
         userId: currentUser?.id || 'unknown',
         userName: currentUser?.name || 'Sistema',
         action: 'CREATE_TENANT',
         details: `[Tenants] Criou empresa ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: newTenant.id
       });
       toast({ title: 'Empresa cadastrada', description: `${form.name} adicionada com sucesso.` });
     }
+    
+    await fetchData();
     setOpen(false);
   };
 
-  const handleDeleteTenant = (id: string, name: string) => {
+  const handleDeleteTenant = async (id: string, name: string) => {
     if (!isAdmin) return;
     if (!window.confirm(`ATENÇÃO: Deseja excluir permanentemente a empresa ${name} e todos os seus dados?`)) return;
-    setTenants(prev => prev.filter(t => t.id !== id));
+    
+    const { error } = await supabase.from('tenants').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
       action: 'DELETE_TENANT',
       details: `[Tenants] Excluiu empresa ${name}`
     });
+    
+    await fetchData();
     toast({ title: 'Empresa excluída' });
   };
 
-  const toggleStatus = (id: string) => {
-    setTenants(prev =>
-      prev.map(t =>
-        t.id === id
-          ? { ...t, subscription: { ...t.subscription, status: t.subscription.status === 'active' ? 'suspended' : 'active' } }
-          : t
-      )
-    );
+  const toggleStatus = async (id: string) => {
+    const tenant = tenants.find(t => t.id === id);
+    if (!tenant) return;
+
+    const newStatus = tenant.subscription.status === 'active' ? 'suspended' : 'active';
+    const { error } = await supabase
+      .from('tenants')
+      .update({
+        subscription: { ...tenant.subscription, status: newStatus }
+      })
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: 'Erro ao alterar status', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Sistema',
       action: 'TOGGLE_TENANT_STATUS',
-      details: `Alterou status da empresa ID: ${id}`,
+      details: `Alterou status da empresa ID: ${id} para ${newStatus}`,
       tenantId: id
     });
+    
+    await fetchData();
   };
 
-  const handleAddStore = () => {
+  const handleAddStore = async () => {
     if (!selectedTenant || !storeForm.name || !storeForm.cnpj) return;
-    const newStore: StoreType = {
+    
+    const { error } = await supabase.from('stores').insert({
       id: `s_${Date.now()}`,
-      tenantId: selectedTenant.id,
+      tenant_id: selectedTenant.id,
       name: storeForm.name,
-      cnpj: storeForm.cnpj,
-    };
-    setStores(prev => [...prev, newStore]);
+      cnpj: storeForm.cnpj
+    });
+
+    if (error) {
+      toast({ title: 'Erro ao cadastrar loja', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     setStoreForm({ name: '', cnpj: '' });
     setAddStoreOpen(false);
+    await fetchData();
     toast({ title: 'Loja cadastrada', description: `${storeForm.name} adicionada com sucesso.` });
   };
 

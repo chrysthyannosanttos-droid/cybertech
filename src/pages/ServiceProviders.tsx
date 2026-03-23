@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { MOCK_SERVICE_PROVIDERS, addAuditLog } from '@/data/mockData';
+import { useEffect, useState } from 'react';
+import { addAuditLog } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
 import { ServiceProvider } from '@/types';
 import { Briefcase, Plus, Search, Mail, Phone, Calendar, AlertCircle, FileText, Upload, Edit2, CheckCircle2, Trash2, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,13 +12,47 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function ServiceProviders() {
-  const [providers, setProviders] = useState(MOCK_SERVICE_PROVIDERS);
+  const [providers, setProviders] = useState<ServiceProvider[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    // Get tenant_id
+    const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+    if (tData?.id) setTenantId(tData.id);
+
+    const { data, error } = await supabase.from('service_providers').select('*').order('name');
+    if (error) {
+      toast({ title: 'Erro ao buscar prestadores', description: error.message, variant: 'destructive' });
+    } else {
+      setProviders((data || []).map(p => ({
+        id: p.id,
+        tenantId: p.tenant_id,
+        name: p.name,
+        cnpj: p.cnpj || '',
+        email: p.email || '',
+        phone: p.phone || '',
+        startDate: p.start_date || '',
+        endDate: p.end_date || '',
+        contractValue: Number(p.contract_value) || 0,
+        duties: p.duties || '',
+        observations: p.observations || '',
+        additionalCosts: p.additional_costs || [],
+      })));
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const [form, setForm] = useState({
     name: '',
@@ -88,73 +123,85 @@ export default function ServiceProviders() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name || !form.cnpj) return;
 
+    const dbData = {
+      name: form.name,
+      cnpj: form.cnpj,
+      email: form.email,
+      phone: form.phone,
+      start_date: form.startDate,
+      end_date: form.endDate,
+      contract_value: Number(form.contractValue) || 0,
+      duties: form.duties,
+      observations: form.observations,
+      additional_costs: form.additionalCosts,
+      tenant_id: tenantId
+    };
+
     if (editingId) {
-      setProviders(prev => prev.map(p =>
-        p.id === editingId ? {
-          ...p,
-          name: form.name,
-          cnpj: form.cnpj,
-          email: form.email,
-          phone: form.phone,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          contractValue: Number(form.contractValue) || 0,
-          duties: form.duties,
-          observations: form.observations,
-          additionalCosts: form.additionalCosts,
-        } : p
-      ));
+      const { error } = await supabase
+        .from('service_providers')
+        .update(dbData)
+        .eq('id', editingId);
+
+      if (error) {
+        toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
       addAuditLog({
         userId: currentUser?.id || 'unknown',
         userName: currentUser?.name || 'Sistema',
         action: 'EDIT_SERVICE_PROVIDER',
         details: `[ServiceProviders] Editou prestador ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: providers.find(p => p.id === editingId)?.tenantId
+        tenantId: tenantId || undefined
       });
       toast({ title: 'Prestador atualizado', description: `${form.name} atualizado com sucesso.` });
     } else {
-      const newProvider: ServiceProvider = {
-        id: `sp${Date.now()}`,
-        tenantId: 't1',
-        name: form.name,
-        cnpj: form.cnpj,
-        email: form.email,
-        phone: form.phone,
-        startDate: form.startDate,
-        endDate: form.endDate,
-        contractValue: Number(form.contractValue) || 0,
-        duties: form.duties,
-        observations: form.observations,
-        additionalCosts: form.additionalCosts,
-      };
-      setProviders(prev => [...prev, newProvider]);
+      const { error } = await supabase
+        .from('service_providers')
+        .insert([{ ...dbData, id: crypto.randomUUID() }]);
+
+      if (error) {
+        toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
       addAuditLog({
         userId: currentUser?.id || 'unknown',
         userName: currentUser?.name || 'Sistema',
         action: 'CREATE_SERVICE_PROVIDER',
         details: `[ServiceProviders] Criou prestador ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: newProvider.tenantId
+        tenantId: tenantId || undefined
       });
       toast({ title: 'Prestador cadastrado', description: `${form.name} adicionada com sucesso.` });
     }
+    
+    await fetchData();
     setOpen(false);
   };
 
-  const handleDeleteProvider = (id: string, name: string) => {
+  const handleDeleteProvider = async (id: string, name: string) => {
     if (!isAdmin) return;
     if (!window.confirm(`Tem certeza que deseja excluir o prestador ${name}?`)) return;
-    const provider = providers.find(p => p.id === id);
-    setProviders(prev => prev.filter(p => p.id !== id));
+    
+    const { error } = await supabase.from('service_providers').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
       action: 'DELETE_SERVICE_PROVIDER',
       details: `[ServiceProviders] Excluiu prestador ${name}`,
-      tenantId: provider?.tenantId
+      tenantId: tenantId || undefined
     });
+    
+    await fetchData();
     toast({ title: 'Prestador removido' });
   };
 

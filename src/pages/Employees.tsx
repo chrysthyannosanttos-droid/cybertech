@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { MOCK_STORES, MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
+import { MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
 import { Employee, Benefit, EmployeeBenefit } from '@/types';
 import { Search, Plus, Download, Upload, Users, UserCheck, UserX, DollarSign, Wallet, Edit2, CheckCircle2, Trash2, FileSpreadsheet, AlertCircle, Camera } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
-  const [dbStores, setDbStores] = useState<{id: string; name: string}[]>([]);
+  const [dbStores, setDbStores] = useState<{id: string; name: string; tenantId: string}[]>([]);
   // Import state
   const [importOpen, setImportOpen] = useState(false);
   const [importStoreId, setImportStoreId] = useState('');
@@ -66,8 +66,8 @@ export default function Employees() {
       if (tenantData?.id) setTenantId(tenantData.id);
 
       // Fetch real stores
-      const { data: storesData } = await supabase.from('stores').select('id, name').order('name');
-      if (storesData && storesData.length > 0) setDbStores(storesData);
+      const { data: storesData } = await supabase.from('stores').select('*').order('name');
+      if (storesData && storesData.length > 0) setDbStores(storesData.map(s => ({ ...s, tenantId: s.tenant_id })));
 
       const { data, error } = await supabase
         .from('employees')
@@ -80,7 +80,7 @@ export default function Employees() {
         // Map snake_case from DB to camelCase in TS
         const mappedData = (data || []).map(emp => ({
           ...emp,
-          storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
+          storeName: dbStores.find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
           admissionDate: emp.admission_date,
           birthDate: emp.birth_date,
           tenantId: emp.tenant_id,
@@ -109,7 +109,7 @@ export default function Employees() {
         if (payload.eventType === 'INSERT') {
           const newEmp = {
             ...payload.new,
-            storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            storeName: dbStores.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
             admissionDate: payload.new.admission_date,
             birthDate: payload.new.birth_date,
             storeId: payload.new.store_id,
@@ -123,7 +123,7 @@ export default function Employees() {
           setEmployees(prev => prev.map(emp => emp.id === payload.new.id ? {
             ...emp,
             ...payload.new,
-            storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            storeName: dbStores.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
             admissionDate: payload.new.admission_date,
             birthDate: payload.new.birth_date,
             storeId: payload.new.store_id,
@@ -721,7 +721,7 @@ export default function Employees() {
                       <Label className="text-[12px] text-muted-foreground">Loja de Alocação *</Label>
                       <Select value={form.storeId} onValueChange={v => setForm(f => ({...f, storeId: v}))}>
                         <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>{(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                        <SelectContent>{dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
@@ -919,7 +919,7 @@ export default function Employees() {
           <SelectTrigger className="w-[180px] h-10 bg-white/5 border-white/10 rounded-xl"><SelectValue placeholder="Lojas" /></SelectTrigger>
           <SelectContent className="glass-card border-white/10 text-white">
             <SelectItem value="all">Todas as Lojas</SelectItem>
-            {(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
+            {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={departmentFilter} onValueChange={v => { setDepartmentFilter(v); setPage(1); }}>
@@ -1175,7 +1175,7 @@ export default function Employees() {
                   <SelectValue placeholder="Selecione a loja..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1218,7 +1218,7 @@ export default function Employees() {
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {importRows.map((row, i) => {
-                        const store = MOCK_STORES.find(s => s.id === importStoreId)!;
+                        const store = dbStores.find(s => s.id === importStoreId)!;
                         const r = mapRow(row, store);
                         const hasError = !r.name || r.cpf.length < 11;
                         return (

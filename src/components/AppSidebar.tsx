@@ -30,7 +30,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/reports',           module: 'reports',           icon: BarChart3,       label: 'Relatórios' },
   { to: '/service-providers', module: 'service-providers', icon: Briefcase,       label: 'Prestadores' },
   { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
-  { to: '/logs',              module: 'logs',              icon: History,         label: 'Audit Logs',   superadminOnly: true },
+  { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
   { to: '/ponto',             module: 'dashboard',         icon: Clock,           label: 'Ponto Digital' },
   { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários',     superadminOnly: true },

@@ -1,63 +1,109 @@
-import { useState } from 'react';
-import { MOCK_STORES, MOCK_EMPLOYEES, MOCK_TENANTS } from '@/data/mockData';
-import { Store, MapPin, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { MapPin, Plus, Search, Trash2, Store } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { addAuditLog } from '@/data/mockData';
+import { Tenant, Store as StoreType, Employee } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Store as StoreType } from '@/types';
+
 
 export default function Stores() {
-  const [stores, setStores] = useState<StoreType[]>(MOCK_STORES);
+  const [stores, setStores] = useState<StoreType[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
-  const [form, setForm] = useState({ name: '', cnpj: '', tenantId: MOCK_TENANTS[0]?.id || '' });
+  const [form, setForm] = useState({ name: '', cnpj: '', tenantId: '' });
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [
+      { data: sData },
+      { data: tData },
+      { data: eData }
+    ] = await Promise.all([
+      supabase.from('stores').select('*').order('name'),
+      supabase.from('tenants').select('*').order('name'),
+      supabase.from('employees').select('id, store_id')
+    ]);
+
+    if (sData) setStores(sData.map(s => ({ ...s, tenantId: s.tenant_id } as StoreType)));
+    if (tData) setTenants(tData as Tenant[]);
+    if (eData) setEmployees(eData.map(e => ({ id: e.id, storeId: e.store_id } as any)));
+    
+    if (tData && tData.length > 0 && !form.tenantId) {
+      setForm(f => ({ ...f, tenantId: tData[0].id }));
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filtered = stores.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) || s.cnpj.includes(search)
   );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.name || !form.cnpj || !form.tenantId) {
       toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' });
       return;
     }
-    const newStore: StoreType = {
-      id: `s_${Date.now()}`,
+    
+    const { error } = await supabase.from('stores').insert([{
+      id: crypto.randomUUID(),
       name: form.name.toUpperCase(),
       cnpj: form.cnpj,
-      tenantId: form.tenantId
-    };
-    setStores(prev => [newStore, ...prev]);
+      tenant_id: form.tenantId
+    }]);
+
+    if (error) {
+      toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Sistema',
       action: 'CREATE_STORE',
       details: `[Stores] Cadastrou unidade ${form.name} (CNPJ: ${form.cnpj})`
     });
-    setForm({ name: '', cnpj: '', tenantId: MOCK_TENANTS[0]?.id || '' });
+    
+    setForm({ name: '', cnpj: '', tenantId: tenants[0]?.id || '' });
     setOpen(false);
+    await fetchData();
     toast({ title: 'Loja cadastrada', description: `${form.name} adicionada com sucesso.` });
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (!isAdmin) return;
     if (!window.confirm(`Deseja excluir a unidade ${name}?`)) return;
-    setStores(prev => prev.filter(s => s.id !== id));
+    
+    const { error } = await supabase.from('stores').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+      return;
+    }
+
     addAuditLog({
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
       action: 'DELETE_STORE',
       details: `[Stores] Excluiu unidade ${name}`
     });
+    
+    await fetchData();
     toast({ title: 'Unidade excluída' });
   };
 
@@ -97,7 +143,7 @@ export default function Stores() {
                 <Select value={form.tenantId} onValueChange={v => setForm(f => ({ ...f, tenantId: v }))}>
                   <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione a empresa associada..." /></SelectTrigger>
                   <SelectContent>
-                    {MOCK_TENANTS.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    {tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -114,8 +160,8 @@ export default function Stores() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map((store, i) => {
-          const empCount = MOCK_EMPLOYEES.filter(e => e.storeId === store.id).length;
-          const tenant = MOCK_TENANTS.find(t => t.id === store.tenantId);
+          const empCount = employees.filter(e => e.storeId === store.id).length;
+          const tenant = tenants.find(t => t.id === store.tenantId);
           return (
             <div key={store.id} className={`glass-card rounded-2xl p-6 border border-white/5 animate-fade-in-up stagger-${(i % 10) + 1} group hover:border-primary/30 transition-all duration-300 shadow-xl relative overflow-hidden`}>
               <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 blur-3xl -mr-12 -mt-12 group-hover:bg-primary/10 transition-colors" />

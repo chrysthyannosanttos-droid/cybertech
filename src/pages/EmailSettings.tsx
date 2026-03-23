@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MOCK_TENANTS } from '@/data/mockData';
+import { Tenant } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Mail, Lock, Server, Send, Save, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+
+interface TenantInternal extends Tenant {}
 
 interface EmailSettings {
   id?: string;
@@ -22,7 +24,8 @@ interface EmailSettings {
 
 export default function EmailSettings() {
   const { toast } = useToast();
-  const [selectedTenantId, setSelectedTenantId] = useState<string>(MOCK_TENANTS[0]?.id || '');
+  const [tenants, setTenants] = useState<TenantInternal[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<EmailSettings>({
@@ -34,6 +37,19 @@ export default function EmailSettings() {
     from_name: 'RH Digital',
     from_email: '',
   });
+
+  useEffect(() => {
+    async function fetchTenants() {
+      const { data } = await supabase.from('tenants').select('*').order('name');
+      if (data) {
+        setTenants(data as TenantInternal[]);
+        if (data.length > 0 && !selectedTenantId) {
+          setSelectedTenantId(data[0].id);
+        }
+      }
+    }
+    fetchTenants();
+  }, []);
 
   useEffect(() => {
     if (selectedTenantId) {
@@ -83,7 +99,7 @@ export default function EmailSettings() {
 
       toast({
         title: 'Configurações Salvas!',
-        description: `E-mail de envio para ${MOCK_TENANTS.find(t => t.id === selectedTenantId)?.name} atualizado.`,
+        description: `E-mail de envio para ${tenants.find(t => t.id === selectedTenantId)?.name} atualizado.`,
       });
     } catch (e: any) {
       toast({
@@ -134,7 +150,7 @@ export default function EmailSettings() {
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent className="glass-card border-white/10">
-                  {MOCK_TENANTS.map(t => (
+                  {tenants.map(t => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
                 </SelectContent>

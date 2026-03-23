@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { addAuditLog } from '@/data/mockData';
-import { MOCK_TENANTS } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
+import { Tenant } from '@/types';
 
 // Módulos disponíveis para configurar permissões
 const MODULE_OPTIONS: Array<{ module: AppModule; label: string; description: string }> = [
@@ -36,12 +37,17 @@ export default function UserManagement() {
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = async () => {
     setLoading(true);
-    const data = await getAllUsers();
-    setUsers(data);
+    const [userData, { data: tenantData }] = await Promise.all([
+      getAllUsers(),
+      supabase.from('tenants').select('*')
+    ]);
+    setUsers(userData);
+    if (tenantData) setTenants(tenantData as Tenant[]);
     setLoading(false);
   };
 
@@ -229,7 +235,7 @@ export default function UserManagement() {
           </thead>
           <tbody className="divide-y divide-white/5">
             {users.map((u) => {
-              const tenant = MOCK_TENANTS.find(t => t.id === u.user.tenantId);
+              const tenant = tenants.find(t => t.id === u.user.tenantId);
               const isAdmin = u.user.role === 'superadmin';
               const permCount = isAdmin ? 'Tudo' : `${(u.permissions ?? DEFAULT_PERMISSIONS).length}/${MODULE_OPTIONS.length}`;
               return (
@@ -344,9 +350,9 @@ export default function UserManagement() {
                 <div className="space-y-1.5">
                   <Label className="text-[12px] text-muted-foreground">Empresa Vinculada</Label>
                   <Select value={form.tenantId} onValueChange={v => setForm(f => ({ ...f, tenantId: v }))}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione o Cliente" /></SelectTrigger>
                     <SelectContent>
-                      {MOCK_TENANTS.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      {tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

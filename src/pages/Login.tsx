@@ -76,7 +76,7 @@ export default function Login() {
             <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic drop-shadow-2xl">
               CyberTech <span className="text-primary">RH</span>
             </h1>
-            <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">Intelligence for Human Resources</p>
+            <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">Inteligência para Recursos Humanos</p>
           </div>
         </div>
 

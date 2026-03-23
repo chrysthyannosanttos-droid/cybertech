@@ -1,9 +1,11 @@
-import { MOCK_TENANTS, MOCK_EMPLOYEES, MOCK_CERTIFICATES, MOCK_MRR_DATA, MOCK_STORES, MOCK_SERVICE_PROVIDERS } from '@/data/mockData';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { Tenant, Employee, Certificate, Store as StoreType, ServiceProvider } from '@/types';
 import { Building2, Users, DollarSign, TrendingUp, FileHeart, Store, Briefcase } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState, useMemo } from 'react';
+
 
 function KpiCard({ icon: Icon, label, value, sub, delay }: { icon: any; label: string; value: string; sub?: string; delay: number }) {
   return (
@@ -35,16 +37,71 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [stores, setStores] = useState<StoreType[]>([]);
+  const [providers, setProviders] = useState<ServiceProvider[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      const [
+        { data: tData },
+        { data: eData },
+        { data: cData },
+        { data: sData },
+        { data: pData }
+      ] = await Promise.all([
+        supabase.from('tenants').select('*'),
+        supabase.from('employees').select('*'),
+        supabase.from('certificates').select('*'),
+        supabase.from('stores').select('*'),
+        supabase.from('service_providers').select('*')
+      ]);
+
+      if (tData) setTenants(tData.map(t => ({ ...t, employeeCount: t.employee_count, subscription: t.subscription || { status: 'active', monthlyFee: 0 } } as Tenant)));
+      if (eData) setEmployees(eData.map(e => ({
+        ...e,
+        storeId: e.store_id,
+        admissionDate: e.admission_date,
+        salary: Number(e.salary),
+        valeTransporte: Number(e.vale_transporte),
+        valeRefeicao: Number(e.vale_refeicao),
+        insalubridade: Number(e.insalubridade),
+        periculosidade: Number(e.periculosidade),
+        gratificacao: Number(e.gratificacao),
+        flexivel: Number(e.flexivel),
+        mobilidade: Number(e.mobilidade),
+        valeFlexivel: Number(e.vale_flexivel)
+      } as Employee)));
+      if (cData) setCertificates(cData.map(c => ({ ...c, employeeId: c.employee_id, employeeName: c.employee_name } as unknown as Certificate)));
+      if (sData) setStores(sData.map(s => ({ ...s, tenantId: s.tenant_id } as StoreType)));
+      if (pData) setProviders(pData.map(p => ({
+        ...p,
+        tenantId: p.tenant_id,
+        contractValue: Number(p.contract_value),
+        startDate: p.start_date,
+        endDate: p.end_date,
+        additionalCosts: p.additional_costs || []
+      } as ServiceProvider)));
+      
+      setIsLoading(false);
+    };
+    fetchData();
+  }, []);
 
   const filteredEmployees = useMemo(() => {
-    if (selectedStoreId === 'all') return MOCK_EMPLOYEES;
-    return MOCK_EMPLOYEES.filter(e => e.storeId === selectedStoreId);
-  }, [selectedStoreId]);
+    if (selectedStoreId === 'all') return employees;
+    return employees.filter(e => e.storeId === selectedStoreId);
+  }, [selectedStoreId, employees]);
 
-  const activeClients = MOCK_TENANTS.filter(t => t.subscription.status === 'active').length;
-  const totalMRR = MOCK_TENANTS.filter(t => t.subscription.status === 'active').reduce((s, t) => s + t.subscription.monthlyFee, 0);
+  const activeClients = tenants.filter(t => t.subscription.status === 'active').length;
+  const totalMRR = tenants.filter(t => t.subscription.status === 'active').reduce((s, t) => s + (t.subscription.monthlyFee || 0), 0);
   const totalEmployees = filteredEmployees.length;
-  const filteredCertificates = MOCK_CERTIFICATES.filter(c => filteredEmployees.some(e => e.id === c.employeeId));
+  const filteredCertificates = certificates.filter(c => filteredEmployees.some(e => e.id === c.employeeId));
   const totalCertificates = filteredCertificates.length;
 
   const maleEmployees = filteredEmployees.filter(e => e.gender === 'M');
@@ -79,14 +136,14 @@ export default function Dashboard() {
       .slice(0, 10);
   }, [filteredCertificates]);
 
-  const storeDistribution = MOCK_STORES.map(store => ({
+  const storeDistribution = stores.map(store => ({
     name: store.name.replace('SUPER ', 'S.').replace('ATACADO ', 'AT.').replace('VAREJO ', 'V.'),
-    count: MOCK_EMPLOYEES.filter(e => e.storeId === store.id).length,
+    count: employees.filter(e => e.storeId === store.id).length,
   }));
 
   const providerCosts = useMemo(() => {
-    return MOCK_SERVICE_PROVIDERS.map(p => {
-      const extraTotal = p.additionalCosts?.reduce((s, c) => s + c.value, 0) || 0;
+    return providers.map(p => {
+      const extraTotal = p.additionalCosts?.reduce((s: number, c: any) => s + c.value, 0) || 0;
       return {
         name: p.name,
         total: p.contractValue + extraTotal,
@@ -94,7 +151,13 @@ export default function Dashboard() {
         extra: extraTotal
       };
     }).sort((a, b) => b.total - a.total);
-  }, []);
+  }, [providers]);
+
+  const mockMRRData = [
+    { month: 'Jan', value: totalMRR * 0.9 },
+    { month: 'Fev', value: totalMRR * 0.95 },
+    { month: 'Mar', value: totalMRR },
+  ];
 
   const totalCertDays = filteredCertificates.reduce((s, c) => s + c.days, 0);
   const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
@@ -133,7 +196,7 @@ export default function Dashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas as Lojas</SelectItem>
-                {MOCK_STORES.map(s => (
+                {stores.map(s => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -146,7 +209,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {isSuperAdmin && (
           <>
-            <KpiCard icon={Building2} label="Clientes Ativos" value={`${activeClients}/${MOCK_TENANTS.length}`} sub={`${MOCK_TENANTS.length - activeClients} inativos`} delay={1} />
+            <KpiCard icon={Building2} label="Clientes Ativos" value={`${activeClients}/${tenants.length}`} sub={`${tenants.length - activeClients} inativos`} delay={1} />
             <KpiCard icon={DollarSign} label="Receita Mensal" value={`R$ ${totalMRR.toLocaleString('pt-BR')}`} delay={2} />
           </>
         )}
@@ -154,8 +217,8 @@ export default function Dashboard() {
         <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
         {!isSuperAdmin && (
           <>
-            <KpiCard icon={Store} label="Lojas Ativas" value={String(MOCK_STORES.length)} delay={3} />
-            <KpiCard icon={TrendingUp} label="Folha Estimada" value={`R$ ${filteredEmployees.reduce((s, e) => s + e.salary, 0).toLocaleString('pt-BR')}`} delay={4} />
+            <KpiCard icon={Store} label="Lojas Ativas" value={String(stores.length)} delay={3} />
+            <KpiCard icon={TrendingUp} label="Folha Estimada" value={`R$ ${filteredEmployees.reduce((s, e) => s + (e.salary || 0), 0).toLocaleString('pt-BR')}`} delay={4} />
           </>
         )}
       </div>
@@ -173,7 +236,7 @@ export default function Dashboard() {
                   <TrendingUp className="w-4 h-4 text-primary" /> Faturamento Recorrente (MRR)
                 </h3>
                 <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={MOCK_MRR_DATA}>
+                  <AreaChart data={mockMRRData}>
                     <defs>
                       <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.1}/>

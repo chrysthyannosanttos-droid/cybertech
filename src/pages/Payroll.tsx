@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MOCK_CERTIFICATES, MOCK_STORES } from '@/data/mockData';
+import { MOCK_BENEFITS } from '@/data/mockData';
 import { supabase } from '@/lib/supabase';
-import { Employee, Certificate, PayrollEntry } from '@/types';
+import { Employee, Certificate, PayrollEntry, Store } from '@/types';
 import { Download, FileText, CalendarIcon, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,13 +41,28 @@ export default function Payroll() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dbEmployees, setDbEmployees] = useState<Employee[]>([]);
   const [dbCertificates, setDbCertificates] = useState<Certificate[]>([]);
+  const [dbStores, setDbStores] = useState<Store[]>([]);
   const [payrollData, setPayrollData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const fetchData = async () => {
-      const { data: empData } = await supabase.from('employees').select('*');
+      setIsLoading(true);
+      const [
+        { data: empData },
+        { data: certData },
+        { data: storesData }
+      ] = await Promise.all([
+        supabase.from('employees').select('*'),
+        supabase.from('certificates').select('*'),
+        supabase.from('stores').select('*')
+      ]);
+
+      const storesList = (storesData || []).map(s => ({ ...s, tenantId: s.tenant_id } as Store));
+      setDbStores(storesList);
+
       if (empData) setDbEmployees(empData.map(e => {
-        const store = MOCK_STORES.find(s => s.id === e.store_id);
+        const store = storesList.find(s => s.id === e.store_id);
         return {
           ...e,
           storeId: e.store_id,
@@ -58,21 +73,20 @@ export default function Payroll() {
         } as Employee;
       }));
 
-      const { data: certData } = await supabase.from('certificates').select('*');
       if (certData) setDbCertificates(certData.map(c => ({
         ...c,
         employeeId: c.employee_id,
         days: c.days
       } as unknown as Certificate)));
+      
+      setIsLoading(false);
     };
     fetchData();
     
-    // Subscribe to employees realtime
     const channel = supabase
-      .channel('payroll_employees_realtime')
-      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => {
-        fetchData();
-      })
+      .channel('payroll_sync_realtime')
+      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => fetchData())
+      .on('postgres_changes', { event: '*', table: 'certificates', schema: 'public' }, () => fetchData())
       .subscribe();
 
     return () => {
@@ -89,7 +103,8 @@ export default function Payroll() {
         const empCerts = dbCertificates.filter(c => c.employeeId === emp.id);
         const certDays = empCerts.reduce((s, c) => s + c.days, 0);
         const dailyRate = emp.salary / 30;
-        const absences = Math.floor(Math.random() * 3);
+        // Keep it simple for now, can be expanded for real absences if a table exists
+        const absences = 0; 
         const deductions = absences * dailyRate;
         return {
           employeeId: emp.id,
@@ -171,7 +186,7 @@ export default function Payroll() {
       return;
     }
 
-    const store = MOCK_STORES.find(s => s.id === exportStoreId);
+    const store = dbStores.find(s => s.id === exportStoreId);
     if (!store) return;
 
     const cnpjClean = store.cnpj.replace(/[./-]/g, '');
@@ -239,7 +254,7 @@ export default function Payroll() {
             <SelectTrigger className="w-[200px] h-10 bg-white/5 border-white/10 rounded-xl text-white"><SelectValue /></SelectTrigger>
             <SelectContent className="glass-card border-white/10 text-white">
               <SelectItem value="all">Todas as Lojas</SelectItem>
-              {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
+              {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl text-white/60 hover:text-white hover:bg-white/10 font-bold text-[12px] gap-2 transition-all" onClick={exportExcel}>
@@ -263,12 +278,12 @@ export default function Payroll() {
                   <Select value={exportStoreId} onValueChange={setExportStoreId}>
                     <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
                     <SelectContent>
-                      {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {exportStoreId && (
                     <p className="text-[11px] text-muted-foreground mt-1 font-mono-data">
-                      CNPJ: {MOCK_STORES.find(s => s.id === exportStoreId)?.cnpj}
+                      CNPJ: {dbStores.find(s => s.id === exportStoreId)?.cnpj}
                     </p>
                   )}
                 </div>
@@ -320,7 +335,7 @@ export default function Payroll() {
                     <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Prévia do arquivo:</p>
                     <pre className="text-[11px] font-mono-data leading-relaxed text-foreground">
                       {(() => {
-                        const store = MOCK_STORES.find(s => s.id === exportStoreId);
+                        const store = dbStores.find(s => s.id === exportStoreId);
                         if (!store) return '';
                         const cnpj = store.cnpj.replace(/[./-]/g, '');
                         const start = format(exportStartDate, 'ddMMyyyy');

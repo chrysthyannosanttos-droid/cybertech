@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { MOCK_EMPLOYEES, MOCK_STORES, MOCK_CERTIFICATES } from '@/data/mockData';
+import { useEffect, useState, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Employee, Store, Certificate } from '@/types';
 import { Search, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,27 +8,76 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import * as XLSX from 'xlsx';
 
 export default function Reports() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      const [
+        { data: eData },
+        { data: sData },
+        { data: cData }
+      ] = await Promise.all([
+        supabase.from('employees').select('*'),
+        supabase.from('stores').select('*'),
+        supabase.from('certificates').select('*')
+      ]);
+
+      if (sData) setStores(sData.map(s => ({ ...s, tenantId: s.tenant_id } as Store)));
+
+      if (eData) {
+        const mappedEmployees = eData.map(e => {
+          const store = sData?.find(s => s.id === e.store_id);
+          return {
+            ...e,
+            storeId: e.store_id,
+            salary: Number(e.salary),
+            admissionDate: e.admission_date,
+            storeName: store?.name || 'Unidade Desconhecida'
+          } as Employee;
+        });
+        setEmployees(mappedEmployees);
+      }
+      
+      if (cData) setCertificates(cData.map(c => ({
+        ...c,
+        employeeId: c.employee_id,
+        days: c.days
+      } as unknown as Certificate)));
+      
+      setIsLoading(false);
+    };
+    fetchData();
+  }, []);
+
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
 
-  const filtered = MOCK_EMPLOYEES.filter(e => {
-    const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) || e.cpf.includes(search);
-    const matchStore = storeFilter === 'all' || e.storeId === storeFilter;
-    return matchSearch && matchStore;
-  });
+  const filtered = useMemo(() => {
+    return employees.filter(e => {
+      const matchSearch = e.name.toLowerCase().includes(search.toLowerCase()) || e.cpf.includes(search);
+      const matchStore = storeFilter === 'all' || e.storeId === storeFilter;
+      // departmentFilter is not currently used in the filtering logic
+      return matchSearch && matchStore;
+    });
+  }, [employees, search, storeFilter]);
 
   const exportReport = () => {
     const data = filtered.map(e => {
-      const certs = MOCK_CERTIFICATES.filter(c => c.employeeId === e.id);
+      const store = stores.find(s => s.id === e.storeId);
+      const empCerts = certificates.filter(c => c.employeeId === e.id);
       return {
-        Nome: e.name,
-        CPF: e.cpf,
-        Sexo: e.gender === 'M' ? 'Homem' : 'Mulher',
-        Cargo: e.role,
-        Loja: e.storeName,
-        Salário: e.salary,
-        'Total Atestados': certs.length,
-        'Dias Afastado': certs.reduce((s, c) => s + c.days, 0),
+        'Nome': e.name,
+        'CPF': e.cpf,
+        'Unidade': store?.name || '---',
+        'Cargo': e.role,
+        'Departamento': e.department,
+        'Salário Base': e.salary,
+        'Atestados (Dias)': empCerts.reduce((acc, c) => acc + c.days, 0)
       };
     });
     const ws = XLSX.utils.json_to_sheet(data);
@@ -59,7 +109,7 @@ export default function Reports() {
           </SelectTrigger>
           <SelectContent className="glass-card border-white/10 text-white">
             <SelectItem value="all">Todas as Lojas</SelectItem>
-            {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
+            {stores.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -97,7 +147,8 @@ export default function Reports() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {filtered.slice(0, 20).map(e => {
-                const certCount = MOCK_CERTIFICATES.filter(c => c.employeeId === e.id).length;
+                const empCerts = certificates.filter(c => c.employeeId === e.id);
+                const totalDays = empCerts.reduce((acc, c) => acc + c.days, 0);
                 return (
                   <tr key={e.id} className="hover:bg-white/[0.02] transition-colors group">
                     <td className="px-6 py-4">
@@ -109,7 +160,7 @@ export default function Reports() {
                     </td>
                     <td className="px-6 py-4 text-[13px] text-muted-foreground font-medium group-hover:text-white/70 transition-colors">{e.role}</td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-[14px] font-black text-primary drop-shadow-[0_0_8px_rgba(31,180,243,0.3)] tabular-nums">{certCount}</span>
+                      <span className="text-[14px] font-black text-primary drop-shadow-[0_0_8px_rgba(31,180,243,0.3)] tabular-nums">{totalDays}</span>
                     </td>
                   </tr>
                 );
