@@ -33,6 +33,7 @@ export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [dbStores, setDbStores] = useState<{id: string; name: string}[]>([]);
   // Import state
   const [importOpen, setImportOpen] = useState(false);
   const [importStoreId, setImportStoreId] = useState('');
@@ -64,6 +65,10 @@ export default function Employees() {
         .maybeSingle();
       if (tenantData?.id) setTenantId(tenantData.id);
 
+      // Fetch real stores
+      const { data: storesData } = await supabase.from('stores').select('id, name').order('name');
+      if (storesData && storesData.length > 0) setDbStores(storesData);
+
       const { data, error } = await supabase
         .from('employees')
         .select('*')
@@ -75,7 +80,7 @@ export default function Employees() {
         // Map snake_case from DB to camelCase in TS
         const mappedData = (data || []).map(emp => ({
           ...emp,
-          storeName: MOCK_STORES.find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
+          storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
           admissionDate: emp.admission_date,
           birthDate: emp.birth_date,
           tenantId: emp.tenant_id,
@@ -104,7 +109,7 @@ export default function Employees() {
         if (payload.eventType === 'INSERT') {
           const newEmp = {
             ...payload.new,
-            storeName: MOCK_STORES.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
             admissionDate: payload.new.admission_date,
             birthDate: payload.new.birth_date,
             storeId: payload.new.store_id,
@@ -118,7 +123,7 @@ export default function Employees() {
           setEmployees(prev => prev.map(emp => emp.id === payload.new.id ? {
             ...emp,
             ...payload.new,
-            storeName: MOCK_STORES.find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
+            storeName: [...dbStores, ...MOCK_STORES].find(s => s.id === payload.new.store_id)?.name || 'Unidade Desconhecida',
             admissionDate: payload.new.admission_date,
             birthDate: payload.new.birth_date,
             storeId: payload.new.store_id,
@@ -175,7 +180,7 @@ export default function Employees() {
     return isNaN(Number(str)) ? 0 : Number(str);
   };
 
-  const mapRow = (row: any, store: typeof MOCK_STORES[0]) => {
+  const mapRow = (row: any, store: {id: string; name: string}) => {
     const rawName = String(row['Nome'] || row['name'] || '').trim();
     const rawCpf = String(row['CPF'] || row['cpf'] || '').replace(/[^\d]/g, '');
     
@@ -207,7 +212,8 @@ export default function Employees() {
   const handleImport = async () => {
     if (!importStoreId) { toast({ title: 'Selecione a loja', variant: 'destructive' }); return; }
     if (importRows.length === 0) { toast({ title: 'Nenhum dado na planilha', variant: 'destructive' }); return; }
-    const store = MOCK_STORES.find(s => s.id === importStoreId)!;
+    const allStores = dbStores.length > 0 ? dbStores : MOCK_STORES;
+    const store = allStores.find(s => s.id === importStoreId) || allStores[0];
     const validationErrors: string[] = [];
     const mapped = importRows.map((row, i) => {
       const r = mapRow(row, store);
@@ -487,7 +493,8 @@ export default function Employees() {
   };
 
   const handleSave = async () => {
-    const store = MOCK_STORES.find(s => s.id === form.storeId) || MOCK_STORES[0];
+    const allStores = dbStores.length > 0 ? dbStores : MOCK_STORES;
+    const store = allStores.find(s => s.id === form.storeId) || allStores[0];
     
     const dbData = {
       name: form.name,
@@ -701,7 +708,7 @@ export default function Employees() {
                       <Label className="text-[12px] text-muted-foreground">Loja de Alocação *</Label>
                       <Select value={form.storeId} onValueChange={v => setForm(f => ({...f, storeId: v}))}>
                         <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>{MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                        <SelectContent>{(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
@@ -899,7 +906,7 @@ export default function Employees() {
           <SelectTrigger className="w-[180px] h-10 bg-white/5 border-white/10 rounded-xl"><SelectValue placeholder="Lojas" /></SelectTrigger>
           <SelectContent className="glass-card border-white/10 text-white">
             <SelectItem value="all">Todas as Lojas</SelectItem>
-            {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
+            {(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={departmentFilter} onValueChange={v => { setDepartmentFilter(v); setPage(1); }}>
@@ -1153,7 +1160,7 @@ export default function Employees() {
                   <SelectValue placeholder="Selecione a loja..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_STORES.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {(dbStores.length > 0 ? dbStores : MOCK_STORES).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
