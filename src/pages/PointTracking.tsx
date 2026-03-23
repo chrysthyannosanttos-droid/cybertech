@@ -150,12 +150,17 @@ export default function PointTracking() {
     } catch (e) { console.error('loadEmployeeData:', e); }
   }, [user, modelsLoaded]);
 
-  // ── Auto-start camera when models are ready ──
+  // ── Auto-start camera ──
   useEffect(() => {
-    if (modelsLoaded && !cameraActive && !photo) {
-      startCamera();
+    if (!cameraActive && !photo) {
+      // Pequeno delay para garantir que o DOM (videoRef) esteja pronto
+      const timer = setTimeout(startCamera, 300);
+      return () => clearTimeout(timer);
     }
-  }, [modelsLoaded, cameraActive, photo]);
+  }, []);
+
+  // Ensure camera restarts if models load late (though startCamera handles it)
+  useEffect(() => { if (modelsLoaded && !cameraActive && !photo) startCamera(); }, [modelsLoaded]);
 
   useEffect(() => { if (modelsLoaded) loadEmployeeData(); }, [modelsLoaded, loadEmployeeData]);
 
@@ -467,6 +472,13 @@ export default function PointTracking() {
                       className="w-full h-full object-cover" 
                       style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} 
                     />
+                    
+                    {!modelsLoaded && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">Iniciando Biometria...</span>
+                      </div>
+                    )}
                     {/* Liveness overlay */}
                     {livenessChecking && !livenessOk && (
                       <div className="absolute top-4 left-0 right-0 flex justify-center">
