@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_email_settings (
 ALTER TABLE public.tenant_email_settings ENABLE ROW LEVEL SECURITY;
 
 -- Simple policies (for MVP, admin only or scoped by tenant)
+DROP POLICY IF EXISTS "Allow superadmins to manage all email settings" ON public.tenant_email_settings;
 CREATE POLICY "Allow superadmins to manage all email settings" 
 ON public.tenant_email_settings FOR ALL 
 USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'superadmin'));

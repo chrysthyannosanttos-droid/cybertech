@@ -49,7 +49,7 @@ export default function Login() {
       {/* Background Image with Overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/bg-modern.jpg')" }}
+        style={{ backgroundImage: "url('/bg-login.png')" }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1d]/80 via-[#0a0f1d]/90 to-[#0a0f1d]" />
       

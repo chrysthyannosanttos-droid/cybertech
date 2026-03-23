@@ -32,6 +32,7 @@ function isValidCPF(cpf: string) {
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   // Import state
   const [importOpen, setImportOpen] = useState(false);
   const [importStoreId, setImportStoreId] = useState('');
@@ -54,7 +55,15 @@ export default function Employees() {
 
   // Fetch initial data and setup realtime subscription
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchData = async () => {
+      // Fetch real tenant_id first
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      if (tenantData?.id) setTenantId(tenantData.id);
+
       const { data, error } = await supabase
         .from('employees')
         .select('*')
@@ -86,7 +95,7 @@ export default function Employees() {
       setLoading(false);
     };
 
-    fetchEmployees();
+    fetchData();
 
     // Subscribe to realtime changes
     const channel = supabase
@@ -260,6 +269,7 @@ export default function Employees() {
   const [photoCameraActive, setPhotoCameraActive] = useState(false);
   const [photoCapture, setPhotoCapture] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // Add/Edit Employee Modal
   const [addOpen, setAddOpen] = useState(false);
@@ -449,6 +459,17 @@ export default function Employees() {
     }
   }, [photoCapture, photoTargetEmpId, toast]);
 
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setPhotoCapture(evt.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    if (e.target) e.target.value = '';
+  };
+
   const handleNextStep = () => {
     if (addStep === 1) {
       if (!form.name || !form.cpf || !form.storeId) {
@@ -478,7 +499,7 @@ export default function Employees() {
       role: form.role,
       status: form.status,
       salary: Number(form.salary || 0),
-      tenant_id: 't1',
+      tenant_id: tenantId,
       store_id: form.storeId,
       cbo: form.cbo,
       conta_itau: form.contaItau,
@@ -1078,15 +1099,21 @@ export default function Employees() {
             <canvas ref={photoCanvasRef} className="hidden" />
 
             <p className="text-[12px] text-muted-foreground text-center leading-relaxed">
-              Posicione o rosto do funcionário no centro da câmera e tire uma foto nítida para o reconhecimento facial.
+              Posicione o rosto do funcionário no centro da câmera ou faça o upload de uma foto nítida para o reconhecimento facial.
             </p>
 
             <div className="flex gap-2">
               {!photoCapture ? (
                 !photoCameraActive ? (
-                  <Button className="flex-1 h-10 gap-2" onClick={startPhotoCamera}>
-                    <Camera className="w-4 h-4" /> Ativar Câmera
-                  </Button>
+                  <>
+                    <Button className="flex-1 h-10 gap-2" onClick={startPhotoCamera}>
+                      <Camera className="w-4 h-4" /> Ativar Câmera
+                    </Button>
+                    <Button variant="outline" className="flex-1 h-10 gap-2" onClick={() => photoInputRef.current?.click()}>
+                      <Upload className="w-4 h-4" /> Enviar Arquivo
+                    </Button>
+                    <input type="file" accept="image/*" ref={photoInputRef} className="hidden" onChange={handlePhotoFileChange} />
+                  </>
                 ) : (
                   <Button className="flex-1 h-10 gap-2 bg-white text-black hover:bg-white/90" onClick={capturePhotoRef}>
                     <div className="w-4 h-4 rounded-full border-2 border-black" />
