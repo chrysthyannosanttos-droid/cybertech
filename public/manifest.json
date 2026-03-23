@@ -1,0 +1,20 @@
+{
+  "short_name": "CyberTech RH",
+  "name": "CyberTech RH - Gestão de Pessoas",
+  "icons": [
+    {
+      "src": "logo-cybertech.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo-cybertech.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#020617"
+}

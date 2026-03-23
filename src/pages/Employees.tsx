@@ -94,6 +94,7 @@ export default function Employees() {
           gratificacao: emp.gratificacao,
           flexivel: emp.flexivel,
           mobilidade: emp.mobilidade,
+          email: emp.email,
         })) as Employee[];
         setEmployees(mappedData);
       }
@@ -117,6 +118,7 @@ export default function Employees() {
             valeFlexivel: payload.new.vale_flexivel,
             valeTransporte: payload.new.vale_transporte,
             valeRefeicao: payload.new.vale_refeicao,
+            email: payload.new.email,
           } as Employee;
           setEmployees(prev => [newEmp, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
@@ -204,6 +206,7 @@ export default function Employees() {
       flexivel: parseNumeric(row['Flexível'] || row['flexivel']),
       mobilidade: parseNumeric(row['Mobilidade'] || row['mobilidade']),
       vale_flexivel: parseNumeric(row['FLEXIVEL'] || row['valeFlexivel']),
+      email: String(row['Email'] || row['email'] || '').trim().toLowerCase(),
       tenant_id: tenantId,
       store_id: store?.id || null,
     };
@@ -257,7 +260,7 @@ export default function Employees() {
 
   const downloadTemplate = () => {
     const template = [[
-      'Nome', 'CPF', 'Sexo', 'Nascimento', 'Admissão', 'Descrição cargo', 'CBO',
+      'Nome', 'CPF', 'Email', 'Sexo', 'Nascimento', 'Admissão', 'Descrição cargo', 'CBO',
       'Setor', 'Salário', 'conta itau', 'Insa', 'Peric', 'Grat', 'VT', 'Vale Refeição', 'Flexível', 'Mobilidade', 'FLEXIVEL', 'Status'
     ]];
     const ws = XLSX.utils.aoa_to_sheet(template);
@@ -283,7 +286,7 @@ export default function Employees() {
   const [addOpen, setAddOpen] = useState(false);
   const [addStep, setAddStep] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<Employee>>({ status: 'ACTIVE', gender: 'M', role: '', department: '', salary: 0, customFields: {} });
+  const [form, setForm] = useState<Partial<Employee>>({ status: 'ACTIVE', gender: 'M', role: '', department: '', salary: 0, email: '', customFields: {} });
   const [selectedBenefits, setSelectedBenefits] = useState<Record<string, boolean>>({});
   
   // Selection
@@ -350,6 +353,7 @@ export default function Employees() {
   const exportExcel = () => {
     const data = filtered.map(e => ({
       Nome: e.name,
+      Email: e.email || '',
       'Descrição cargo': e.role,
       CBO: e.cbo || '',
       CPF: e.cpf,
@@ -525,6 +529,7 @@ export default function Employees() {
       jornada_retorno_almoco: form.jornadaRetornoAlmoco || '13:00',
       jornada_saida: form.jornadaSaida || '17:00',
       geofence_radius: Number(form.geofenceRadius || 0),
+      email: form.email,
     };
 
     if (editingId) {
@@ -660,7 +665,7 @@ export default function Employees() {
             <Button variant="outline" size="sm" className="h-9 gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4" /> Importar
             </Button>
-            <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if(!v) { setAddStep(1); setEditingId(null); setForm({status: 'ACTIVE', gender: 'M', salary: 0}); setSelectedBenefits({}) } }}>
+            <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if(!v) { setAddStep(1); setEditingId(null); setForm({status: 'ACTIVE', gender: 'M', salary: 0, email: ''}); setSelectedBenefits({}) } }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="h-9 gap-1.5"><Plus className="w-4 h-4" /> Novo Funcionário</Button>
               </DialogTrigger>
@@ -696,6 +701,11 @@ export default function Employees() {
                         setForm(f => ({...f, cpf: v}));
                       }} placeholder="000.000.000-00" className="h-9" />
                     </div>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-[12px] text-muted-foreground">E-mail para Contato (Opcional)</Label>
+                    <Input type="email" value={form.email || ''} onChange={e => setForm(f => ({...f, email: e.target.value.toLowerCase()}))} placeholder="exemplo@email.com" className="h-9" />
                   </div>
                   
                   <div className="grid grid-cols-3 gap-4">

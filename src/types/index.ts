@@ -43,6 +43,7 @@ export interface Employee {
   flexivel?: number;
   mobilidade?: number;
   valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
+  email?: string;
   photo_reference_url?: string;
   photo_references?: string[]; // Multiple face reference images
   // Work schedule (Jornada)

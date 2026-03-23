@@ -81,6 +81,7 @@ export default function PointTracking() {
   const [livenessOk, setLivenessOk] = useState(false);
   const [livenessChecking, setLivenessChecking] = useState(false);
   const [eyeBlinkCount, setEyeBlinkCount] = useState(0);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const livenessRef = useRef<{ prevEAR: number; blinks: number }>({ prevEAR: 1, blinks: 0 });
 
   const appPermissions = JSON.parse(sessionStorage.getItem('app_permissions') || '{}');
@@ -191,11 +192,24 @@ export default function PointTracking() {
   // ── Camera ──
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
       if (videoRef.current) { videoRef.current.srcObject = stream; setCameraActive(true); }
       setLivenessOk(false); setEyeBlinkCount(0);
-    } catch {
-      toast({ title: 'Erro na câmera', description: 'Não foi possível acessar a câmera.', variant: 'destructive' });
+    } catch (e: any) {
+      console.error('Camera error:', e);
+      toast({ title: 'Erro na câmera', description: 'Não foi possível acessar a câmera: ' + e.message, variant: 'destructive' });
+    }
+  };
+
+  const toggleCamera = () => {
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    if (cameraActive) {
+      // Re-start with new mode
+      setTimeout(startCamera, 100);
     }
   };
 
@@ -427,13 +441,25 @@ export default function PointTracking() {
                         <Button variant="ghost" size="sm" className="text-white/60 hover:text-white mt-1" onClick={() => { setPhoto(null); startCamera(); }}>Tentar Novamente</Button>
                       </div>
                     )}
-                    <Button size="icon" variant="secondary" className="absolute top-4 right-4 rounded-full" onClick={() => { setPhoto(null); setMatchResult(null); startCamera(); }}>
-                      <RefreshCw className="w-4 h-4" />
-                    </Button>
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      <Button size="icon" variant="secondary" className="rounded-full bg-black/40 border border-white/10 hover:bg-black/60" onClick={toggleCamera} title="Alternar Câmera">
+                        <RefreshCw className="w-4 h-4 text-white" />
+                      </Button>
+                      <Button size="icon" variant="secondary" className="rounded-full bg-black/40 border border-white/10 hover:bg-black/60" onClick={() => { setPhoto(null); setMatchResult(null); startCamera(); }}>
+                        <RefreshCw className="w-4 h-4 text-white" />
+                      </Button>
+                    </div>
                   </>
                 ) : cameraActive ? (
                   <>
-                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      className="w-full h-full object-cover" 
+                      style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} 
+                    />
                     {/* Liveness overlay */}
                     {livenessChecking && !livenessOk && (
                       <div className="absolute top-4 left-0 right-0 flex justify-center">
@@ -459,19 +485,28 @@ export default function PointTracking() {
                 )}
 
                 {cameraActive && (
-                  <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-6">
+                  <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6 px-6 items-center">
                     {!livenessChecking && !livenessOk && (
-                      <Button onClick={startLiveness} variant="secondary" className="h-12 px-4 rounded-full text-[11px] font-bold gap-2">
+                      <Button onClick={startLiveness} variant="secondary" className="h-12 px-4 rounded-full text-[11px] font-bold gap-2 bg-black/40 border border-white/10 text-white backdrop-blur-md">
                         <Eye className="w-4 h-4" /> Prova de Vida
                       </Button>
                     )}
-                    <Button
-                      onClick={capturePhoto}
-                      disabled={!livenessOk && modelsLoaded}
-                      className="w-16 h-16 rounded-full bg-white border-4 border-primary shadow-2xl p-0"
-                    >
-                      <div className="w-12 h-12 rounded-full border-2 border-black/10" />
-                    </Button>
+                    
+                    <div className="flex items-center gap-4">
+                      <Button size="icon" variant="ghost" className="w-12 h-12 rounded-full bg-black/20 text-white hover:bg-black/40" onClick={toggleCamera}>
+                        <RefreshCw className="w-5 h-5" />
+                      </Button>
+                      
+                      <Button
+                        onClick={capturePhoto}
+                        disabled={!livenessOk && modelsLoaded}
+                        className="w-16 h-16 rounded-full bg-white border-4 border-primary shadow-2xl p-0 transition-transform active:scale-90"
+                      >
+                        <div className="w-12 h-12 rounded-full border-2 border-black/10" />
+                      </Button>
+                      
+                      <div className="w-12 h-12" /> {/* Spacer */}
+                    </div>
                   </div>
                 )}
               </div>

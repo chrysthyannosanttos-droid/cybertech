@@ -19,6 +19,7 @@ import {
   FileText,
   Mail,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentType<{ className?: string }>; label: string; superadminOnly?: boolean }> = [
   { to: '/dashboard',         module: 'dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
@@ -38,7 +39,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () => void; isMobile?: boolean }) {
   const { user, logout, currentPermissions, isEmployeeView } = useAuth();
 
   const isCristiano = user?.email === 'cristiano' || user?.name?.toLowerCase() === 'cristiano';
@@ -59,7 +60,10 @@ export default function AppSidebar() {
   });
 
   return (
-    <aside className="relative flex flex-col w-[240px] min-h-screen glass border-r border-white/5 shadow-2xl z-50">
+    <aside className={cn(
+      "relative flex flex-col w-[240px] min-h-screen glass border-r border-white/5 shadow-2xl z-50",
+      isMobile && "h-full border-none shadow-none"
+    )}>
       {/* Background Glow */}
       <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[100px] pointer-events-none" />
       {/* Logo */}
@@ -80,11 +84,12 @@ export default function AppSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 space-y-0.5">
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto custom-scrollbar">
         {links.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 group ${
                 isActive
@@ -104,7 +109,7 @@ export default function AppSidebar() {
       </nav>
 
       {/* User & Logout */}
-      <div className="border-t border-border/50 p-4 space-y-3">
+      <div className="border-t border-border/50 p-4 space-y-3 bg-black/20">
         <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white/5 border border-white/5 mb-2">
           <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[12px] border border-primary/20 shadow-[0_0_10px_rgba(31,180,243,0.1)]">
             {user?.name?.charAt(0)}
@@ -117,7 +122,7 @@ export default function AppSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={logout}
+          onClick={() => { logout(); onNavigate?.(); }}
           className="w-full justify-start gap-2.5 h-9 text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 text-[13px] font-medium"
         >
           <LogOut className="w-4 h-4" />
