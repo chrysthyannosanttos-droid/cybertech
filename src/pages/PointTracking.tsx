@@ -148,7 +148,14 @@ export default function PointTracking() {
       }
       setReferenceDescriptors(descs);
     } catch (e) { console.error('loadEmployeeData:', e); }
-  }, [user?.id, modelsLoaded]);
+  }, [user, modelsLoaded]);
+
+  // ── Auto-start camera when models are ready ──
+  useEffect(() => {
+    if (modelsLoaded && !cameraActive && !photo) {
+      startCamera();
+    }
+  }, [modelsLoaded, cameraActive, photo]);
 
   useEffect(() => { if (modelsLoaded) loadEmployeeData(); }, [modelsLoaded, loadEmployeeData]);
 
