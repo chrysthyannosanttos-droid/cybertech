@@ -31,10 +31,15 @@ export default function Rescissions() {
     rescissionValue: '',
     type: 'PEDIDO' as Rescission['type']
   });
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
   // Fetch data from Supabase
   useEffect(() => {
     const fetchData = async () => {
+      // Fetch real tenant_id
+      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+      if (tData?.id) setTenantId(tData.id);
+
       // Fetch Rescissions
       const { data: rescData, error: rescError } = await supabase
         .from('rescissions')
@@ -96,7 +101,7 @@ export default function Rescissions() {
       fgts_value: Number(form.fgtsValue),
       rescission_value: Number(form.rescissionValue),
       type: form.type,
-      tenant_id: 't1' // Or get from context
+      tenant_id: tenantId
     };
 
     const { error } = await supabase.from('rescissions').insert([dbData]);

@@ -21,11 +21,16 @@ export default function Certificates() {
   const { user: currentUser } = useAuth();
   const [form, setForm] = useState({ employeeId: '', date: '', cid: '', days: '' });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
   useEffect(() => {
     const fetchData = async () => {
+      // Fetch real tenant_id
+      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+      if (tData?.id) setTenantId(tData.id);
+
       // Fetch Certificates
       const { data: certData } = await supabase.from('certificates').select('*').order('date', { ascending: false });
       if (certData) setCertificates(certData.map(c => ({
@@ -65,7 +70,7 @@ export default function Certificates() {
       date: form.date,
       cid: form.cid.toUpperCase(),
       days: Number(form.days),
-      tenant_id: 't1'
+      tenant_id: tenantId
     };
 
     const { error } = await supabase.from('certificates').insert([dbData]);
