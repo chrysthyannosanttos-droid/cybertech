@@ -228,17 +228,21 @@ export default function Employees() {
 
     setImportLoading(true);
     try {
-      const { error } = await supabase.from('employees').insert(mapped);
+      const { data: upserted, error } = await supabase
+        .from('employees')
+        .upsert(mapped, { onConflict: 'cpf', ignoreDuplicates: true })
+        .select('id');
       if (error) {
-        if (error.code === '23505') {
-          toast({ title: 'Erro de Duplicidade', description: 'Um ou mais CPFs já estão cadastrados.', variant: 'destructive' });
-        } else {
-          toast({ title: 'Erro ao importar', description: error.message, variant: 'destructive' });
-        }
+        toast({ title: 'Erro ao importar', description: error.message, variant: 'destructive' });
         setImportErrors([`Erro no banco: ${error.message}`]);
       } else {
-        addAuditLog({ userId: currentUser?.id || 'unknown', userName: currentUser?.name || 'Sistema', action: 'IMPORT_EMPLOYEES', details: `Importou ${mapped.length} funcionários na loja ${store.name}` });
-        toast({ title: 'Importação bem-sucedida!', description: `${mapped.length} funcionários cadastrados.` });
+        const inserted = upserted?.length ?? mapped.length;
+        const skipped = mapped.length - inserted;
+        addAuditLog({ userId: currentUser?.id || 'unknown', userName: currentUser?.name || 'Sistema', action: 'IMPORT_EMPLOYEES', details: `Importou ${inserted} funcionários (${skipped} duplicados ignorados)` });
+        toast({
+          title: 'Importação concluída!',
+          description: `${inserted} cadastrado(s)${skipped > 0 ? `, ${skipped} duplicado(s) ignorado(s)` : ''}.`
+        });
         setImportOpen(false);
         setImportRows([]);
         setImportStoreId('');
