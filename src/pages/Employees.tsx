@@ -205,15 +205,13 @@ export default function Employees() {
       mobilidade: parseNumeric(row['Mobilidade'] || row['mobilidade']),
       vale_flexivel: parseNumeric(row['FLEXIVEL'] || row['valeFlexivel']),
       tenant_id: tenantId,
-      store_id: store.id,
+      store_id: store?.id || null,
     };
   };
 
   const handleImport = async () => {
-    if (!importStoreId) { toast({ title: 'Selecione a loja', variant: 'destructive' }); return; }
     if (importRows.length === 0) { toast({ title: 'Nenhum dado na planilha', variant: 'destructive' }); return; }
-    const allStores = dbStores.length > 0 ? dbStores : MOCK_STORES;
-    const store = allStores.find(s => s.id === importStoreId) || allStores[0];
+    const store = dbStores.length > 0 ? (dbStores.find(s => s.id === importStoreId) || dbStores[0]) : null;
     const validationErrors: string[] = [];
     const mapped = importRows.map((row, i) => {
       const r = mapRow(row, store);
@@ -493,8 +491,8 @@ export default function Employees() {
   };
 
   const handleSave = async () => {
-    const allStores = dbStores.length > 0 ? dbStores : MOCK_STORES;
-    const store = allStores.find(s => s.id === form.storeId) || allStores[0];
+    const allStores = dbStores.length > 0 ? dbStores : [];
+    const store = allStores.find(s => s.id === form.storeId) || null;
     
     const dbData = {
       name: form.name,
@@ -507,7 +505,7 @@ export default function Employees() {
       status: form.status,
       salary: Number(form.salary || 0),
       tenant_id: tenantId,
-      store_id: form.storeId,
+      store_id: store?.id || null,
       cbo: form.cbo,
       conta_itau: form.contaItau,
       insalubridade: Number(form.insalubridade || 0),
