@@ -199,7 +199,7 @@ export default function Employees() {
       flexivel: parseNumeric(row['Flexível'] || row['flexivel']),
       mobilidade: parseNumeric(row['Mobilidade'] || row['mobilidade']),
       vale_flexivel: parseNumeric(row['FLEXIVEL'] || row['valeFlexivel']),
-      tenant_id: 't1',
+      tenant_id: tenantId,
       store_id: store.id,
     };
   };
