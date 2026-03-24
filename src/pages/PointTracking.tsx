@@ -127,12 +127,17 @@ export default function PointTracking() {
   // ── Load employee data + reference descriptors ──
   const loadEmployeeData = useCallback(async () => {
     if (!user?.id || !modelsLoaded) return;
-    try {
-      const { data } = await supabase.from('employees').select('*').eq('id', user.id).maybeSingle();
-      if (data) setEmployeeData(data);
+    
+    // Se o ID for mock (ex: u1, u2...), não tenta buscar no Supabase para evitar erro 400
+    if (user.id.startsWith('u') && user.id.length < 5) {
+      console.warn('Usando ID de mock, biometria facial pode não carregar');
+      return;
+    }
 
-      // Build list of reference photos
-      const refUrls: string[] = [];
+    try {
+      const { data, error } = await supabase.from('employees').select('*').eq('id', user.id).maybeSingle();
+      if (error) throw error;
+      if (data) setEmployeeData(data);
       if (data?.photo_reference_url) refUrls.push(data.photo_reference_url);
       if (Array.isArray(data?.photo_references)) refUrls.push(...data.photo_references);
 
