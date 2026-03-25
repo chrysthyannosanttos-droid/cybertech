@@ -66,12 +66,16 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
       {/* Background Glow */}
       <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[100px] pointer-events-none" />
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-white/5">
+      <NavLink 
+        to="/dashboard" 
+        onClick={onNavigate}
+        className="flex items-center gap-3 px-5 h-16 border-b border-white/5 hover:bg-white/5 transition-colors"
+      >
         <div className="w-12 h-12 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(31,180,243,0.2)] bg-black/40 p-1 border border-white/5">
           <img src="/logo-cybertech.png" alt="CyberTech Logo" className="w-full h-full object-contain" />
         </div>
         <span className="font-bold text-[16px] tracking-tighter text-white drop-shadow-sm">CyberTech RH</span>
-      </div>
+      </NavLink>
 
       {/* Role badge */}
       <div className="px-5 py-3">

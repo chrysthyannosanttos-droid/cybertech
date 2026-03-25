@@ -235,7 +235,10 @@ export default function Tenants() {
     
     await fetchData();
     setOpen(false);
+    toast({ title: editTenantId ? 'Empresa atualizada' : 'Empresa cadastrada' });
+    setTimeout(() => window.location.reload(), 500);
   };
+ Kinder
 
   const handleDeleteTenant = async (id: string, name: string) => {
     if (!isAdmin) return;
@@ -256,6 +259,7 @@ export default function Tenants() {
     
     await fetchData();
     toast({ title: 'Empresa excluída' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const toggleStatus = async (id: string) => {
@@ -284,6 +288,7 @@ export default function Tenants() {
     });
     
     await fetchData();
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleAddStore = async () => {
@@ -300,11 +305,11 @@ export default function Tenants() {
       toast({ title: 'Erro ao cadastrar loja', description: error.message, variant: 'destructive' });
       return;
     }
-
     setStoreForm({ name: '', cnpj: '' });
     setAddStoreOpen(false);
     await fetchData();
     toast({ title: 'Loja cadastrada', description: `${storeForm.name} adicionada com sucesso.` });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleAddUser = async () => {
@@ -349,6 +354,7 @@ export default function Tenants() {
     setAddUserOpen(false);
     setEditingEmail(null);
     toast({ title: isNew ? 'Usuário cadastrado' : 'Usuário atualizado' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleEditUser = (u: ManagedUser) => {
@@ -370,6 +376,7 @@ export default function Tenants() {
     deleteUser(email);
     setManagedUsers(getAllUsers());
     toast({ title: 'Usuário removido' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   if (selectedTenant) {
@@ -459,6 +466,7 @@ export default function Tenants() {
                 for (const u of tenantUsers) await saveUser(u);
                 setManagedUsers(await getAllUsers());
                 toast({ title: 'Sincronização concluída!' });
+                setTimeout(() => window.location.reload(), 500);
               }}>
                 <RefreshCw className="w-3.5 h-3.5" /> Sincronizar Tudo
               </Button>

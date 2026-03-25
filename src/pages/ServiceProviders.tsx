@@ -181,6 +181,7 @@ export default function ServiceProviders() {
     
     await fetchData();
     setOpen(false);
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDeleteProvider = async (id: string, name: string) => {
@@ -203,6 +204,7 @@ export default function ServiceProviders() {
     
     await fetchData();
     toast({ title: 'Prestador removido' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const getDaysRemaining = (dateStr: string) => {

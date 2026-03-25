@@ -84,6 +84,7 @@ export default function Stores() {
     setOpen(false);
     await fetchData();
     toast({ title: 'Loja cadastrada', description: `${form.name} adicionada com sucesso.` });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -105,6 +106,7 @@ export default function Stores() {
     
     await fetchData();
     toast({ title: 'Unidade excluída' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   return (

@@ -101,6 +101,7 @@ export default function EmailSettings() {
         title: 'Configurações Salvas!',
         description: `E-mail de envio para ${tenants.find(t => t.id === selectedTenantId)?.name} atualizado.`,
       });
+      setTimeout(() => window.location.reload(), 500);
     } catch (e: any) {
       toast({
         title: 'Erro ao salvar',

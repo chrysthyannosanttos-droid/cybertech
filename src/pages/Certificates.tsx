@@ -89,6 +89,7 @@ export default function Certificates() {
     setForm({ employeeId: '', date: '', cid: '', days: '' });
     setOpen(false);
     toast({ title: 'Atestado registrado' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const toggleSelectAll = () => {
@@ -122,6 +123,7 @@ export default function Certificates() {
     });
     setSelectedIds([]);
     toast({ title: `${count} atestado(s) excluído(s)` });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDeleteOne = async (id: string, name: string) => {
@@ -142,6 +144,7 @@ export default function Certificates() {
     });
     setSelectedIds(prev => prev.filter(x => x !== id));
     toast({ title: 'Atestado excluído' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   return (

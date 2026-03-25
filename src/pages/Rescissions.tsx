@@ -124,6 +124,7 @@ export default function Rescissions() {
     setForm({ employeeId: '', terminationDate: '', fgtsValue: '', rescissionValue: '', type: 'PEDIDO' });
     setOpen(false);
     toast({ title: 'Rescisão cadastrada', description: `Lançamento para ${emp.name} concluído.` });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -144,6 +145,7 @@ export default function Rescissions() {
       details: `[Rescisões] Excluiu rescisão de ${name}`
     });
     toast({ title: 'Lançamento excluído' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const getTypeName = (type: Rescission['type']) => {

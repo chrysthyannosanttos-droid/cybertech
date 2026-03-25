@@ -42,6 +42,7 @@ export default function Settings() {
       title: 'Configurações Salvas',
       description: 'As alterações de conexão remota foram aplicadas com sucesso.'
     });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   if (!isAdmin) {

@@ -12,40 +12,24 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, isValidCPF, formatCPF } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { EmployeeImportModal } from '@/components/employees/EmployeeImportModal';
 
-// Validate CPF Helper
-function isValidCPF(cpf: string) {
-  const cleanCPF = cpf.replace(/[^\d]+/g, '');
-  if (cleanCPF.length !== 11 || !!cleanCPF.match(/(\d)\1{10}/)) return false;
-  const split = cleanCPF.split('');
-  let v1 = 0, v2 = 0;
-  for (let i = 0, p = 10; i < 9; i++, p--) v1 += parseInt(split[i]) * p;
-  v1 = ((v1 * 10) % 11) % 10;
-  if (parseInt(split[9]) !== v1) return false;
-  for (let i = 0, p = 11; i < 10; i++, p--) v2 += parseInt(split[i]) * p;
-  v2 = ((v2 * 10) % 11) % 10;
-  return parseInt(split[10]) === v2;
-}
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [dbStores, setDbStores] = useState<{id: string; name: string; tenantId: string}[]>([]);
-  // Import state
   const [importOpen, setImportOpen] = useState(false);
-  const [importStoreId, setImportStoreId] = useState('');
-  const [importRows, setImportRows] = useState<any[]>([]);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   // Photo capture modal refs
   const photoVideoRef = useRef<HTMLVideoElement>(null);
   const photoCanvasRef = useRef<HTMLCanvasElement>(null);
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+  
   // States for Filters
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('all');
@@ -141,135 +125,8 @@ export default function Employees() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [dbStores]);
 
-  // ============ IMPORT LOGIC ============
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-      const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      setImportRows(rows);
-      setImportErrors([]);
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const parseExcelDate = (val: any) => {
-    if (!val) return null;
-    if (typeof val === 'number') {
-      // Excel serial date
-      const date = new Date((val - 25569) * 86400 * 1000);
-      return date.toISOString().split('T')[0];
-    }
-    if (typeof val === 'string') {
-      const parts = val.split(/[/-]/);
-      if (parts.length === 3) {
-        if (parts[0].length === 4) return val; // YYYY-MM-DD
-        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // DD/MM/YYYY to YYYY-MM-DD
-      }
-    }
-    return null;
-  };
-
-  const parseNumeric = (val: any) => {
-    if (val === undefined || val === null || val === '') return 0;
-    const str = String(val).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.');
-    return isNaN(Number(str)) ? 0 : Number(str);
-  };
-
-  const mapRow = (row: any, store: {id: string; name: string}) => {
-    const rawName = String(row['Nome'] || row['name'] || '').trim();
-    const rawCpf = String(row['CPF'] || row['cpf'] || '').replace(/[^\d]/g, '');
-    
-    return {
-      name: rawName.toUpperCase(),
-      cpf: rawCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
-      gender: String(row['Sexo'] || row['gender'] || 'M').toUpperCase().startsWith('F') ? 'F' : 'M',
-      birth_date: parseExcelDate(row['Nascimento'] || row['birth_date']),
-      admission_date: parseExcelDate(row['Admissão'] || row['admissionDate'] || row['admission_date']),
-      department: String(row['Setor'] || row['department'] || '').trim().toUpperCase(),
-      role: String(row['Descrição cargo'] || row['Cargo'] || row['role'] || '').trim().toUpperCase(),
-      status: String(row['Status'] || 'Ativo').toLowerCase().includes('ativ') ? 'ACTIVE' : 'INACTIVE',
-      salary: parseNumeric(row['Salário'] || row['salary']),
-      cbo: String(row['CBO'] || row['cbo'] || '').trim().toUpperCase(),
-      conta_itau: String(row['conta itau'] || row['contaItau'] || '').trim().toUpperCase(),
-      insalubridade: parseNumeric(row['Insa'] || row['insalubridade']),
-      periculosidade: parseNumeric(row['Peric'] || row['periculosidade']),
-      gratificacao: parseNumeric(row['Grat'] || row['gratificacao']),
-      vale_transporte: parseNumeric(row['VT'] || row['valeTransporte']),
-      vale_refeicao: parseNumeric(row['Vale Refeição'] || row['valeRefeicao']),
-      flexivel: parseNumeric(row['Flexível'] || row['flexivel']),
-      mobilidade: parseNumeric(row['Mobilidade'] || row['mobilidade']),
-      vale_flexivel: parseNumeric(row['FLEXIVEL'] || row['valeFlexivel']),
-      email: String(row['Email'] || row['email'] || '').trim().toLowerCase(),
-      tenant_id: tenantId,
-      store_id: store?.id || null,
-    };
-  };
-
-  const handleImport = async () => {
-    if (importRows.length === 0) { toast({ title: 'Nenhum dado na planilha', variant: 'destructive' }); return; }
-    const store = dbStores.length > 0 ? (dbStores.find(s => s.id === importStoreId) || dbStores[0]) : null;
-    const validationErrors: string[] = [];
-    const mapped = importRows.map((row, i) => {
-      const r = mapRow(row, store);
-      if (!r.name || r.name.length < 3) validationErrors.push(`Linha ${i + 2}: Nome inválido ou ausente`);
-      if (!r.cpf || r.cpf.length < 11) validationErrors.push(`Linha ${i + 2}: CPF inválido para ${r.name || 'Desconhecido'}`);
-      return r;
-    });
-
-    if (validationErrors.length > 0) {
-      setImportErrors(validationErrors);
-      toast({ title: 'Erros na planilha', description: 'Corrija os campos destacados.', variant: 'destructive' });
-      return;
-    }
-
-    setImportLoading(true);
-    try {
-      const { data: upserted, error } = await supabase
-        .from('employees')
-        .upsert(mapped, { onConflict: 'cpf', ignoreDuplicates: true })
-        .select('id');
-      if (error) {
-        toast({ title: 'Erro ao importar', description: error.message, variant: 'destructive' });
-        setImportErrors([`Erro no banco: ${error.message}`]);
-      } else {
-        const inserted = upserted?.length ?? mapped.length;
-        const skipped = mapped.length - inserted;
-        addAuditLog({ userId: currentUser?.id || 'unknown', userName: currentUser?.name || 'Sistema', action: 'IMPORT_EMPLOYEES', details: `Importou ${inserted} funcionários (${skipped} duplicados ignorados)` });
-        toast({
-          title: 'Importação concluída!',
-          description: `${inserted} cadastrado(s)${skipped > 0 ? `, ${skipped} duplicado(s) ignorado(s)` : ''}.`
-        });
-        setImportOpen(false);
-        setImportRows([]);
-        setImportStoreId('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    } catch (e: any) {
-      toast({ title: 'Erro inesperado', description: e.message, variant: 'destructive' });
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const downloadTemplate = () => {
-    const template = [[
-      'Nome', 'CPF', 'Email', 'Sexo', 'Nascimento', 'Admissão', 'Descrição cargo', 'CBO',
-      'Setor', 'Salário', 'conta itau', 'Insa', 'Peric', 'Grat', 'VT', 'Vale Refeição', 'Flexível', 'Mobilidade', 'FLEXIVEL', 'Status'
-    ]];
-    const ws = XLSX.utils.aoa_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Funcionarios');
-    XLSX.writeFile(wb, 'modelo_importacao.xlsx');
-  };
-  // ============ END IMPORT ============
-  
   // Pagination
   const [page, setPage] = useState(1);
   const perPage = 15;
@@ -552,16 +409,19 @@ export default function Employees() {
       });
 
       toast({ title: 'Funcionário atualizado com sucesso!' });
+      setTimeout(() => window.location.reload(), 500);
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('employees')
-        .insert([dbData]);
+        .insert([dbData])
+        .select();
 
       if (error) {
         toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
         return;
       }
       
+      const newEmp = data[0];
       addAuditLog({
         userId: currentUser?.id || 'unknown',
         userName: currentUser?.name || 'Sistema',
@@ -571,6 +431,7 @@ export default function Employees() {
       });
 
       toast({ title: 'Funcionário cadastrado com sucesso!' });
+      setTimeout(() => window.location.reload(), 500);
     }
     
     setAddOpen(false);
@@ -617,6 +478,7 @@ export default function Employees() {
 
     setSelectedIds([]);
     toast({ title: 'Exclusão concluída', description: `${selectedIds.length} funcionário(s) removido(s) com sucesso.` });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDeleteOne = async (id: string, name: string) => {
@@ -643,6 +505,7 @@ export default function Employees() {
     
     setSelectedIds(prev => prev.filter(x => x !== id));
     toast({ title: 'Funcionário excluído' });
+    setTimeout(() => window.location.reload(), 500);
   };
 
   return (
@@ -665,6 +528,15 @@ export default function Employees() {
             <Button variant="outline" size="sm" className="h-9 gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setImportOpen(true)}>
               <Upload className="w-4 h-4" /> Importar
             </Button>
+            <EmployeeImportModal 
+              open={importOpen} 
+              onOpenChange={setImportOpen} 
+              onImportComplete={() => {
+                setTimeout(() => window.location.reload(), 1000);
+              }}
+              tenantId={tenantId}
+              stores={dbStores}
+            />
             <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if(!v) { setAddStep(1); setEditingId(null); setForm({status: 'ACTIVE', gender: 'M', salary: 0, email: ''}); setSelectedBenefits({}) } }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="h-9 gap-1.5"><Plus className="w-4 h-4" /> Novo Funcionário</Button>
@@ -1168,99 +1040,15 @@ export default function Employees() {
       </Dialog>
 
       {/* ===== MODAL DE IMPORTAÇÃO ===== */}
-      <Dialog open={importOpen} onOpenChange={(v) => { setImportOpen(v); if (!v) { setImportRows([]); setImportErrors([]); setImportStoreId(''); if (fileInputRef.current) fileInputRef.current.value = ''; } }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-              Importar Funcionários por Planilha
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">1. Loja de Destino</Label>
-              <Select value={importStoreId} onValueChange={setImportStoreId}>
-                <SelectTrigger className="h-10 bg-white/5 border-white/10">
-                  <SelectValue placeholder="Selecione a loja..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">2. Arquivo de Planilha</Label>
-              <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center hover:border-emerald-500/40 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-[13px] font-medium text-muted-foreground">Clique para selecionar <span className="text-white">.xlsx</span> ou <span className="text-white">.xls</span></p>
-                {importRows.length > 0 && <p className="text-[12px] text-emerald-400 font-bold mt-2">✓ {importRows.length} linhas carregadas</p>}
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
-              </div>
-              <Button variant="ghost" size="sm" className="text-[11px] text-muted-foreground hover:text-white gap-1.5" onClick={downloadTemplate}>
-                <Download className="w-3.5 h-3.5" /> Baixar modelo de planilha
-              </Button>
-            </div>
-
-            {importErrors.length > 0 && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                <p className="text-[12px] font-bold text-rose-400 flex items-center gap-2 mb-2"><AlertCircle className="w-4 h-4" /> {importErrors.length} erro(s):</p>
-                <ul className="space-y-1 max-h-32 overflow-y-auto">
-                  {importErrors.map((e, i) => <li key={i} className="text-[11px] text-rose-300 font-mono">{e}</li>)}
-                </ul>
-              </div>
-            )}
-
-            {importRows.length > 0 && importStoreId && (
-              <div className="space-y-2">
-                <Label className="text-[12px] text-muted-foreground font-bold uppercase tracking-widest">3. Prévia — {importRows.length} funcionários</Label>
-                <div className="rounded-xl border border-white/10 overflow-hidden max-h-[280px] overflow-y-auto">
-                  <table className="w-full text-left text-[12px]">
-                    <thead className="bg-white/5 sticky top-0">
-                      <tr className="text-[10px] font-bold text-primary uppercase tracking-widest">
-                        <th className="px-4 py-2">#</th>
-                        <th className="px-4 py-2">Nome</th>
-                        <th className="px-4 py-2">CPF</th>
-                        <th className="px-4 py-2 text-right">Salário</th>
-                        <th className="px-4 py-2">Cargo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {importRows.map((row, i) => {
-                        const store = dbStores.find(s => s.id === importStoreId)!;
-                        const r = mapRow(row, store);
-                        const hasError = !r.name || r.cpf.length < 11;
-                        return (
-                          <tr key={i} className={cn('hover:bg-white/[0.02]', hasError && 'bg-rose-500/5')}>
-                            <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
-                            <td className="px-4 py-2 font-medium text-white">{r.name || <span className="text-rose-400">—</span>}</td>
-                            <td className="px-4 py-2 font-mono text-muted-foreground text-[11px]">{r.cpf || <span className="text-rose-400">inválido</span>}</td>
-                            <td className="px-4 py-2 text-muted-foreground truncate max-w-[120px]">{r.role || '—'}</td>
-                            <td className="px-4 py-2 text-primary font-bold">R$ {Number(r.salary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                                {r.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="border-t border-white/5 pt-4 gap-2">
-            <Button variant="ghost" onClick={() => setImportOpen(false)}>Cancelar</Button>
-            <Button onClick={handleImport} disabled={importLoading || importRows.length === 0 || !importStoreId} className="bg-emerald-600 hover:bg-emerald-700 font-bold gap-2">
-              {importLoading ? 'Importando...' : <><Upload className="w-4 h-4" /> Confirmar Importação ({importRows.length})</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmployeeImportModal 
+        open={importOpen} 
+        onOpenChange={setImportOpen} 
+        onImportComplete={() => {
+          setTimeout(() => window.location.reload(), 1000);
+        }}
+        tenantId={tenantId}
+        stores={dbStores}
+      />
     </div>
   );
 }

@@ -22,6 +22,7 @@ CREATE TABLE employees (
   flexivel NUMERIC DEFAULT 0,
   mobilidade NUMERIC DEFAULT 0,
   vale_flexivel NUMERIC DEFAULT 0,
+  custom_fields JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
