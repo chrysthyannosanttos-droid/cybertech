@@ -18,6 +18,9 @@ import Settings from "@/pages/Settings";
 import AuditLogs from "@/pages/AuditLogs";
 import UserManagement from "@/pages/UserManagement";
 import PointTracking from "@/pages/PointTracking";
+import PointHistory from "@/pages/PointHistory";
+import PointEmployees from "@/pages/PointEmployees";
+import PointReports from "@/pages/PointReports";
 import Holerites from "@/pages/Holerites";
 import EmailSettings from "@/pages/EmailSettings";
 import NotFound from "@/pages/NotFound";
@@ -52,6 +55,9 @@ function AppRoutes() {
         <Route path="/logs" element={<AuditLogs />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/ponto" element={<PointTracking />} />
+        <Route path="/ponto/historico" element={<PointHistory />} />
+        <Route path="/ponto/funcionarios" element={<PointEmployees />} />
+        <Route path="/ponto/relatorios" element={<PointReports />} />
         <Route path="/holerites" element={<Holerites />} />
       </Route>
       <Route path="*" element={<NotFound />} />
