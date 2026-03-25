@@ -32,10 +32,6 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/service-providers', module: 'service-providers', icon: Briefcase,       label: 'Prestadores' },
   { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
-  { to: '/ponto',             module: 'dashboard',         icon: Clock,           label: 'Bater Ponto' },
-  { to: '/ponto/historico',   module: 'dashboard',         icon: History,         label: 'Meu Histórico' },
-  { to: '/ponto/funcionarios', module: 'employees',         icon: Users,           label: 'Gestão de Ponto',    superadminOnly: true },
-  { to: '/ponto/relatorios',  module: 'reports',           icon: BarChart3,       label: 'Relatórios Ponto',   superadminOnly: true },
   { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários',     superadminOnly: true },
   { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
@@ -49,9 +45,9 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
   const isSuperAdmin = user?.role === 'superadmin';
 
   const links = ALL_LINKS.filter(link => {
-    // Se visão de colaborador estiver ativa, mostrar apenas Ponto e Holerites
+    // Se visão de colaborador estiver ativa, mostrar apenas Holerites
     if (user?.email === 'teste' && isEmployeeView) {
-      return ['/ponto', '/holerites', '/dashboard'].includes(link.to);
+      return ['/holerites', '/dashboard'].includes(link.to);
     }
 
     // Links exclusivos de superadmin só aparecem para cristiano/superadmin
