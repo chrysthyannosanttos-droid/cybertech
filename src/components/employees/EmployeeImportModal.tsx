@@ -57,26 +57,27 @@ interface MappingField {
 }
 
 const MAPPING_FIELDS: MappingField[] = [
-  { key: 'name', label: 'Nome do Funcionário', required: true, type: 'string' },
+  { key: 'name', label: 'Nome', required: true, type: 'string' },
+  { key: 'role', label: 'Descrição cargo', type: 'string' },
+  { key: 'cbo', label: 'CBO', type: 'string' },
+  { key: 'department', label: 'Setor', type: 'string' },
   { key: 'cpf', label: 'CPF', required: true, type: 'string' },
   { key: 'email', label: 'E-mail', type: 'string' },
-  { key: 'gender', label: 'Sexo', type: 'enum', options: ['M', 'F', 'OTHER'] },
-  { key: 'birth_date', label: 'Data de Nascimento', type: 'date' },
-  { key: 'admission_date', label: 'Data de Admissão', required: true, type: 'date' },
-  { key: 'department', label: 'Departamento / Setor', type: 'string' },
-  { key: 'role', label: 'Cargo', type: 'string' },
-  { key: 'status', label: 'Status', type: 'enum', options: ['ACTIVE', 'INACTIVE'] },
-  { key: 'salary', label: 'Salário Base', type: 'number' },
-  { key: 'cbo', label: 'CBO', type: 'string' },
-  { key: 'conta_itau', label: 'Conta Itaú', type: 'string' },
+  { key: 'salary', label: 'Salário', type: 'number' },
   { key: 'insalubridade', label: 'Insalubridade', type: 'number' },
   { key: 'periculosidade', label: 'Periculosidade', type: 'number' },
-  { key: 'gratificacao', label: 'Gratificação', type: 'number' },
-  { key: 'vale_transporte', label: 'Vale Transporte', type: 'number' },
-  { key: 'vale_refeicao', label: 'Vale Refeição', type: 'number' },
-  { key: 'vale_flexivel', label: 'Vale Flexível (FLEXIVEL)', type: 'number' },
+  { key: 'vale_refeicao', label: 'VR', type: 'number' },
+  { key: 'gender', label: 'Sexo', type: 'enum', options: ['M', 'F', 'OTHER'] },
+  { key: 'admission_date', label: 'Admissão', required: true, type: 'date' },
+  { key: 'vale_transporte', label: 'VT', type: 'number' },
   { key: 'flexivel', label: 'Flexível', type: 'number' },
   { key: 'mobilidade', label: 'Mobilidade', type: 'number' },
+  // Keeping other existing valid mapping keys for legacy matching
+  { key: 'birth_date', label: 'Data de Nascimento', type: 'date' },
+  { key: 'status', label: 'Status', type: 'enum', options: ['ACTIVE', 'INACTIVE'] },
+  { key: 'conta_itau', label: 'Conta Itaú', type: 'string' },
+  { key: 'gratificacao', label: 'Gratificação', type: 'number' },
+  { key: 'vale_flexivel', label: 'Vale Flexível (FLEXIVEL)', type: 'number' },
 ];
 
 export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tenantId, stores }: EmployeeImportModalProps) {
@@ -498,6 +499,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                       <TableHead className="w-12 text-center text-[10px] uppercase font-bold">Status</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold">Nome</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold">CPF</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold">E-mail</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold">Cargo</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold">Setor</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold">Admissão</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold">Problemas</TableHead>
                     </TableRow>
@@ -516,6 +520,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                           </TableCell>
                           <TableCell className="font-medium">{row.name || '-'}</TableCell>
                           <TableCell>{row.cpf ? formatCPF(row.cpf) : '-'}</TableCell>
+                          <TableCell>{row.email || '-'}</TableCell>
+                          <TableCell>{row.role || '-'}</TableCell>
+                          <TableCell>{row.department || '-'}</TableCell>
                           <TableCell>{row.admission_date || '-'}</TableCell>
                           <TableCell>
                             {errors.length > 0 ? (

@@ -210,28 +210,26 @@ export default function Employees() {
   const exportExcel = () => {
     const data = filtered.map(e => ({
       Nome: e.name,
-      Email: e.email || '',
-      'Descrição cargo': e.role,
+      'Descrição cargo': e.role || '',
       CBO: e.cbo || '',
+      Setor: e.department || '',
       CPF: e.cpf,
-      Sexo: e.gender === 'M' ? 'Masculino' : e.gender === 'F' ? 'Feminino' : 'Outro',
-      Admissão: e.admissionDate,
-      Salário: e.salary,
-      'conta itau': e.contaItau || '',
-      Insa: e.insalubridade || 0,
-      Peric: e.periculosidade || 0,
-      Grat: e.gratificacao || 0,
-      'Salário + Insalubridade + Periculosidade + Gratificação': 
-        (e.salary || 0) + (e.insalubridade || 0) + (e.periculosidade || 0) + (e.gratificacao || 0),
+      'E-mail': e.email || '',
+      Salário: e.salary || 0,
+      Insalubridade: e.insalubridade || 0,
+      Periculosidade: e.periculosidade || 0,
+      VR: e.valeRefeicao || 0,
+      Sexo: e.gender,
+      Admissão: e.admissionDate || '',
       VT: e.valeTransporte || 0,
-      'Vale Refeição': e.valeRefeicao || 0,
-      Flexível: e.flexivel || 0,
+      Flexível: e.flexivel || e.valeFlexivel || 0,
       Mobilidade: e.mobilidade || 0,
-      FLEXIVEL: e.flexivel || 0,
+      // Manter informações adicionais para referência
       Status: e.status === 'ACTIVE' ? 'Ativo' : 'Inativo',
+      'Conta Itaú': e.contaItau || '',
+      Gratificação: e.gratificacao || 0,
       Loja: e.storeName,
-      Setor: e.department,
-      CustoTotal: calcEmployeeCost(e),
+      'Custo Total Estimado': calcEmployeeCost(e),
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
