@@ -534,7 +534,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
           )}
 
           {step === 'MAPPING' && (
-            <div className="h-full flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                     <ArrowRight className="w-4 h-4 text-emerald-400" />
@@ -545,7 +545,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </Badge>
               </div>
 
-              <ScrollArea className="flex-1 -mr-2 pr-4 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto pr-2 -mr-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-2 pr-2">
                   {MAPPING_FIELDS.map((field) => {
                     const mappedHeader = mapping[field.key];
@@ -589,7 +589,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
               
               <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg flex items-start gap-3">
                 <Info className="w-4 h-4 text-blue-400 mt-0.5" />
@@ -601,7 +601,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
           )}
 
           {step === 'PREVIEW' && (
-            <div className="h-full flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex gap-4">
                     <div className="flex flex-col">
@@ -652,7 +652,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 border rounded-xl overflow-hidden bg-muted/20">
+              <div className="flex-1 overflow-auto border rounded-xl bg-muted/20">
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
@@ -702,7 +702,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                     })}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             </div>
           )}
 
