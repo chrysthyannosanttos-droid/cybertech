@@ -262,34 +262,38 @@ export default function EmployeeDocuments() {
                             {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
                               <CommandItem
                                 key={emp.id}
-                                value={emp.name}
+                                value={`${emp.name} ${emp.id}`}
                                 onSelect={() => {
                                   setForm(f => ({ ...f, employeeId: emp.id }));
                                   setOpenCombo(false);
                                 }}
-                                className="text-xs py-2 cursor-pointer hover:bg-primary/20"
+                                className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
                               >
-                                <Check className={cn("mr-2 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                <span>{emp.name}</span>
+                                <div className="flex items-center flex-1">
+                                  <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-medium text-white">{emp.name}</span>
+                                </div>
                               </CommandItem>
                             ))}
                           </CommandGroup>
 
-                          <CommandSeparator className="bg-white/10" />
+                          <CommandSeparator className="bg-white/10 my-2" />
 
                           <CommandGroup heading="Arquivo Morto (Desativados)">
                             {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
                               <CommandItem
                                 key={emp.id}
-                                value={emp.name}
+                                value={`${emp.name} ${emp.id}`}
                                 onSelect={() => {
                                   setForm(f => ({ ...f, employeeId: emp.id }));
                                   setOpenCombo(false);
                                 }}
-                                className="text-xs py-2 cursor-pointer hover:bg-rose-500/10"
+                                className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
                               >
-                                <Check className={cn("mr-2 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                <span className="text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
+                                <div className="flex items-center flex-1">
+                                  <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                  <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
+                                </div>
                               </CommandItem>
                             ))}
                           </CommandGroup>
