@@ -96,8 +96,18 @@ export default function EmployeeDocuments() {
 
   const fetchData = async () => {
     try {
-      // Join logic with employees to get status and name
-      const { data: docsData, error: docsError } = await supabase
+      setIsUploading(true); // Re-using isUploading or adding isFetching
+      
+      let tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      
+      // Fallback: Fetch real tenant_id if not in user profile
+      if (!tenantId) {
+        const { data: tenantData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        if (tenantData?.id) tenantId = tenantData.id;
+      }
+
+      // Fetch documents
+      let docsQuery = supabase
         .from('employee_documents')
         .select(`
           id,
@@ -106,16 +116,22 @@ export default function EmployeeDocuments() {
           category,
           file_url,
           created_at,
+          tenant_id,
           employees (
             name,
             status
           )
-        `)
-        .order('created_at', { ascending: false });
+        `);
+      
+      if (tenantId) {
+        docsQuery = docsQuery.eq('tenant_id', tenantId);
+      }
 
-      if (docsError) throw docsError;
+      const { data: docsData, error: docsError } = await docsQuery.order('created_at', { ascending: false });
 
-      if (docsData) {
+      if (docsError) {
+        console.error('Error fetching docs:', docsError);
+      } else if (docsData) {
         setDocuments(docsData.map((d: any) => ({
           ...d,
           employee_name: d.employees?.name,
@@ -123,18 +139,26 @@ export default function EmployeeDocuments() {
         })));
       }
 
-      // Fetch all employees for the selection, filtering by tenant if available
-      let query = supabase.from('employees').select('id, name, status').order('name');
+      // Fetch employees for the selector
+      let empQuery = supabase.from('employees').select('id, name, status').order('name');
       
-      const { data: empData, error: empError } = await query;
+      if (tenantId) {
+        empQuery = empQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: empData, error: empError } = await empQuery;
       
       if (empError) {
         console.error('Error fetching employees:', empError);
+        toast({ title: 'Erro ao buscar funcionários', description: empError.message, variant: 'destructive' });
       } else {
-        setEmployees(empData || []);
+        const foundEmps = empData || [];
+        setEmployees(foundEmps);
       }
     } catch (err) {
-      console.error('Error fetching docs:', err);
+      console.error('Error in fetchData:', err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -178,7 +202,7 @@ export default function EmployeeDocuments() {
           name: form.name,
           category: form.category,
           file_url: 'https://placeholder-url.com', 
-          tenant_id: (currentUser as any)?.tenant_id || '9de674ac-807c-482a-a550-61014e7afee8'
+          tenant_id: (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id || '9de674ac-807c-482a-a550-61014e7afee8'
         }]);
 
       if (error) throw error;
@@ -260,57 +284,65 @@ export default function EmployeeDocuments() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[340px] p-0 glass-card border-white/10 shadow-2xl">
-                    <Command className="bg-transparent">
+                    <Command className="bg-transparent" shouldFilter={true}>
                       <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
                         <CommandList className="max-h-[300px] custom-scrollbar overflow-y-auto w-full">
-                          <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
-                            {employees.length === 0 
-                              ? "Nenhum funcionário cadastrado no sistema." 
-                              : "Nenhum resultado para esta pesquisa."}
-                          </CommandEmpty>
-                          
-                          {employees.filter(e => e.status === 'ACTIVE').length > 0 && (
-                            <CommandGroup heading="Funcionários Ativos">
-                              {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
-                                <CommandItem
-                                  key={emp.id}
-                                  value={emp.name}
-                                  onSelect={() => {
-                                    setForm(f => ({ ...f, employeeId: emp.id }));
-                                    setOpenCombo(false);
-                                  }}
-                                  className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                                >
-                                  <div className="flex items-center flex-1">
-                                    <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                    <span className="font-medium text-white">{emp.name}</span>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          )}
-
-                          {employees.filter(e => e.status === 'INACTIVE').length > 0 && (
+                          {isUploading ? (
+                            <div className="py-10 text-center text-xs text-muted-foreground animate-pulse">
+                              Carregando lista de funcionários...
+                            </div>
+                          ) : (
                             <>
-                              <CommandSeparator className="bg-white/10 my-2" />
-                              <CommandGroup heading="Arquivo Morto (Desativados)">
-                                {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
-                                  <CommandItem
-                                    key={emp.id}
-                                    value={emp.name}
-                                    onSelect={() => {
-                                      setForm(f => ({ ...f, employeeId: emp.id }));
-                                      setOpenCombo(false);
-                                    }}
-                                    className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                                  >
-                                    <div className="flex items-center flex-1">
-                                      <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
+                              <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                                {employees.length === 0 
+                                  ? "Nenhum funcionário cadastrado no sistema." 
+                                  : "Nenhum resultado para esta pesquisa."}
+                              </CommandEmpty>
+                              
+                              {employees.filter(e => e.status === 'ACTIVE').length > 0 && (
+                                <CommandGroup heading="Funcionários Ativos">
+                                  {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
+                                    <CommandItem
+                                      key={emp.id}
+                                      value={emp.name}
+                                      onSelect={() => {
+                                        setForm(f => ({ ...f, employeeId: emp.id }));
+                                        setOpenCombo(false);
+                                      }}
+                                      className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
+                                    >
+                                      <div className="flex items-center flex-1">
+                                        <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                        <span className="font-medium text-white">{emp.name}</span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              )}
+
+                              {employees.filter(e => e.status === 'INACTIVE').length > 0 && (
+                                <>
+                                  <CommandSeparator className="bg-white/10 my-2" />
+                                  <CommandGroup heading="Arquivo Morto (Desativados)">
+                                    {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
+                                      <CommandItem
+                                        key={emp.id}
+                                        value={emp.name}
+                                        onSelect={() => {
+                                          setForm(f => ({ ...f, employeeId: emp.id }));
+                                          setOpenCombo(false);
+                                        }}
+                                        className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
+                                      >
+                                        <div className="flex items-center flex-1">
+                                          <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                          <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </>
+                              )}
                             </>
                           )}
                         </CommandList>
