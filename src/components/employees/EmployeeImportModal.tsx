@@ -453,8 +453,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
             ))}
           </div>
         </DialogHeader>
-
-        <div className="flex-1 overflow-hidden p-6 pt-2">
+        
+        {/* Main Content Area - Needs fixed height/flex-1 to enable inner scroll */}
+        <div className="flex-1 min-h-0 p-6 pt-2">
           {step === 'UPLOAD' && (
             <div className="h-full flex flex-col items-center justify-center space-y-6 py-10">
               <div 
@@ -507,8 +508,8 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </Badge>
               </div>
 
-              <ScrollArea className="flex-1 pr-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-2">
+              <ScrollArea className="flex-1 -mr-2 pr-4 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-2 pr-2">
                   {MAPPING_FIELDS.map((field) => {
                     const mappedHeader = mapping[field.key];
                     const isMapped = !!mappedHeader;
