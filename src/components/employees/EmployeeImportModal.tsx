@@ -184,7 +184,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
 
   const processFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const bstr = e.target?.result;
       const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
       const wsname = wb.SheetNames[0];
@@ -196,6 +196,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
         return;
       }
 
+      setStep('IMPORTING'); // Use importing as a temporary "Processing" state
+      setImportProgress(0);
+
       const fileHeaders = data[0].map(h => String(h).trim()).filter(h => h !== '');
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
 
@@ -204,13 +207,8 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
       
       // Smart AI Mapping Logic
       const initialMapping: Record<string, string> = {};
-      const aiConfidence: Record<string, 'high' | 'medium' | 'low'> = {};
-
       MAPPING_FIELDS.forEach(field => {
         let bestMatch = '';
-        let confidence: 'high' | 'medium' | 'low' = 'low';
-
-        // 1. Direct label or key match
         const directMatch = fileHeaders.find(h => {
           const lh = h.toLowerCase();
           return lh === field.key.toLowerCase() || lh === field.label.toLowerCase();
@@ -218,9 +216,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
 
         if (directMatch) {
           bestMatch = directMatch;
-          confidence = 'high';
         } else {
-          // 2. Synonym match
           const synonymMatch = fileHeaders.find(h => {
             const lh = h.toLowerCase();
             return field.synonyms?.some(syn => lh.includes(syn.toLowerCase()) || syn.toLowerCase().includes(lh));
@@ -228,52 +224,62 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
 
           if (synonymMatch) {
             bestMatch = synonymMatch;
-            confidence = 'medium';
           } else {
-            // 3. Data type detection (AI content analysis)
             const typeMatch = fileHeaders.find(h => {
               const sample = rows.slice(0, 5).map(r => String(r[h] || '').trim()).filter(v => v !== '');
               if (sample.length === 0) return false;
-
-              if (field.key === 'cpf') {
-                return sample.every(v => v.replace(/\D/g, '').length >= 11);
-              }
-              if (field.key === 'email') {
-                return sample.every(v => v.includes('@') && v.includes('.'));
-              }
-              if (field.type === 'date') {
-                return sample.every(v => {
-                  const d = new Date(v);
-                  return !isNaN(d.getTime()) || /^\d{2}\/\d{2}\/\d{4}$/.test(v);
-                });
-              }
-              if (field.key === 'salary' || field.key === 'insalubridade') {
-                return sample.every(v => !isNaN(parseNumeric(v)));
-              }
+              if (field.key === 'cpf') return sample.every(v => v.replace(/\D/g, '').length >= 11);
+              if (field.key === 'email') return sample.every(v => v.includes('@') && v.includes('.'));
+              if (field.type === 'date') return sample.every(v => !isNaN(new Date(v).getTime()) || /^\d{2}\/\d{2}\/\d{4}$/.test(v));
               return false;
             });
-
-            if (typeMatch) {
-              bestMatch = typeMatch;
-              confidence = 'low'; // Data-based is low confidence without header hint
-            }
+            if (typeMatch) bestMatch = typeMatch;
           }
         }
-
-        if (bestMatch) {
-          initialMapping[field.key] = bestMatch;
-        }
+        if (bestMatch) initialMapping[field.key] = bestMatch;
       });
       
       setMapping(initialMapping);
+
+      // Brief artificial delay for "AI feeling"
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const missingRequired = MAPPING_FIELDS.filter(f => f.required && !initialMapping[f.key]);
       
-      toast({ 
-        title: 'Mapeamento Inteligente Ativado', 
-        description: 'A IA organizou as colunas baseada no conteúdo e sinônimos.',
-        icon: <Info className="w-4 h-4 text-emerald-400" />
-      });
-      
-      setStep('MAPPING');
+      if (missingRequired.length === 0) {
+        // AI found everything! Move to preview.
+        toast({ 
+          title: 'Mapeamento Automático Concluído', 
+          description: 'A IA identificou todos os campos necessários.',
+          icon: <Sparkles className="w-4 h-4 text-emerald-400" />
+        });
+        // We simulate handleNextToPreview with the new initialMapping
+        const processed = rows.map((row, index) => {
+          const rowData: any = { _originalIndex: index + 1, _errors: {} };
+          const custom_fields: any = {};
+          MAPPING_FIELDS.forEach(f => {
+            const fileCol = initialMapping[f.key];
+            let val = fileCol ? row[fileCol] : null;
+            if (f.type === 'number') val = parseNumeric(val);
+            if (f.type === 'date') val = parseExcelDate(val);
+            if (f.type === 'string' && val) val = String(val).trim().toUpperCase();
+            if (f.key === 'email' && val) val = String(val).trim().toLowerCase();
+            if (f.key === 'cpf' && val) val = String(val).replace(/\D/g, '');
+            rowData[f.key] = val;
+          });
+          fileHeaders.forEach(h => { if (!Object.values(initialMapping).includes(h)) custom_fields[h] = row[h]; });
+          rowData.custom_fields = custom_fields;
+          if (!rowData.name || rowData.name.length < 2) rowData._errors.name = 'Nome inválido';
+          if (!rowData.cpf || !isValidCPF(rowData.cpf)) rowData._errors.cpf = 'CPF inválido';
+          if (!rowData.admission_date) rowData._errors.admission_date = 'Data de admissão obrigatória';
+          return rowData;
+        });
+        setImportRows(processed);
+        setStep('PREVIEW');
+      } else {
+        // Some columns missing, ask user
+        setStep('MAPPING');
+      }
     };
     reader.readAsBinaryString(file);
   };
@@ -586,10 +592,13 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setStep('MAPPING')}>
+                        <Sparkles className="w-3 h-3" /> Ajustar Mapeamento
+                    </Button>
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Unidade de Alocação</Label>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Unidade</Label>
                         <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-                            <SelectTrigger className="h-8 w-40 text-xs">
+                            <SelectTrigger className="h-8 w-28 text-[11px]">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -598,14 +607,14 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                         </Select>
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Conflito de CPF</Label>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Conflito CPF</Label>
                         <Select value={conflictResolution} onValueChange={(v: any) => setConflictResolution(v)}>
-                            <SelectTrigger className="h-8 w-40 text-xs">
+                            <SelectTrigger className="h-8 w-32 text-[11px]">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="update">Atualizar Existente</SelectItem>
-                                <SelectItem value="skip">Ignorar (Manter atual)</SelectItem>
+                                <SelectItem value="update">Atualizar</SelectItem>
+                                <SelectItem value="skip">Ignorar</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -666,11 +675,24 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
             </div>
           )}
 
-          {step === 'IMPORTING' && (
+          {step === 'IMPORTING' && importRows.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center space-y-6">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+                <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-emerald-400 animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-bold">IA Processando Planilha...</h3>
+                <p className="text-sm text-muted-foreground italic">Identificando colunas e corrigindo formatos automaticamente</p>
+              </div>
+            </div>
+          )}
+
+          {step === 'IMPORTING' && importRows.length > 0 && (
             <div className="h-full flex flex-col items-center justify-center space-y-6">
               <div className="w-24 h-24 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-bold">Processando Importação...</h3>
+                <h3 className="text-lg font-bold">Importando Dados...</h3>
                 <p className="text-sm text-muted-foreground">{importProgress}% concluído</p>
               </div>
               <div className="w-full max-w-md">
@@ -678,7 +700,6 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 <div className="flex justify-between mt-2 text-[10px] uppercase font-bold text-muted-foreground">
                     <span>{importSummary.success} Processados</span>
                     <span>{importSummary.error} Erros</span>
-                    <span>Restam {importSummary.total - (importSummary.success + importSummary.error)}</span>
                 </div>
               </div>
             </div>
