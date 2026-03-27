@@ -196,16 +196,47 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
         return;
       }
 
-      setStep('IMPORTING'); // Use importing as a temporary "Processing" state
+      setStep('IMPORTING'); 
       setImportProgress(0);
 
-      const fileHeaders = data[0].map(h => String(h).trim()).filter(h => h !== '');
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
+      // Smart Header Detection Logic
+      let headerRowIndex = 0;
+      let maxMatches = 0;
+
+      // Scan up to 10 rows to find the best header row
+      for (let i = 0; i < Math.min(data.length, 10); i++) {
+        const potentialHeaders = data[i].map(h => String(h || '').trim().toLowerCase()).filter(h => h !== '');
+        let matches = 0;
+        
+        MAPPING_FIELDS.forEach(field => {
+          if (potentialHeaders.includes(field.key.toLowerCase()) || 
+              potentialHeaders.includes(field.label.toLowerCase()) ||
+              field.synonyms?.some(syn => potentialHeaders.some(ph => ph.includes(syn.toLowerCase()) || syn.toLowerCase().includes(ph)))) {
+            matches++;
+          }
+        });
+
+        if (matches > maxMatches) {
+          maxMatches = matches;
+          headerRowIndex = i;
+        }
+      }
+
+      const fileHeaders = data[headerRowIndex].map(h => String(h || '').trim()).filter(h => h !== '');
+      
+      // Get rows starting from AFTER the detected header row
+      const dataRows = data.slice(headerRowIndex + 1);
+      // Convert aoa (array of arrays) back to objects using the detected headers
+      const rows = dataRows.map(row => {
+        const obj: any = {};
+        fileHeaders.forEach((h, idx) => { obj[h] = row[idx]; });
+        return obj;
+      });
 
       setHeaders(fileHeaders);
       setRawRows(rows);
       
-      // Smart AI Mapping Logic
+      // Smart AI Mapping Logic (Refined)
       const initialMapping: Record<string, string> = {};
       MAPPING_FIELDS.forEach(field => {
         let bestMatch = '';

@@ -31,6 +31,9 @@ export function parseNumeric(val: any) {
 
 export function parseExcelDate(val: any) {
   if (!val) return null;
+  if (val instanceof Date) {
+    return val.toISOString().split('T')[0];
+  }
   if (typeof val === 'number') {
     const date = new Date((val - 25569) * 86400 * 1000);
     return date.toISOString().split('T')[0];
