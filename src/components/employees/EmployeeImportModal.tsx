@@ -313,7 +313,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
           if (!rowData.cpf || !isValidCPF(rowData.cpf)) rowData._errors.cpf = 'CPF inválido';
           if (!rowData.admission_date) rowData._errors.admission_date = 'Data de admissão obrigatória';
           return rowData;
-        });
+        }).filter(r => r.name || r.cpf || r.email || r.role || r.department);
         setImportRows(processed);
         setStep('PREVIEW');
       } else {
@@ -366,7 +366,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
       if (!data.admission_date) data._errors.admission_date = 'Data de admissão obrigatória';
       
       return data;
-    });
+    }).filter(r => r.name || r.cpf || r.email || r.role || r.department);
 
     setImportRows(processed);
     setStep('PREVIEW');
