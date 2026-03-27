@@ -12,7 +12,9 @@ import {
   UserCheck,
   Filter,
   FileCheck2,
-  AlertCircle
+  AlertCircle,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,19 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { addAuditLog } from '@/data/mockData';
@@ -66,6 +81,7 @@ export default function EmployeeDocuments() {
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [openCombo, setOpenCombo] = useState(false);
   
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -221,18 +237,55 @@ export default function EmployeeDocuments() {
             <form onSubmit={handleUpload} className="space-y-5">
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Funcionário</Label>
-                <Select value={form.employeeId} onValueChange={v => setForm(f => ({...f, employeeId: v}))}>
-                  <SelectTrigger className="h-11 bg-white/5 border-white/10 text-[13px]">
-                    <SelectValue placeholder="Selecione o colaborador..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map(e => (
-                      <SelectItem key={e.id} value={e.id} className="text-xs">
-                        {e.name} {e.status === 'INACTIVE' ? '(Desativado)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openCombo} onOpenChange={setOpenCombo}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombo}
+                      className="w-full h-11 justify-between bg-white/5 border-white/10 text-[13px] font-normal hover:bg-white/10"
+                    >
+                      {form.employeeId
+                        ? employees.find((emp) => emp.id === form.employeeId)?.name
+                        : "Selecione o colaborador..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[340px] p-0 glass-card border-white/10 shadow-2xl">
+                    <Command className="bg-transparent">
+                      <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
+                      <CommandList className="max-h-[250px] custom-scrollbar">
+                        <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {employees.map((emp) => (
+                            <CommandItem
+                              key={emp.id}
+                              value={emp.name}
+                              onSelect={() => {
+                                setForm(f => ({ ...f, employeeId: emp.id }));
+                                setOpenCombo(false);
+                              }}
+                              className="text-xs py-2 cursor-pointer hover:bg-primary/20"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  form.employeeId === emp.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex items-center gap-2">
+                                <span>{emp.name}</span>
+                                {emp.status === 'INACTIVE' && (
+                                  <span className="text-[10px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/20 font-black">ARQUIVO MORTO</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
