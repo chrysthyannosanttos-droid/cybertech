@@ -615,67 +615,80 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
           )}
 
           {step === 'PREVIEW' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-4">
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total</span>
-                        <span className="text-xl font-bold">{importRows.length}</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-emerald-500/70 uppercase font-bold tracking-wider">Válidos</span>
-                        <span className="text-xl font-bold text-emerald-400">
-                            {importRows.filter(r => Object.keys(r._errors).length === 0).length}
-                        </span>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-rose-500/70 uppercase font-bold tracking-wider">Com Erro</span>
-                        <span className="text-xl font-bold text-rose-500">
-                            {importRows.filter(r => Object.keys(r._errors).length > 0).length}
-                        </span>
-                    </div>
+            <div className="flex-1 flex flex-col min-h-0 space-y-4">
+              {/* Header Actions - Now at the Top */}
+              <div className="bg-muted/30 p-4 rounded-xl border border-white/5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex gap-6">
+                      <div className="flex flex-col">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total</span>
+                          <span className="text-xl font-bold">{importRows.length}</span>
+                      </div>
+                      <div className="flex flex-col">
+                          <span className="text-[10px] text-emerald-500/70 uppercase font-bold tracking-wider">Válidos</span>
+                          <span className="text-xl font-bold text-emerald-400">
+                              {importRows.filter(r => Object.keys(r._errors).length === 0).length}
+                          </span>
+                      </div>
+                      <div className="flex flex-col">
+                          <span className="text-[10px] text-rose-500/70 uppercase font-bold tracking-wider">Com Erro</span>
+                          <span className="text-xl font-bold text-rose-500">
+                              {importRows.filter(r => Object.keys(r._errors).length > 0).length}
+                          </span>
+                      </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/5 border border-rose-500/20 rounded-lg">
+                          <Label htmlFor="bypass" className="text-[9px] uppercase font-black text-rose-400 cursor-pointer">Ignorar Validação</Label>
+                          <Switch id="bypass" checked={bypassValidation} onCheckedChange={setBypassValidation} className="scale-75 data-[state=checked]:bg-rose-500" />
+                      </div>
+                      
+                      <Button variant="outline" size="sm" className="h-9 text-[11px] gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setStep('MAPPING')}>
+                          <Sparkles className="w-3 h-3" /> Ajustar Mapeamento
+                      </Button>
+
+                      <Button size="sm" onClick={handleStartImport} className="h-9 px-6 font-bold bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-lg shadow-emerald-500/20">
+                          Confirmar Importação <Check className="w-4 h-4" />
+                      </Button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-rose-500/5 border border-rose-500/20 rounded-lg h-8">
-                        <Label htmlFor="bypass" className="text-[9px] uppercase font-black text-rose-400 cursor-pointer">Ignorar Validação</Label>
-                        <Switch id="bypass" checked={bypassValidation} onCheckedChange={setBypassValidation} className="scale-75 data-[state=checked]:bg-rose-500" />
-                    </div>
-                    <div className="h-6 w-px bg-white/10" />
-                    <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setStep('MAPPING')}>
-                        <Sparkles className="w-3 h-3" /> Ajustar Mapeamento
-                    </Button>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Unidade</Label>
+                <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-white/5">
+                    <div className="space-y-1.5 flex-1 min-w-[200px]">
+                        <Label className="text-[10px] uppercase text-muted-foreground font-bold flex items-center gap-2">
+                             <FileSpreadsheet className="w-3 h-3" /> Selecionar Unidade/Loja para Importar
+                        </Label>
                         <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-                            <SelectTrigger className="h-8 w-28 text-[11px]">
-                                <SelectValue />
+                            <SelectTrigger className="h-10 w-full bg-background/50 border-emerald-500/20 focus:ring-emerald-500/20">
+                                <SelectValue placeholder="Selecione a loja..." />
                             </SelectTrigger>
                             <SelectContent>
                                 {stores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Conflito</Label>
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase text-muted-foreground font-bold">Conflito de CPF</Label>
                         <Select value={conflictResolution} onValueChange={(v: any) => setConflictResolution(v)}>
-                            <SelectTrigger className="h-8 w-24 text-[11px]">
+                            <SelectTrigger className="h-10 w-32 bg-background/50">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="update">Update</SelectItem>
-                                <SelectItem value="skip">Skip</SelectItem>
+                                <SelectItem value="update">Atualizar</SelectItem>
+                                <SelectItem value="skip">Ignorar</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </div>
               </div>
 
-              <div className="flex-1 min-h-[300px] border rounded-xl overflow-hidden bg-muted/20 flex flex-col">
-                <div className="flex-1 overflow-y-auto">
+              {/* Table Area - Explicitly constrained height for scrolling */}
+              <div className="flex-1 min-h-0 border rounded-xl overflow-hidden bg-muted/20 flex flex-col shadow-inner">
+                <div className="flex-1 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-emerald-500/20">
                     <Table>
-                        <TableHeader className="bg-muted/95 sticky top-0 z-20 backdrop-blur-md">
-                            <TableRow className="border-white/5 hover:bg-transparent shadow-sm">
+                        <TableHeader className="bg-muted/95 sticky top-0 z-20 backdrop-blur-md border-b">
+                            <TableRow className="border-white/5 hover:bg-transparent">
                                 <TableHead className="w-12 text-center text-[10px] uppercase font-bold">Status</TableHead>
                                 <TableHead className="text-[10px] uppercase font-bold">Nome</TableHead>
                                 <TableHead className="text-[10px] uppercase font-bold">CPF</TableHead>
@@ -685,53 +698,61 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {importRows.map((row, idx) => {
-                                const hasErrors = Object.keys(row._errors).length > 0;
-                                return (
-                                    <TableRow key={idx} className={cn(
-                                        "border-white/5 transition-colors",
-                                        hasErrors && !bypassValidation ? "bg-rose-500/[0.04]" : "hover:bg-white/[0.02]"
-                                    )}>
-                                        <TableCell className="text-center">
-                                            {hasErrors ? (
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse cursor-help mx-auto" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent className="bg-rose-600 text-white border-0 shadow-lg">
-                                                            <ul className="text-[11px] list-disc pl-3 py-1 space-y-0.5">
-                                                                {Object.values(row._errors).map((err: any, i) => <li key={i}>{err}</li>)}
-                                                            </ul>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            ) : (
-                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mx-auto" />
-                                            )}
-                                        </TableCell>
-                                        <TableCell className={cn("text-xs font-semibold", row._errors.name && !bypassValidation && "text-rose-400 capitalize underline decoration-dotted")}>
-                                            {row.name || '---'}
-                                        </TableCell>
-                                        <TableCell className={cn("text-xs font-mono", row._errors.cpf && !bypassValidation && "text-rose-400 underline decoration-dotted")}>
-                                            {row.cpf ? formatCPF(row.cpf) : '---'}
-                                        </TableCell>
-                                        <TableCell className="text-xs text-muted-foreground">
-                                            {row.email || '---'}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {row.role || '---'}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={() => {
-                                                setImportRows(prev => prev.filter((_, i) => i !== idx));
-                                            }}>
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
+                            {importRows.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                                        Nenhum registro para exibir
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                importRows.map((row, idx) => {
+                                    const hasErrors = Object.keys(row._errors).length > 0;
+                                    return (
+                                        <TableRow key={idx} className={cn(
+                                            "border-white/5 transition-colors",
+                                            hasErrors && !bypassValidation ? "bg-rose-500/[0.04]" : "hover:bg-white/[0.02]"
+                                        )}>
+                                            <TableCell className="text-center">
+                                                {hasErrors ? (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse cursor-help mx-auto" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="bg-rose-600 text-white border-0 shadow-lg">
+                                                                <ul className="text-[11px] list-disc pl-3 py-1 space-y-0.5">
+                                                                    {Object.values(row._errors).map((err: any, i) => <li key={i}>{err}</li>)}
+                                                                </ul>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                ) : (
+                                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mx-auto" />
+                                                )}
+                                            </TableCell>
+                                            <TableCell className={cn("text-xs font-semibold", row._errors.name && !bypassValidation && "text-rose-400 capitalize underline decoration-dotted")}>
+                                                {row.name || '---'}
+                                            </TableCell>
+                                            <TableCell className={cn("text-xs font-mono", row._errors.cpf && !bypassValidation && "text-rose-400 underline decoration-dotted")}>
+                                                {row.cpf ? formatCPF(row.cpf) : '---'}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {row.email || '---'}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                {row.role || '---'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={() => {
+                                                    setImportRows(prev => prev.filter((_, i) => i !== idx));
+                                                }}>
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
+                            )}
                         </TableBody>
                     </Table>
                 </div>
@@ -841,9 +862,6 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 <>
                   <Button variant="ghost" size="sm" onClick={() => setStep('MAPPING')} className="h-9 px-4 text-xs gap-1.5">
                     <ChevronLeft className="w-4 h-4" /> Ajustar Mapeamento
-                  </Button>
-                  <Button size="sm" onClick={handleStartImport} className="h-9 px-4 text-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5">
-                    Confirmar Importação <Check className="w-4 h-4" />
                   </Button>
                 </>
               )}
