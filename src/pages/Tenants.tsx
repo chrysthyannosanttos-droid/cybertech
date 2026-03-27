@@ -75,7 +75,20 @@ export default function Tenants() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+
+    // Realtime subscription for profiles (managed users)
+    const channel = supabase
+      .channel('profiles_realtime')
+      .on('postgres_changes', { event: '*', table: 'profiles', schema: 'public' }, async () => {
+        // Refresh users list whenever any profile changes
+        setManagedUsers(await getAllUsers());
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [getAllUsers]);
 
   const [form, setForm] = useState({ name: '', cnpj: '', monthlyFee: '', startDate: '', expiryDate: '' });
   

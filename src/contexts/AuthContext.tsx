@@ -222,30 +222,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getAllUsers = useCallback(async (): Promise<ManagedUser[]> => {
     try {
       const { data: profiles, error } = await supabase.from('profiles').select('*').order('name');
-      if (profiles && profiles.length > 0) {
-        return profiles.map(p => ({
-          email: p.email,
-          password: p.password,
-          mustChangePassword: p.must_change_password,
-          permissions: p.permissions,
-          appPermissions: p.app_permissions,
-          canEditEmployees: p.can_edit_employees,
-          canDeleteEmployees: p.can_delete_employees,
-          user: {
-            id: p.id,
-            email: p.email,
-            name: p.name,
-            role: p.role,
-            tenantId: p.tenant_id,
-            canEditEmployees: p.can_edit_employees,
-            canDeleteEmployees: p.can_delete_employees
-          }
-        }));
+      
+      if (error) {
+        console.warn('Usando fallback do localStorage:', error.message);
+        return getStoredUsers();
       }
+
+      const dbUsers = (profiles || []).map(p => ({
+        email: p.email,
+        password: p.password,
+        mustChangePassword: p.must_change_password,
+        permissions: p.permissions,
+        appPermissions: p.app_permissions,
+        canEditEmployees: p.can_edit_employees,
+        canDeleteEmployees: p.can_delete_employees,
+        user: {
+          id: p.id,
+          email: p.email,
+          name: p.name,
+          role: p.role,
+          tenantId: p.tenant_id,
+          canEditEmployees: p.can_edit_employees,
+          canDeleteEmployees: p.can_delete_employees
+        }
+      }));
+
+      // Merge with DEFAULT_USERS if DB is completely empty (initial setup)
+      if (dbUsers.length === 0) return DEFAULT_USERS;
+      
+      return dbUsers;
     } catch (err) {
       console.error('Erro ao buscar usuários:', err);
+      return getStoredUsers();
     }
-    return getStoredUsers();
   }, []);
 
   const saveUser = useCallback(async (userData: ManagedUser) => {

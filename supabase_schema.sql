@@ -146,3 +146,40 @@ CREATE POLICY "Allow all for now" ON time_entries FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON payslips FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON payslip_items FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON esocial_events FOR ALL USING (true);
+
+-- Tabela de Perfis de Usuário
+CREATE TABLE profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  password TEXT NOT NULL,
+  role TEXT DEFAULT 'tenant', -- 'superadmin' ou 'tenant'
+  tenant_id TEXT,
+  permissions JSONB DEFAULT '[]',
+  app_permissions JSONB DEFAULT '{"ponto": true}',
+  must_change_password BOOLEAN DEFAULT true,
+  can_edit_employees BOOLEAN DEFAULT true,
+  can_delete_employees BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabela de Documentos de Funcionários
+CREATE TABLE employee_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  category TEXT, -- 'RG', 'CPF', 'Contrato', 'Outros'
+  file_url TEXT NOT NULL,
+  file_type TEXT,
+  tenant_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all for now" ON profiles FOR ALL USING (true);
+CREATE POLICY "Allow all for now" ON employee_documents FOR ALL USING (true);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE employee_documents;
