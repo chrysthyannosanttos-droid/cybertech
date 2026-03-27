@@ -238,7 +238,6 @@ export default function Tenants() {
     toast({ title: editTenantId ? 'Empresa atualizada' : 'Empresa cadastrada' });
     setTimeout(() => window.location.reload(), 500);
   };
- Kinder
 
   const handleDeleteTenant = async (id: string, name: string) => {
     if (!isAdmin) return;
