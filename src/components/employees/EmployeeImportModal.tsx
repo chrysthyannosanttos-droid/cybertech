@@ -13,7 +13,9 @@ import {
   Search,
   Check,
   AlertTriangle,
-  Info
+  Info,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -54,30 +56,74 @@ interface MappingField {
   type: 'string' | 'number' | 'date' | 'enum';
   options?: string[];
   description?: string;
+  synonyms?: string[];
 }
 
 const MAPPING_FIELDS: MappingField[] = [
-  { key: 'name', label: 'Nome', required: true, type: 'string' },
-  { key: 'role', label: 'Descrição cargo', type: 'string' },
-  { key: 'cbo', label: 'CBO', type: 'string' },
-  { key: 'department', label: 'Setor', type: 'string' },
-  { key: 'cpf', label: 'CPF', required: true, type: 'string' },
-  { key: 'email', label: 'E-mail', type: 'string' },
-  { key: 'salary', label: 'Salário', type: 'number' },
-  { key: 'insalubridade', label: 'Insalubridade', type: 'number' },
-  { key: 'periculosidade', label: 'Periculosidade', type: 'number' },
-  { key: 'vale_refeicao', label: 'VR', type: 'number' },
-  { key: 'gender', label: 'Sexo', type: 'enum', options: ['M', 'F', 'OTHER'] },
-  { key: 'admission_date', label: 'Admissão', required: true, type: 'date' },
-  { key: 'vale_transporte', label: 'VT', type: 'number' },
-  { key: 'flexivel', label: 'Flexível', type: 'number' },
-  { key: 'mobilidade', label: 'Mobilidade', type: 'number' },
-  // Keeping other existing valid mapping keys for legacy matching
-  { key: 'birth_date', label: 'Data de Nascimento', type: 'date' },
+  { 
+    key: 'name', label: 'Nome', required: true, type: 'string',
+    synonyms: ['funcionario', 'colaborador', 'nome completo', 'full name', 'emp_name', 'pessoal'] 
+  },
+  { 
+    key: 'role', label: 'Descrição cargo', type: 'string',
+    synonyms: ['cargo', 'função', 'ocupação', 'desig', 'position', 'job'] 
+  },
+  { 
+    key: 'cbo', label: 'CBO', type: 'string',
+    synonyms: ['cod ocupação', 'classificação brasileira de ocupações'] 
+  },
+  { 
+    key: 'department', label: 'Setor', type: 'string',
+    synonyms: ['departamento', 'área', 'unidade', 'dept', 'area'] 
+  },
+  { 
+    key: 'cpf', label: 'CPF', required: true, type: 'string',
+    synonyms: ['doc', 'documento', 'id', 'identidade', 'tax id'] 
+  },
+  { 
+    key: 'email', label: 'E-mail', type: 'string',
+    synonyms: ['e-mail', 'mail', 'endereço eletrônico'] 
+  },
+  { 
+    key: 'salary', label: 'Salário', type: 'number',
+    synonyms: ['salario', 'base', 'remuneração', 'wage', 'salary'] 
+  },
+  { 
+    key: 'insalubridade', label: 'Insalubridade', type: 'number',
+    synonyms: ['adicional insalubridade', 'insalub'] 
+  },
+  { 
+    key: 'periculosidade', label: 'Periculosidade', type: 'number',
+    synonyms: ['adicional periculosidade', 'pericul'] 
+  },
+  { 
+    key: 'vale_refeicao', label: 'VR', type: 'number',
+    synonyms: ['vale refeição', 'alimentação', 'ticket', 'vr'] 
+  },
+  { 
+    key: 'gender', label: 'Sexo', type: 'enum', options: ['M', 'F', 'OTHER'],
+    synonyms: ['genero', 'gênero', 'sex'] 
+  },
+  { 
+    key: 'admission_date', label: 'Admissão', required: true, type: 'date',
+    synonyms: ['data admissão', 'admitido', 'contratação', 'hired date'] 
+  },
+  { 
+    key: 'vale_transporte', label: 'VT', type: 'number',
+    synonyms: ['vale transporte', 'transporte', 'vt'] 
+  },
+  { 
+    key: 'flexivel', label: 'Flexível', type: 'number',
+    synonyms: ['ajuda de custo', 'vale flexivel', 'beneficio flexivel'] 
+  },
+  { 
+    key: 'mobilidade', label: 'Mobilidade', type: 'number',
+    synonyms: ['ajuda mobilidade', 'transporte extra'] 
+  },
+  { key: 'birth_date', label: 'Data de Nascimento', type: 'date', synonyms: ['nascimento', 'aniversario'] },
   { key: 'status', label: 'Status', type: 'enum', options: ['ACTIVE', 'INACTIVE'] },
-  { key: 'conta_itau', label: 'Conta Itaú', type: 'string' },
+  { key: 'conta_itau', label: 'Conta Itaú', type: 'string', synonyms: ['itau', 'conta bancaria'] },
   { key: 'gratificacao', label: 'Gratificação', type: 'number' },
-  { key: 'vale_flexivel', label: 'Vale Flexível (FLEXIVEL)', type: 'number' },
 ];
 
 export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tenantId, stores }: EmployeeImportModalProps) {
@@ -151,23 +197,82 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
       }
 
       const fileHeaders = data[0].map(h => String(h).trim()).filter(h => h !== '');
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
 
       setHeaders(fileHeaders);
       setRawRows(rows);
       
-      // Auto-mapping
+      // Smart AI Mapping Logic
       const initialMapping: Record<string, string> = {};
+      const aiConfidence: Record<string, 'high' | 'medium' | 'low'> = {};
+
       MAPPING_FIELDS.forEach(field => {
-        const match = fileHeaders.find(h => {
+        let bestMatch = '';
+        let confidence: 'high' | 'medium' | 'low' = 'low';
+
+        // 1. Direct label or key match
+        const directMatch = fileHeaders.find(h => {
           const lh = h.toLowerCase();
-          const lk = field.key.toLowerCase();
-          const ll = field.label.toLowerCase();
-          return lh === lk || lh === ll || lh.includes(ll) || ll.includes(lh);
+          return lh === field.key.toLowerCase() || lh === field.label.toLowerCase();
         });
-        if (match) initialMapping[field.key] = match;
+
+        if (directMatch) {
+          bestMatch = directMatch;
+          confidence = 'high';
+        } else {
+          // 2. Synonym match
+          const synonymMatch = fileHeaders.find(h => {
+            const lh = h.toLowerCase();
+            return field.synonyms?.some(syn => lh.includes(syn.toLowerCase()) || syn.toLowerCase().includes(lh));
+          });
+
+          if (synonymMatch) {
+            bestMatch = synonymMatch;
+            confidence = 'medium';
+          } else {
+            // 3. Data type detection (AI content analysis)
+            const typeMatch = fileHeaders.find(h => {
+              const sample = rows.slice(0, 5).map(r => String(r[h] || '').trim()).filter(v => v !== '');
+              if (sample.length === 0) return false;
+
+              if (field.key === 'cpf') {
+                return sample.every(v => v.replace(/\D/g, '').length >= 11);
+              }
+              if (field.key === 'email') {
+                return sample.every(v => v.includes('@') && v.includes('.'));
+              }
+              if (field.type === 'date') {
+                return sample.every(v => {
+                  const d = new Date(v);
+                  return !isNaN(d.getTime()) || /^\d{2}\/\d{2}\/\d{4}$/.test(v);
+                });
+              }
+              if (field.key === 'salary' || field.key === 'insalubridade') {
+                return sample.every(v => !isNaN(parseNumeric(v)));
+              }
+              return false;
+            });
+
+            if (typeMatch) {
+              bestMatch = typeMatch;
+              confidence = 'low'; // Data-based is low confidence without header hint
+            }
+          }
+        }
+
+        if (bestMatch) {
+          initialMapping[field.key] = bestMatch;
+        }
       });
+      
       setMapping(initialMapping);
+      
+      toast({ 
+        title: 'Mapeamento Inteligente Ativado', 
+        description: 'A IA organizou as colunas baseada no conteúdo e sinônimos.',
+        icon: <Info className="w-4 h-4 text-emerald-400" />
+      });
+      
       setStep('MAPPING');
     };
     reader.readAsBinaryString(file);
@@ -404,33 +509,47 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
 
               <ScrollArea className="flex-1 pr-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-2">
-                  {MAPPING_FIELDS.map((field) => (
-                    <div key={field.key} className="flex flex-col gap-2 p-3 rounded-lg bg-muted/30 border border-white/5">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-bold flex items-center gap-1.5">
-                            {field.label}
-                            {field.required && <span className="text-rose-500">*</span>}
-                        </Label>
-                        {mapping[field.key] && (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        )}
+                  {MAPPING_FIELDS.map((field) => {
+                    const mappedHeader = mapping[field.key];
+                    const isMapped = !!mappedHeader;
+                    
+                    return (
+                      <div key={field.key} className={cn(
+                        "flex flex-col gap-2 p-3 rounded-lg border transition-all duration-300",
+                        isMapped ? "bg-emerald-500/[0.03] border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]" : "bg-muted/30 border-white/5"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold flex items-center gap-1.5 lowercase">
+                              <span className="capitalize">{field.label}</span>
+                              {field.required && <span className="text-rose-500">*</span>}
+                          </Label>
+                          {isMapped && (
+                            <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-500">
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500/80 bg-emerald-500/10 px-1.5 py-0.5 rounded">IA Ativa</span>
+                                <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+                            </div>
+                          )}
+                        </div>
+                        <Select 
+                          value={mapping[field.key] || 'none'} 
+                          onValueChange={(v) => setMapping(prev => ({...prev, [field.key]: v === 'none' ? '' : v}))}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-9 text-xs transition-shadow hover:shadow-lg bg-background/50",
+                            isMapped && "border-emerald-500/30 text-emerald-100"
+                          )}>
+                            <SelectValue placeholder="Não mapeado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-rose-400">Não importar</SelectItem>
+                            {headers.map(h => (
+                              <SelectItem key={h} value={h}>{h}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select 
-                        value={mapping[field.key] || 'none'} 
-                        onValueChange={(v) => setMapping(prev => ({...prev, [field.key]: v === 'none' ? '' : v}))}
-                      >
-                        <SelectTrigger className="h-9 text-xs transition-shadow hover:shadow-lg bg-background/50">
-                          <SelectValue placeholder="Não mapeado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none" className="text-rose-400">Não importar</SelectItem>
-                          {headers.map(h => (
-                            <SelectItem key={h} value={h}>{h}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
               
