@@ -123,12 +123,16 @@ export default function EmployeeDocuments() {
         })));
       }
 
-      // Fetch all employees for the selection
-      const { data: empData } = await supabase
-        .from('employees')
-        .select('id, name, status')
-        .order('name');
-      if (empData) setEmployees(empData);
+      // Fetch all employees for the selection, filtering by tenant if available
+      let query = supabase.from('employees').select('id, name, status').order('name');
+      
+      const { data: empData, error: empError } = await query;
+      
+      if (empError) {
+        console.error('Error fetching employees:', empError);
+      } else {
+        setEmployees(empData || []);
+      }
     } catch (err) {
       console.error('Error fetching docs:', err);
     }
@@ -224,7 +228,10 @@ export default function EmployeeDocuments() {
           </p>
         </div>
 
-        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <Sheet open={isSheetOpen} onOpenChange={(open) => {
+          setIsSheetOpen(open);
+          if (open) fetchData();
+        }}>
           <SheetTrigger asChild>
             <Button className="h-11 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[13px] gap-2 shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95">
               <Plus className="w-4 h-4" /> Novo Documento
@@ -255,48 +262,57 @@ export default function EmployeeDocuments() {
                   <PopoverContent className="w-[340px] p-0 glass-card border-white/10 shadow-2xl">
                     <Command className="bg-transparent">
                       <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
-                        <CommandList className="max-h-[300px] custom-scrollbar">
-                          <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
+                        <CommandList className="max-h-[300px] custom-scrollbar overflow-y-auto w-full">
+                          <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                            {employees.length === 0 
+                              ? "Nenhum funcionário cadastrado no sistema." 
+                              : "Nenhum resultado para esta pesquisa."}
+                          </CommandEmpty>
                           
-                          <CommandGroup heading="Funcionários Ativos">
-                            {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
-                              <CommandItem
-                                key={emp.id}
-                                value={`${emp.name} ${emp.id}`}
-                                onSelect={() => {
-                                  setForm(f => ({ ...f, employeeId: emp.id }));
-                                  setOpenCombo(false);
-                                }}
-                                className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                              >
-                                <div className="flex items-center flex-1">
-                                  <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-medium text-white">{emp.name}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                          {employees.filter(e => e.status === 'ACTIVE').length > 0 && (
+                            <CommandGroup heading="Funcionários Ativos">
+                              {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
+                                <CommandItem
+                                  key={emp.id}
+                                  value={emp.name}
+                                  onSelect={() => {
+                                    setForm(f => ({ ...f, employeeId: emp.id }));
+                                    setOpenCombo(false);
+                                  }}
+                                  className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
+                                >
+                                  <div className="flex items-center flex-1">
+                                    <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                    <span className="font-medium text-white">{emp.name}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
 
-                          <CommandSeparator className="bg-white/10 my-2" />
-
-                          <CommandGroup heading="Arquivo Morto (Desativados)">
-                            {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
-                              <CommandItem
-                                key={emp.id}
-                                value={`${emp.name} ${emp.id}`}
-                                onSelect={() => {
-                                  setForm(f => ({ ...f, employeeId: emp.id }));
-                                  setOpenCombo(false);
-                                }}
-                                className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                              >
-                                <div className="flex items-center flex-1">
-                                  <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                  <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                          {employees.filter(e => e.status === 'INACTIVE').length > 0 && (
+                            <>
+                              <CommandSeparator className="bg-white/10 my-2" />
+                              <CommandGroup heading="Arquivo Morto (Desativados)">
+                                {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
+                                  <CommandItem
+                                    key={emp.id}
+                                    value={emp.name}
+                                    onSelect={() => {
+                                      setForm(f => ({ ...f, employeeId: emp.id }));
+                                      setOpenCombo(false);
+                                    }}
+                                    className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
+                                  >
+                                    <div className="flex items-center flex-1">
+                                      <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </>
+                          )}
                         </CommandList>
                     </Command>
                   </PopoverContent>
