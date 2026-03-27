@@ -479,6 +479,35 @@ export default function Employees() {
     setTimeout(() => window.location.reload(), 500);
   };
 
+  const handleStatusUpdateSelected = async (newStatus: 'ACTIVE' | 'INACTIVE') => {
+    if (selectedIds.length === 0) return;
+    
+    const { error } = await supabase
+      .from('employees')
+      .update({ status: newStatus })
+      .in('id', selectedIds);
+
+    if (error) {
+      toast({ title: 'Erro ao atualizar status', description: error.message, variant: 'destructive' });
+      return;
+    }
+    
+    addAuditLog({
+      userId: currentUser?.id || 'unknown',
+      userName: currentUser?.name || 'Sistema',
+      action: 'BULK_STATUS_UPDATE',
+      details: `[Employees] Alterou status de ${selectedIds.length} funcionários para ${newStatus === 'ACTIVE' ? 'ATIVO' : 'INATIVO'}.`,
+    });
+
+    setSelectedIds([]);
+    toast({ 
+      title: 'Status atualizado', 
+      description: `${selectedIds.length} funcionário(s) agora estão ${newStatus === 'ACTIVE' ? 'ativos' : 'inativos'}.`,
+      icon: newStatus === 'ACTIVE' ? <UserCheck className="w-4 h-4 text-emerald-500" /> : <UserX className="w-4 h-4 text-rose-500" />
+    });
+    setTimeout(() => window.location.reload(), 500);
+  };
+
   const handleDeleteOne = async (id: string, name: string) => {
     const canDelete = isAdmin || currentUser?.canDeleteEmployees;
     if (!canDelete) return;
@@ -515,9 +544,27 @@ export default function Employees() {
         </div>
         <div className="flex gap-2.5">
           {(isAdmin || currentUser?.canDeleteEmployees) && selectedIds.length > 0 && (
-            <Button variant="destructive" size="sm" className="h-9 gap-1.5" onClick={handleDeleteSelected}>
-              Excluir ({selectedIds.length})
-            </Button>
+            <div className="flex gap-2 animate-in fade-in slide-in-from-right-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => handleStatusUpdateSelected('ACTIVE')}
+              >
+                <UserCheck className="w-4 h-4" /> Ativar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 gap-1.5 border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                onClick={() => handleStatusUpdateSelected('INACTIVE')}
+              >
+                <UserX className="w-4 h-4" /> Inativar
+              </Button>
+              <Button variant="destructive" size="sm" className="h-9 gap-1.5" onClick={handleDeleteSelected}>
+                <Trash2 className="w-4 h-4" /> Excluir ({selectedIds.length})
+              </Button>
+            </div>
           )}
           <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportExcel}>
             <Download className="w-4 h-4" /> Exportar Planilha
