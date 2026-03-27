@@ -397,13 +397,19 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
         const row = validRows[i];
         const { _originalIndex, _errors, ...dbRow } = row;
         
+        // Robust tenant_id detection for each row insert
+        let finalTenantId = tenantId;
+        if (!finalTenantId) {
+            const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+            if (tData?.id) finalTenantId = tData.id;
+        }
+
         // Prepare DB object
         const finalRow = {
             ...dbRow,
-            tenant_id: tenantId,
+            tenant_id: finalTenantId,
             store_id: selectedStoreId,
-            cpf: formatCPF(dbRow.cpf), // Store formatted? Check schema. Schema says unique. Usually stored clean or formatted consistently.
-            // Formatted in current Employees.tsx as $1.$2.$3-$4
+            cpf: formatCPF(dbRow.cpf),
         };
 
         try {

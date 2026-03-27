@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { MOCK_BENEFITS, MOCK_EMPLOYEE_BENEFITS, ROLES, addAuditLog } from '@/data/mockData';
 import { Employee, Benefit, EmployeeBenefit } from '@/types';
-import { Search, Plus, Download, Upload, Users, UserCheck, UserX, DollarSign, Wallet, Edit2, CheckCircle2, Trash2, FileSpreadsheet, AlertCircle, Camera } from 'lucide-react';
+import { Search, Plus, Download, Upload, Users, UserCheck, UserX, DollarSign, Wallet, Edit2, CheckCircle2, Trash2, FileSpreadsheet, AlertCircle, Camera, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,48 +41,59 @@ export default function Employees() {
   // Fetch initial data and setup realtime subscription
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch real tenant_id first
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      if (tenantData?.id) setTenantId(tenantData.id);
+      setLoading(true);
+      try {
+        // Robust tenant_id resolution
+        let currentTenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+        
+        if (!currentTenantId) {
+          const { data: tenantData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+          if (tenantData?.id) currentTenantId = tenantData.id;
+        }
+        
+        if (currentTenantId) setTenantId(currentTenantId);
 
-      // Fetch real stores
-      const { data: storesData } = await supabase.from('stores').select('*').order('name');
-      if (storesData && storesData.length > 0) setDbStores(storesData.map(s => ({ ...s, tenantId: s.tenant_id })));
+        // Fetch real stores
+        const { data: storesData } = await supabase.from('stores').select('*').order('name');
+        if (storesData) setDbStores(storesData.map(s => ({ ...s, tenantId: s.tenant_id })));
 
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('created_at', { ascending: false });
+        let query = supabase.from('employees').select('*');
+        if (currentTenantId) {
+          query = query.eq('tenant_id', currentTenantId);
+        }
 
-      if (error) {
-        console.error('Error fetching employees:', error);
-      } else {
-        // Map snake_case from DB to camelCase in TS
-        const mappedData = (data || []).map(emp => ({
-          ...emp,
-          storeName: dbStores.find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
-          admissionDate: emp.admission_date,
-          birthDate: emp.birth_date,
-          tenantId: emp.tenant_id,
-          storeId: emp.store_id,
-          contaItau: emp.conta_itau,
-          valeFlexivel: emp.vale_flexivel,
-          valeTransporte: emp.vale_transporte,
-          valeRefeicao: emp.vale_refeicao,
-          insalubridade: emp.insalubridade,
-          periculosidade: emp.periculosidade,
-          gratificacao: emp.gratificacao,
-          flexivel: emp.flexivel,
-          mobilidade: emp.mobilidade,
-          email: emp.email,
-        })) as Employee[];
-        setEmployees(mappedData);
+        const { data, error } = await query.order('name', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching employees:', error);
+          toast({ title: 'Erro de Sincronização', description: error.message, variant: 'destructive' });
+        } else {
+          // Map snake_case from DB to camelCase in TS
+          const mappedData = (data || []).map(emp => ({
+            ...emp,
+            storeName: storesData?.find(s => s.id === emp.store_id)?.name || 'Unidade Desconhecida',
+            admissionDate: emp.admission_date,
+            birthDate: emp.birth_date,
+            tenantId: emp.tenant_id,
+            storeId: emp.store_id,
+            contaItau: emp.conta_itau,
+            valeFlexivel: emp.vale_flexivel,
+            valeTransporte: emp.vale_transporte,
+            valeRefeicao: emp.vale_refeicao,
+            insalubridade: emp.insalubridade,
+            periculosidade: emp.periculosidade,
+            gratificacao: emp.gratificacao,
+            flexivel: emp.flexivel,
+            mobilidade: emp.mobilidade,
+            email: emp.email,
+          })) as Employee[];
+          setEmployees(mappedData);
+        }
+      } catch (err) {
+        console.error('Fetch error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchData();
@@ -566,6 +577,16 @@ export default function Employees() {
               </Button>
             </div>
           )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-9 gap-1.5 bg-white/5 border-white/10 text-white hover:bg-white/10"
+            onClick={() => window.location.reload()}
+            disabled={loading}
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+            Sincronizar
+          </Button>
           <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={exportExcel}>
             <Download className="w-4 h-4" /> Exportar Planilha
           </Button>
