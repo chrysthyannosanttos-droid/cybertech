@@ -463,8 +463,8 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn(
-        "max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden",
-        "bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl transition-all duration-300"
+        "max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden",
+        "bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl"
       )}>
         <DialogHeader className="p-6 pb-2">
           <div className="flex items-center justify-between">
@@ -559,7 +559,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </Badge>
               </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+              <div className="flex-1 overflow-y-auto pr-4 mb-4 border rounded-xl p-4 bg-muted/10 min-h-[300px]">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-2 pr-2">
                   {MAPPING_FIELDS.map((field) => {
                     const mappedHeader = mapping[field.key];
@@ -671,8 +671,8 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 border rounded-xl overflow-hidden bg-muted/20 flex flex-col">
-                <div className="flex-1 overflow-auto">
+              <div className="flex-1 min-h-[300px] border rounded-xl overflow-hidden bg-muted/20 flex flex-col">
+                <div className="flex-1 overflow-y-auto">
                     <Table>
                         <TableHeader className="bg-muted/95 sticky top-0 z-20 backdrop-blur-md">
                             <TableRow className="border-white/5 hover:bg-transparent shadow-sm">
