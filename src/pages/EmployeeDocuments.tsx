@@ -42,6 +42,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -254,35 +255,45 @@ export default function EmployeeDocuments() {
                   <PopoverContent className="w-[340px] p-0 glass-card border-white/10 shadow-2xl">
                     <Command className="bg-transparent">
                       <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
-                      <CommandList className="max-h-[250px] custom-scrollbar">
-                        <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {employees.map((emp) => (
-                            <CommandItem
-                              key={emp.id}
-                              value={emp.name}
-                              onSelect={() => {
-                                setForm(f => ({ ...f, employeeId: emp.id }));
-                                setOpenCombo(false);
-                              }}
-                              className="text-xs py-2 cursor-pointer hover:bg-primary/20"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  form.employeeId === emp.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex items-center gap-2">
+                        <CommandList className="max-h-[300px] custom-scrollbar">
+                          <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
+                          
+                          <CommandGroup heading="Funcionários Ativos">
+                            {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
+                              <CommandItem
+                                key={emp.id}
+                                value={emp.name}
+                                onSelect={() => {
+                                  setForm(f => ({ ...f, employeeId: emp.id }));
+                                  setOpenCombo(false);
+                                }}
+                                className="text-xs py-2 cursor-pointer hover:bg-primary/20"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
                                 <span>{emp.name}</span>
-                                {emp.status === 'INACTIVE' && (
-                                  <span className="text-[10px] bg-rose-500/10 text-rose-500 px-1.5 py-0.5 rounded border border-rose-500/20 font-black">ARQUIVO MORTO</span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+
+                          <CommandSeparator className="bg-white/10" />
+
+                          <CommandGroup heading="Arquivo Morto (Desativados)">
+                            {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
+                              <CommandItem
+                                key={emp.id}
+                                value={emp.name}
+                                onSelect={() => {
+                                  setForm(f => ({ ...f, employeeId: emp.id }));
+                                  setOpenCombo(false);
+                                }}
+                                className="text-xs py-2 cursor-pointer hover:bg-rose-500/10"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                <span className="text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
