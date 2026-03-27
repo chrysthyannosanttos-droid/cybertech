@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Info,
   Sparkles,
-  Zap
+  Zap,
+  Trash2
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -33,6 +34,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { cn, isValidCPF, formatCPF, parseNumeric, parseExcelDate } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -139,6 +147,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
   const [errorFileRows, setErrorFileRows] = useState<any[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.id || '');
   const [conflictResolution, setConflictResolution] = useState<'update' | 'skip'>('update');
+  const [bypassValidation, setBypassValidation] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -364,17 +373,22 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
   };
 
   const handleStartImport = async () => {
-    const validRows = importRows.filter(r => Object.keys(r._errors).length === 0);
+    const validRows = bypassValidation ? importRows : importRows.filter(r => Object.keys(r._errors).length === 0);
     const errorRows = importRows.filter(r => Object.keys(r._errors).length > 0);
     
     if (validRows.length === 0) {
-      toast({ title: 'Nenhum registro válido', description: 'Corrija os erros na planilha antes de importar.', variant: 'destructive' });
+      toast({ 
+        title: 'Nenhum registro válido', 
+        description: 'Corrija os erros na planilha ou ative "Ignorar Validação" para prosseguir.', 
+        variant: 'destructive' 
+      });
       return;
     }
 
     setStep('IMPORTING');
+    setImportProgress(0);
     setImportSummary({ success: 0, error: 0, total: validRows.length });
-    setErrorFileRows(errorRows);
+    setErrorFileRows(bypassValidation ? [] : errorRows);
 
     let successCount = 0;
     let failCount = 0;
@@ -622,7 +636,12 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-rose-500/5 border border-rose-500/20 rounded-lg h-8">
+                        <Label htmlFor="bypass" className="text-[9px] uppercase font-black text-rose-400 cursor-pointer">Ignorar Validação</Label>
+                        <Switch id="bypass" checked={bypassValidation} onCheckedChange={setBypassValidation} className="scale-75 data-[state=checked]:bg-rose-500" />
+                    </div>
+                    <div className="h-6 w-px bg-white/10" />
                     <Button variant="outline" size="sm" className="h-8 text-[11px] gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setStep('MAPPING')}>
                         <Sparkles className="w-3 h-3" /> Ajustar Mapeamento
                     </Button>
@@ -638,70 +657,84 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                         </Select>
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-muted-foreground">Conflito CPF</Label>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Conflito</Label>
                         <Select value={conflictResolution} onValueChange={(v: any) => setConflictResolution(v)}>
-                            <SelectTrigger className="h-8 w-32 text-[11px]">
+                            <SelectTrigger className="h-8 w-24 text-[11px]">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="update">Atualizar</SelectItem>
-                                <SelectItem value="skip">Ignorar</SelectItem>
+                                <SelectItem value="update">Update</SelectItem>
+                                <SelectItem value="skip">Skip</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-auto border rounded-xl bg-muted/20">
-                <Table>
-                  <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                    <TableRow>
-                      <TableHead className="w-12 text-center text-[10px] uppercase font-bold">Status</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">Nome</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">CPF</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">E-mail</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">Cargo</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">Setor</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">Admissão</TableHead>
-                      <TableHead className="text-[10px] uppercase font-bold">Problemas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {importRows.map((row, i) => {
-                      const errors = Object.values(row._errors);
-                      return (
-                        <TableRow key={i} className={cn("text-xs", errors.length > 0 && "bg-rose-500/5")}>
-                          <TableCell className="text-center">
-                            {errors.length === 0 ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 inline-block" />
-                            ) : (
-                              <AlertCircle className="w-4 h-4 text-rose-500 inline-block" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">{row.name || '-'}</TableCell>
-                          <TableCell>{row.cpf ? formatCPF(row.cpf) : '-'}</TableCell>
-                          <TableCell>{row.email || '-'}</TableCell>
-                          <TableCell>{row.role || '-'}</TableCell>
-                          <TableCell>{row.department || '-'}</TableCell>
-                          <TableCell>{row.admission_date || '-'}</TableCell>
-                          <TableCell>
-                            {errors.length > 0 ? (
-                                <div className="flex gap-1 flex-wrap">
-                                    {errors.map((e: any, ei) => (
-                                        <Badge key={ei} variant="outline" className="text-[9px] h-4 px-1.5 border-rose-500/30 text-rose-400 bg-rose-500/10">
-                                            {e}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            ) : (
-                                <span className="text-emerald-500/50">OK</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div className="flex-1 min-h-0 border rounded-xl overflow-hidden bg-muted/20 flex flex-col">
+                <div className="flex-1 overflow-auto">
+                    <Table>
+                        <TableHeader className="bg-muted/95 sticky top-0 z-20 backdrop-blur-md">
+                            <TableRow className="border-white/5 hover:bg-transparent shadow-sm">
+                                <TableHead className="w-12 text-center text-[10px] uppercase font-bold">Status</TableHead>
+                                <TableHead className="text-[10px] uppercase font-bold">Nome</TableHead>
+                                <TableHead className="text-[10px] uppercase font-bold">CPF</TableHead>
+                                <TableHead className="text-[10px] uppercase font-bold">E-mail</TableHead>
+                                <TableHead className="text-[10px] uppercase font-bold">Cargo</TableHead>
+                                <TableHead className="text-[10px] uppercase font-bold text-right">Ações</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {importRows.map((row, idx) => {
+                                const hasErrors = Object.keys(row._errors).length > 0;
+                                return (
+                                    <TableRow key={idx} className={cn(
+                                        "border-white/5 transition-colors",
+                                        hasErrors && !bypassValidation ? "bg-rose-500/[0.04]" : "hover:bg-white/[0.02]"
+                                    )}>
+                                        <TableCell className="text-center">
+                                            {hasErrors ? (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse cursor-help mx-auto" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="bg-rose-600 text-white border-0 shadow-lg">
+                                                            <ul className="text-[11px] list-disc pl-3 py-1 space-y-0.5">
+                                                                {Object.values(row._errors).map((err: any, i) => <li key={i}>{err}</li>)}
+                                                            </ul>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            ) : (
+                                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mx-auto" />
+                                            )}
+                                        </TableCell>
+                                        <TableCell className={cn("text-xs font-semibold", row._errors.name && !bypassValidation && "text-rose-400 capitalize underline decoration-dotted")}>
+                                            {row.name || '---'}
+                                        </TableCell>
+                                        <TableCell className={cn("text-xs font-mono", row._errors.cpf && !bypassValidation && "text-rose-400 underline decoration-dotted")}>
+                                            {row.cpf ? formatCPF(row.cpf) : '---'}
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                            {row.email || '---'}
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {row.role || '---'}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={() => {
+                                                setImportRows(prev => prev.filter((_, i) => i !== idx));
+                                            }}>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
               </div>
             </div>
           )}
