@@ -18,6 +18,7 @@ import {
   Clock,
   FileText,
   Mail,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/tenants',           module: 'tenants',           icon: Building2,       label: 'Empresas',     superadminOnly: true },
   { to: '/stores',            module: 'stores',            icon: Store,           label: 'Lojas' },
   { to: '/employees',         module: 'employees',         icon: Users,           label: 'Funcionários' },
+  { to: '/documents',         module: 'employees',         icon: FolderOpen,      label: 'Arquivo Digital' },
   { to: '/certificates',      module: 'certificates',      icon: FileHeart,       label: 'Atestados' },
   { to: '/payroll',           module: 'payroll',           icon: DollarSign,      label: 'Folha' },
   { to: '/reports',           module: 'reports',           icon: BarChart3,       label: 'Relatórios' },

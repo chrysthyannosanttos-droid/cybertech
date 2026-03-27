@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Tenants from "@/pages/Tenants";
 import Stores from "@/pages/Stores";
 import Employees from "@/pages/Employees";
+import EmployeeDocuments from "@/pages/EmployeeDocuments";
 import Certificates from "@/pages/Certificates";
 import Payroll from "@/pages/Payroll";
 import Reports from "@/pages/Reports";
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="/tenants" element={<Tenants />} />
         <Route path="/stores" element={<Stores />} />
         <Route path="/employees" element={<Employees />} />
+        <Route path="/documents" element={<EmployeeDocuments />} />
         <Route path="/certificates" element={<Certificates />} />
         <Route path="/payroll" element={<Payroll />} />
         <Route path="/reports" element={<Reports />} />
