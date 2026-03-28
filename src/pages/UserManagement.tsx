@@ -161,7 +161,13 @@ export default function UserManagement() {
       canDeleteEmployees: form.role === 'superadmin' ? true : form.canDeleteEmployees,
     };
 
-    await saveUser(newUserData);
+    const { error } = await saveUser(newUserData);
+    
+    if (error) {
+      toast({ title: 'Erro ao salvar usuário', description: error.message || 'Verifique se o e-mail já existe no banco de dados Supabase.', variant: 'destructive' });
+      return;
+    }
+
     await fetchUsers();
 
     addAuditLog({
@@ -186,8 +192,8 @@ export default function UserManagement() {
     
     let count = 0;
     for (const u of users) {
-      await saveUser(u);
-      count++;
+    const { error } = await saveUser(u);
+    if (!error) count++;
     }
     
     await fetchUsers();
@@ -202,7 +208,11 @@ export default function UserManagement() {
     }
     if (!window.confirm(`Deseja excluir permanentemente o usuário "${name}"?`)) return;
 
-    await deleteUser(email);
+    const { error } = await deleteUser(email);
+    if (error) {
+      toast({ title: 'Erro ao excluir usuário', description: error.message, variant: 'destructive' });
+      return;
+    }
     await fetchUsers();
 
     addAuditLog({

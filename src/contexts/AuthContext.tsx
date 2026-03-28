@@ -35,8 +35,8 @@ interface AuthContextType {
   mustChangePassword: boolean;
   changePassword: (newPassword: string) => void;
   getAllUsers: () => Promise<ManagedUser[]>;
-  saveUser: (userData: ManagedUser) => void;
-  deleteUser: (email: string) => void;
+  saveUser: (userData: ManagedUser) => Promise<{ error: any }>;
+  deleteUser: (email: string) => Promise<{ error: any }>;
   getUserPermissions: (email: string) => Promise<AppModule[] | undefined>;
   currentPermissions: AppModule[] | undefined; // undefined = all access
   isEmployeeView: boolean;
@@ -273,30 +273,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         can_delete_employees: userData.canDeleteEmployees
       };
 
-      await supabase.from('profiles').upsert(dbData, { onConflict: 'email' });
-    } catch (err) {
-      console.error('Erro ao salvar usuário no banco:', err);
-    }
+      const { error } = await supabase.from('profiles').upsert(dbData, { onConflict: 'email' });
+      
+      // Update local storage as fallback
+      const users = getStoredUsers();
+      const index = users.findIndex(u => u.email === userData.email);
+      if (index >= 0) {
+        users[index] = userData;
+      } else {
+        users.push(userData);
+      }
+      localStorage.setItem('managed_users', JSON.stringify(users));
 
-    // Mantém fallback no localStorage por enquanto
-    const users = getStoredUsers();
-    const index = users.findIndex(u => u.email === userData.email);
-    if (index >= 0) {
-      users[index] = userData;
-    } else {
-      users.push(userData);
+      return { error };
+    } catch (err: any) {
+      console.error('Erro ao salvar usuário no banco:', err);
+      return { error: err };
     }
-    localStorage.setItem('managed_users', JSON.stringify(users));
   }, []);
 
   const deleteUser = useCallback(async (email: string) => {
     try {
-      await supabase.from('profiles').delete().eq('email', email);
-    } catch (err) {
+      const { error } = await supabase.from('profiles').delete().eq('email', email);
+      const users = getStoredUsers().filter(u => u.email !== email);
+      localStorage.setItem('managed_users', JSON.stringify(users));
+      return { error };
+    } catch (err: any) {
       console.error('Erro ao deletar usuário no banco:', err);
+      return { error: err };
     }
-    const users = getStoredUsers().filter(u => u.email !== email);
-    localStorage.setItem('managed_users', JSON.stringify(users));
   }, []);
 
   const getUserPermissions = useCallback(async (email: string): Promise<AppModule[] | undefined> => {

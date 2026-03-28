@@ -358,7 +358,11 @@ export default function Tenants() {
       },
     };
 
-    await saveUser(newUserData);
+    const { error } = await saveUser(newUserData);
+    if (error) {
+      toast({ title: 'Erro ao salvar usuário', description: error.message, variant: 'destructive' });
+      return;
+    }
     setManagedUsers(await getAllUsers());
     
     setUserForm({ name: '', email: '', password: '123', appPermissions: { 'ponto': true } });
@@ -385,10 +389,15 @@ export default function Tenants() {
     if (email === 'cristiano') return;
     if (!window.confirm(`Deseja excluir permanentemente o acesso de "${name}"?`)) return;
     
-    deleteUser(email);
-    setManagedUsers(getAllUsers());
-    toast({ title: 'Usuário removido' });
-    setTimeout(() => window.location.reload(), 500);
+    deleteUser(email).then(({ error }) => {
+      if (error) {
+        toast({ title: 'Erro ao excluir usuário', description: error.message, variant: 'destructive' });
+      } else {
+        setManagedUsers(getAllUsers());
+        toast({ title: 'Usuário removido' });
+        setTimeout(() => window.location.reload(), 500);
+      }
+    });
   };
 
   if (selectedTenant) {
@@ -474,8 +483,13 @@ export default function Tenants() {
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="outline" className="h-8 gap-1.5 border-primary/20 text-primary hover:bg-primary/5" onClick={async () => {
                 const tenantUsers = managedUsers.filter(u => u.user.tenantId === selectedTenant.id);
-                if (!window.confirm(`Deseja sincronizar ${tenantUsers.length} usuários desta empresa com o banco de dados?`)) return;
-                for (const u of tenantUsers) await saveUser(u);
+                for (const u of tenantUsers) {
+                  const { error } = await saveUser(u);
+                  if (error) {
+                    toast({ title: `Erro ao sincronizar ${u.email}`, description: error.message, variant: 'destructive' });
+                    return;
+                  }
+                }
                 setManagedUsers(await getAllUsers());
                 toast({ title: 'Sincronização concluída!' });
                 setTimeout(() => window.location.reload(), 500);
