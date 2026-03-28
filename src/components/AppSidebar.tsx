@@ -35,7 +35,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
   { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
-  { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários',     superadminOnly: true },
+  { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
   { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
   { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
 ];

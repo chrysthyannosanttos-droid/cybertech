@@ -23,6 +23,7 @@ const MODULE_OPTIONS: Array<{ module: AppModule; label: string; description: str
   { module: 'service-providers', label: 'Prestadores',    description: 'Controle de prestadores de serviço' },
   { module: 'rescissions',       label: 'Rescisões',      description: 'Registro de rescisões contratuais' },
   { module: 'stores',            label: 'Lojas',          description: 'Gestão de unidades/lojas' },
+  { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e usuários' },
 ];
 
 const DEFAULT_PERMISSIONS: AppModule[] = MODULE_OPTIONS.map(m => m.module);
@@ -32,9 +33,10 @@ export default function UserManagement() {
   const { toast } = useToast();
   
   const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
-  const isAdmin = currentUser?.role === 'superadmin' || isCristiano;
+  const isSuperAdmin = currentUser?.role === 'superadmin' || isCristiano;
+  const isTenantAdmin = currentUser?.role === 'tenant';
 
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isSuperAdmin && !isTenantAdmin) return <Navigate to="/dashboard" replace />;
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -46,7 +48,12 @@ export default function UserManagement() {
       getAllUsers(),
       supabase.from('tenants').select('*')
     ]);
-    setUsers(userData);
+    let filteredUsers = userData;
+    if (isTenantAdmin && currentUser?.tenantId) {
+      filteredUsers = userData.filter(u => u.user.tenantId === currentUser.tenantId);
+    }
+    setUsers(filteredUsers);
+    
     if (tenantData) setTenants(tenantData as Tenant[]);
     setLoading(false);
   };
@@ -90,7 +97,7 @@ export default function UserManagement() {
       setEditingEmail(userData.email);
       setForm({
         email: userData.email,
-        password: '', // Deixa em branco para não mostrar a senha atual, mas permitir sobrescrever
+        password: '', 
         name: userData.user.name,
         role: userData.user.role as 'superadmin' | 'tenant',
         tenantId: userData.user.tenantId || '',
@@ -101,6 +108,10 @@ export default function UserManagement() {
       setSelectedPermissions(userData.permissions ?? DEFAULT_PERMISSIONS);
     } else {
       resetForm();
+      // Auto-set tenantId for tenant admins
+      if (isTenantAdmin && currentUser?.tenantId) {
+        setForm(f => ({ ...f, tenantId: currentUser.tenantId }));
+      }
     }
     setOpen(true);
   };
@@ -338,21 +349,39 @@ export default function UserManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[12px] text-muted-foreground">Perfil de Acesso</Label>
-                <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as 'superadmin' | 'tenant' }))}>
-                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <Select 
+                  value={form.role} 
+                  onValueChange={v => setForm(f => ({ ...f, role: v as 'superadmin' | 'tenant' }))}
+                  disabled={!isSuperAdmin}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tenant"><Building2 className="w-4 h-4 inline mr-2" />Empresa</SelectItem>
-                    <SelectItem value="superadmin"><ShieldCheck className="w-4 h-4 inline mr-2" />Super Admin</SelectItem>
+                    {isSuperAdmin && <SelectItem value="superadmin"><ShieldCheck className="w-4 h-4 inline mr-2" />Super Admin</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
               {form.role === 'tenant' && (
                 <div className="space-y-1.5">
                   <Label className="text-[12px] text-muted-foreground">Empresa Vinculada</Label>
-                  <Select value={form.tenantId} onValueChange={v => setForm(f => ({ ...f, tenantId: v }))}>
-                    <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione o Cliente" /></SelectTrigger>
+                  <Select 
+                    value={form.tenantId} 
+                    onValueChange={v => setForm(f => ({ ...f, tenantId: v }))}
+                    disabled={!isSuperAdmin}
+                  >
+                    <SelectTrigger className="h-9 text-[13px]">
+                      <SelectValue placeholder="Selecione o Cliente" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      {isSuperAdmin ? (
+                        tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+                      ) : (
+                        <SelectItem value={currentUser?.tenantId || ''}>
+                          {tenants.find(t => t.id === currentUser?.tenantId)?.name || 'Sua Empresa'}
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
