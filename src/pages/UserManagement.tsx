@@ -137,8 +137,8 @@ export default function UserManagement() {
     }
 
     const id = editingEmail
-      ? existingUsers.find(u => u.email === editingEmail)?.user.id || `u_${Date.now()}`
-      : `u_${Date.now()}`;
+      ? users.find(u => u.email === editingEmail)?.user.id || crypto.randomUUID()
+      : crypto.randomUUID();
 
     const existingRecord = editingEmail ? existingUsers.find(u => u.email === editingEmail) : undefined;
     const passwordToSave = (editingEmail && !form.password) ? (existingRecord?.password || '123') : form.password;

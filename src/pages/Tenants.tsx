@@ -337,8 +337,8 @@ export default function Tenants() {
     }
 
     const userId = editingEmail 
-      ? currentAllUsers.find(u => u.email === editingEmail)?.user.id || `u_${Date.now()}`
-      : `u_${Date.now()}`;
+      ? currentAllUsers.find(u => u.email === editingEmail)?.user.id || crypto.randomUUID()
+      : crypto.randomUUID();
 
     const existingRecord = editingEmail ? currentAllUsers.find(u => u.email === editingEmail) : undefined;
     const passwordToSave = (editingEmail && !userForm.password) ? (existingRecord?.password || '123') : userForm.password;
@@ -393,7 +393,7 @@ export default function Tenants() {
       if (error) {
         toast({ title: 'Erro ao excluir usuário', description: error.message, variant: 'destructive' });
       } else {
-        setManagedUsers(getAllUsers());
+        getAllUsers().then(setManagedUsers);
         toast({ title: 'Usuário removido' });
         setTimeout(() => window.location.reload(), 500);
       }
