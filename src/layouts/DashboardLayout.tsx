@@ -9,9 +9,9 @@ export default function DashboardLayout() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-background text-white overflow-hidden">
       {/* Desktop Sidebar */}
-      <div className="hidden md:block">
+      <div className="hidden md:flex h-full border-r border-white/5">
         <AppSidebar />
       </div>
 
@@ -37,8 +37,8 @@ export default function DashboardLayout() {
         </Sheet>
       </div>
 
-      <main className="flex-1 overflow-auto md:h-screen pt-16 md:pt-0">
-        <div className="p-4 md:p-6 max-w-[1200px] mx-auto pb-24 md:pb-6">
+      <main className="flex-1 overflow-y-auto h-full pt-16 md:pt-0 custom-scrollbar">
+        <div className="p-4 md:p-8 max-w-[1400px] mx-auto min-h-full">
           <Outlet />
         </div>
       </main>
