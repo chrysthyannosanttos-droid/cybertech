@@ -23,6 +23,7 @@ const MODULE_OPTIONS: Array<{ module: AppModule; label: string; description: str
   { module: 'service-providers', label: 'Prestadores',    description: 'Controle de prestadores de serviço' },
   { module: 'rescissions',       label: 'Rescisões',      description: 'Registro de rescisões contratuais' },
   { module: 'stores',            label: 'Lojas',          description: 'Gestão de unidades/lojas' },
+  { module: 'attendance',        label: 'Ponto Eletrônico', description: 'Configuração de relógios e histórico' },
   { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e usuários' },
 ];
 

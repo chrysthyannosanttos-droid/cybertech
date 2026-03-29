@@ -80,6 +80,19 @@ CREATE POLICY "Allow all for now" ON audit_logs FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON rescissions FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON certificates FOR ALL USING (true);
 
+-- Tabela de Dispositivos de Ponto (Relógios)
+CREATE TABLE attendance_devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  ip_address TEXT,
+  port INTEGER DEFAULT 80,
+  model TEXT,
+  status TEXT DEFAULT 'ACTIVE',
+  last_sync TIMESTAMPTZ,
+  tenant_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Tabela de Registros de Ponto
 CREATE TABLE time_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -91,6 +104,7 @@ CREATE TABLE time_entries (
   longitude NUMERIC,
   photo_url TEXT,
   status TEXT DEFAULT 'PENDING',
+  device_id UUID REFERENCES attendance_devices(id) ON DELETE SET NULL,
   tenant_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -134,14 +148,17 @@ CREATE TABLE esocial_events (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER PUBLICATION supabase_realtime ADD TABLE attendance_devices;
 ALTER PUBLICATION supabase_realtime ADD TABLE time_entries;
 ALTER PUBLICATION supabase_realtime ADD TABLE payslips;
 
+ALTER TABLE attendance_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payslips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payslip_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE esocial_events ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Allow all for now" ON attendance_devices FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON time_entries FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON payslips FOR ALL USING (true);
 CREATE POLICY "Allow all for now" ON payslip_items FOR ALL USING (true);

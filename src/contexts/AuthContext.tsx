@@ -14,6 +14,7 @@ export type AppModule =
   | 'tenants'
   | 'logs'
   | 'users'
+  | 'attendance'
   | 'settings';
 
 export interface ManagedUser {
@@ -46,7 +47,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const DEFAULT_PERMISSIONS: AppModule[] = [
-  'dashboard', 'employees', 'certificates', 'payroll', 'reports', 'service-providers', 'rescissions', 'stores'
+  'dashboard', 'employees', 'certificates', 'payroll', 'reports', 'service-providers', 'rescissions', 'stores', 'attendance'
 ];
 
 const DEFAULT_USERS: ManagedUser[] = [

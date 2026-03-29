@@ -56,7 +56,7 @@ export default function Dashboard() {
         { data: pData }
       ] = await Promise.all([
         supabase.from('tenants').select('*'),
-        supabase.from('employees').select('*'),
+        supabase.from('employees').select('*').eq('status', 'ACTIVE'),
         supabase.from('certificates').select('*'),
         supabase.from('stores').select('*'),
         supabase.from('service_providers').select('*')

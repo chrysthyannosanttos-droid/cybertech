@@ -130,7 +130,16 @@ export default function EmployeeDocuments() {
       const { data: docsData, error: docsError } = await docsQuery.order('created_at', { ascending: false });
 
       if (docsError) {
-        console.error('Error fetching docs:', docsError);
+        if (docsError.message.includes('Could not find the table')) {
+           toast({ 
+             title: 'Erro de Configuração', 
+             description: 'A tabela employee_documents não foi encontrada no Supabase. Execute o script SQL fornecido.', 
+             variant: 'destructive',
+             duration: 10000 
+           });
+        } else {
+           console.error('Error fetching docs:', docsError);
+        }
       } else if (docsData) {
         setDocuments(docsData.map((d: any) => ({
           ...d,
@@ -150,12 +159,11 @@ export default function EmployeeDocuments() {
       
       if (empError) {
         console.error('Error fetching employees:', empError);
-        toast({ title: 'Erro ao buscar funcionários', description: empError.message, variant: 'destructive' });
       } else {
         const foundEmps = empData || [];
         setEmployees(foundEmps);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in fetchData:', err);
     } finally {
       setIsUploading(false);

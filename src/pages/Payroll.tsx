@@ -53,7 +53,7 @@ export default function Payroll() {
         { data: certData },
         { data: storesData }
       ] = await Promise.all([
-        supabase.from('employees').select('*'),
+        supabase.from('employees').select('*').eq('status', 'ACTIVE'),
         supabase.from('certificates').select('*'),
         supabase.from('stores').select('*')
       ]);
