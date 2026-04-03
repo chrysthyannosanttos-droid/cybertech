@@ -1,113 +1,141 @@
-import { useState, useEffect, useMemo } from 'react';
-import { addAuditLog } from '@/data/mockData';
-import { Rescission, Employee } from '@/types';
-import { FileX, Plus, Search, Trash2, Calendar, DollarSign, UserMinus, Check, ChevronsUpDown } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { calculateRescission, RescissionType, monthsBetween } from '@/lib/cltEngine';
+import { addAuditLog } from '@/data/mockData';
+import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator, Check, ChevronsUpDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+interface Employee { id: string; name: string; salary: number; hazard_pay?: number; unhealthy_pay?: number; bonus?: number; admission_date?: string; }
+interface Rescission {
+  id: string; employee_id: string; employee_name: string; termination_date: string;
+  fgts_value: number; rescission_value: number; type: string; tenant_id: string;
+  admission_date?: string; last_salary?: number; gross_value?: number;
+  inss_deduction?: number; irrf_deduction?: number;
+}
+
+const fmt = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+const TYPE_NAMES: Record<string, string> = {
+  SEM_JUSTA_CAUSA: 'Sem Justa Causa',
+  COM_JUSTA_CAUSA: 'Com Justa Causa',
+  PEDIDO_DEMISSAO: 'Pedido de Demissão',
+  ACORDO: 'Rescisão por Acordo',
+  INDENIZADO: 'Aviso Prévio Indenizado',
+  TRABALHADO: 'Aviso Prévio Trabalhado',
+  TERMINO_CONTRATO: 'Término de Contrato',
+};
+
 export default function Rescissions() {
-  const [rescissions, setRescissions] = useState<Rescission[]>([]);
-  const [dbEmployees, setDbEmployees] = useState<{id: string, name: string}[]>([]);
-  const [search, setSearch] = useState('');
-  const [open, setOpen] = useState(false);
-  const [comboOpen, setComboOpen] = useState(false);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
 
-  const [form, setForm] = useState({
-    employeeId: '',
-    terminationDate: '',
-    fgtsValue: '',
-    rescissionValue: '',
-    type: 'PEDIDO' as Rescission['type']
-  });
+  const [rescissions, setRescissions] = useState<Rescission[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [comboOpen, setComboOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
-  // Fetch data from Supabase
+  const [form, setForm] = useState({
+    employeeId: '',
+    type: 'SEM_JUSTA_CAUSA' as RescissionType,
+    terminationDate: new Date().toISOString().split('T')[0] as string,
+    admissionDate: '' as string,
+    lastSalary: 0,
+    hazardPay: 0,
+    unhealthyPay: 0,
+    fgtsBalance: 0,
+    hasVestedVacation: false,
+    noticePeriodWorked: false,
+    dependents: 0,
+  });
+
+  const selectedEmp = employees.find(e => e.id === form.employeeId);
+
+  // preview dinâmico
+  const preview = (form.admissionDate || selectedEmp?.admission_date) && form.terminationDate && form.lastSalary > 0
+    ? (() => {
+        try {
+          return calculateRescission({
+            type: form.type,
+            admissionDate: new Date(form.admissionDate || selectedEmp?.admission_date || ''),
+            terminationDate: new Date(form.terminationDate),
+            lastSalary: form.lastSalary,
+            hazardPay: form.hazardPay,
+            unhealthyPay: form.unhealthyPay,
+            fgtsBalance: form.fgtsBalance,
+            hasVestedVacation: form.hasVestedVacation,
+            noticePeriodWorked: form.noticePeriodWorked,
+            dependents: form.dependents,
+          });
+        } catch { return null; }
+      })()
+    : null;
+
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch real tenant_id
       const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
       if (tData?.id) setTenantId(tData.id);
 
-      // Fetch Rescissions
-      const { data: rescData, error: rescError } = await supabase
-        .from('rescissions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (!rescError) {
-        setRescissions((rescData || []).map(r => ({
-          ...r,
-          employeeId: r.employee_id,
-          employeeName: r.employee_name,
-          terminationDate: r.termination_date,
-          fgtsValue: Number(r.fgts_value),
-          rescissionValue: Number(r.rescission_value),
-        })));
-      }
+      const [{ data: rData }, { data: eData }] = await Promise.all([
+        supabase.from('rescissions').select('*').order('created_at', { ascending: false }),
+        supabase.from('employees').select('id, name, salary, hazard_pay, unhealthy_pay, admission_date').eq('status', 'ACTIVE').order('name'),
+      ]);
 
-      // Fetch Active Employees for the selection
-      const { data: empData, error: empError } = await supabase
-        .from('employees')
-        .select('id, name')
-        .eq('status', 'ACTIVE');
-      
-      if (!empError) setDbEmployees(empData || []);
+      if (rData) setRescissions(rData as Rescission[]);
+      if (eData) setEmployees(eData as Employee[]);
     };
-
     fetchData();
-
-    // Realtime subscription
-    const channel = supabase
-      .channel('rescissions_data_realtime')
-      .on('postgres_changes', { event: '*', table: 'rescissions', schema: 'public' }, () => {
-        fetchData();
-      })
-      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => {
-        fetchData();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
-  const filtered = rescissions.filter(r =>
-    r.employeeName.toLowerCase().includes(search.toLowerCase())
-  );
+  // Ao selecionar funcionário, preenche dados automaticamente
+  useEffect(() => {
+    if (selectedEmp) {
+      setForm(f => ({
+        ...f,
+        lastSalary: selectedEmp.salary,
+        hazardPay: selectedEmp.hazard_pay || 0,
+        unhealthyPay: selectedEmp.unhealthy_pay || 0,
+        admissionDate: selectedEmp.admission_date || '',
+      }));
+    }
+  }, [form.employeeId]);
 
   const handleSave = async () => {
-    if (!form.employeeId || !form.terminationDate || !form.fgtsValue || !form.rescissionValue) {
-      toast({ title: 'Campos obrigatórios', description: 'Por favor, preencha todos os campos.', variant: 'destructive' });
+    if (!form.employeeId || !form.terminationDate || !preview) {
+      toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' });
       return;
     }
 
-    const emp = dbEmployees.find(e => e.id === form.employeeId);
+    const emp = employees.find(e => e.id === form.employeeId);
     if (!emp) return;
 
-    const dbData = {
+    const { error } = await supabase.from('rescissions').insert([{
       employee_id: form.employeeId,
       employee_name: emp.name,
       termination_date: form.terminationDate,
-      fgts_value: Number(form.fgtsValue),
-      rescission_value: Number(form.rescissionValue),
+      fgts_value: preview.multaFGTS + preview.fgtsTotal,
+      rescission_value: preview.valorLiquido,
       type: form.type,
-      tenant_id: tenantId
-    };
-
-    const { error } = await supabase.from('rescissions').insert([dbData]);
+      tenant_id: tenantId,
+      admission_date: form.admissionDate || selectedEmp?.admission_date,
+      last_salary: form.lastSalary,
+      gross_value: preview.totalCreditos,
+      inss_deduction: preview.inss,
+      irrf_deduction: preview.irrf,
+    }]);
 
     if (error) {
       toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
@@ -118,104 +146,108 @@ export default function Rescissions() {
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Sistema',
       action: 'CREATE_RESCISSION',
-      details: `[Rescisões] Lançou rescisão para ${emp.name} (Tipo: ${form.type})`
+      details: `[Rescisões] Rescisão de ${emp.name} — Tipo: ${TYPE_NAMES[form.type]} — Líquido: ${fmt(preview.valorLiquido)}`,
     });
 
-    setForm({ employeeId: '', terminationDate: '', fgtsValue: '', rescissionValue: '', type: 'PEDIDO' });
-    setOpen(false);
-    toast({ title: 'Rescisão cadastrada', description: `Lançamento para ${emp.name} concluído.` });
+    toast({ title: '✅ Rescisão calculada e registrada!', description: `${emp.name} — Líquido: ${fmt(preview.valorLiquido)}` });
+    setIsOpen(false);
+    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0 });
     setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (!isAdmin) return;
-    if (!window.confirm(`Deseja excluir o lançamento de rescisão de ${name}?`)) return;
-    
+    if (!window.confirm(`Excluir rescisão de ${name}?`)) return;
     const { error } = await supabase.from('rescissions').delete().eq('id', id);
-
-    if (error) {
+    if (!error) {
+      setRescissions(prev => prev.filter(r => r.id !== id));
+      toast({ title: 'Excluído com sucesso' });
+    } else {
       toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
-      return;
     }
-
-    addAuditLog({
-      userId: currentUser?.id || 'unknown',
-      userName: currentUser?.name || 'Cristiano',
-      action: 'DELETE_RESCISSION',
-      details: `[Rescisões] Excluiu rescisão de ${name}`
-    });
-    toast({ title: 'Lançamento excluído' });
-    setTimeout(() => window.location.reload(), 500);
   };
 
-  const getTypeName = (type: Rescission['type']) => {
-    const names = {
-      'PEDIDO': 'Pedido de Demissão',
-      'INDENIZADO': 'Aviso Prévio Indenizado',
-      'ACORDO': 'Acordo',
-      'TRABALHADO': 'Aviso Prévio Trabalhado',
-      'JUSTA_CAUSA': 'Justa Causa',
-      'TERMINO_CONTRATO': 'Término de Contrato'
-    };
-    return names[type];
+  const handlePrint = (r: Rescission) => {
+    const win = window.open('', '_blank');
+    const months = r.admission_date && r.termination_date
+      ? monthsBetween(new Date(r.admission_date), new Date(r.termination_date))
+      : '—';
+    win?.document.write(`<html><head><title>Rescisão — ${r.employee_name}</title><style>
+      body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;font-size:13px;}
+      h1{text-align:center;font-size:16px;border-bottom:2px solid #000;padding-bottom:8px;}
+      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;}
+      .credit{color:#167a3c;font-weight:bold;} .deduction{color:#c0392b;font-weight:bold;}
+      .total{background:#f0f0f0;padding:12px;margin-top:16px;font-weight:bold;font-size:15px;}
+      .assin{margin-top:60px;display:flex;justify-content:space-between;}
+      .assin div{text-align:center;border-top:1px solid #000;padding-top:8px;width:45%;}
+    </style></head><body>
+    <h1>TERMO DE RESCISÃO DE CONTRATO DE TRABALHO</h1>
+    <div class="row"><span>Funcionário</span><strong>${r.employee_name}</strong></div>
+    <div class="row"><span>Data de Admissão</span><span>${r.admission_date ? new Date(r.admission_date).toLocaleDateString('pt-BR') : '—'}</span></div>
+    <div class="row"><span>Data de Demissão</span><span>${new Date(r.termination_date).toLocaleDateString('pt-BR')}</span></div>
+    <div class="row"><span>Tempo de Serviço</span><span>${months} meses</span></div>
+    <div class="row"><span>Motivo</span><strong>${TYPE_NAMES[r.type] || r.type}</strong></div>
+    <div class="row"><span>Último Salário</span><span>${fmt(r.last_salary || 0)}</span></div>
+    <div class="row"><span>Total Bruto (Proventos)</span><span class="credit">${fmt(r.gross_value || r.rescission_value)}</span></div>
+    <div class="row"><span>INSS Descontado</span><span class="deduction">-${fmt(r.inss_deduction || 0)}</span></div>
+    <div class="row"><span>IRRF Descontado</span><span class="deduction">-${fmt(r.irrf_deduction || 0)}</span></div>
+    <div class="row"><span>FGTS + Multa</span><span class="credit">+${fmt(r.fgts_value || 0)}</span></div>
+    <div class="total"><div class="row"><span>VALOR LÍQUIDO A RECEBER</span><strong>${fmt(r.rescission_value)}</strong></div></div>
+    <div class="assin"><div>Assinatura da Empresa</div><div>Assinatura do Funcionário</div></div>
+    </body></html>`);
+    win?.document.close();
+    win?.print();
   };
+
+  const filtered = rescissions.filter(r => r.employee_name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="animate-fade-in-up stagger-1">
-      <div className="flex items-center justify-between mb-8">
+    <div className="animate-fade-in-up space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white tracking-tighter">Lançamento de Rescisões</h1>
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Gestão de desligamentos e cálculos rescisórios</p>
+          <h1 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+              <UserMinus className="w-6 h-6 text-rose-400" />
+            </div>
+            Rescisões
+          </h1>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 ml-14">
+            Calculadora automática CLT — Multa FGTS, Férias, 13º, INSS, IRRF
+          </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="h-10 px-6 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold text-[12px] gap-2 shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+            <Button className="h-10 px-6 rounded-xl bg-rose-500 hover:bg-rose-600 font-bold text-[13px] gap-2 shadow-lg shadow-rose-500/20">
               <Plus className="w-4 h-4" /> Nova Rescisão
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md bg-slate-900 border-white/10 text-white">
+          <DialogContent className="max-w-2xl border-white/10 bg-[#0a0f1e]">
             <DialogHeader>
-              <DialogTitle className="text-[15px] font-bold tracking-tight text-white/90">Cadastrar Novo Desligamento</DialogTitle>
+              <DialogTitle className="text-white font-black flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-rose-400" /> Calculadora de Rescisão (CLT)
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest">Funcionário</Label>
+
+            <div className="max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar space-y-4 mt-2">
+              {/* Funcionário */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Funcionário</Label>
                 <Popover open={comboOpen} onOpenChange={setComboOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={comboOpen}
-                      className="w-full justify-between bg-white/5 border-white/10 h-10 text-[13px] font-normal"
-                    >
-                      {form.employeeId
-                        ? dbEmployees.find((emp) => emp.id === form.employeeId)?.name
-                        : "Pesquisar colaborador..."}
+                    <Button variant="outline" role="combobox" className="w-full justify-between bg-white/5 border-white/10 h-10 text-[13px] font-normal">
+                      {selectedEmp ? selectedEmp.name : 'Buscar colaborador...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-slate-900 border-white/10">
                     <Command className="bg-transparent text-white">
-                      <CommandInput placeholder="Digite o nome..." className="h-9 text-white" />
+                      <CommandInput placeholder="Digite o nome..." className="h-9 text-white border-white/10" />
                       <CommandList>
                         <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
                         <CommandGroup>
-                          {dbEmployees.map((emp) => (
-                            <CommandItem
-                              key={emp.id}
-                              value={emp.name}
-                              onSelect={() => {
-                                setForm(f => ({ ...f, employeeId: emp.id }));
-                                setComboOpen(false);
-                              }}
-                              className="text-[13px] hover:bg-primary/20 cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  form.employeeId === emp.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
+                          {employees.map(emp => (
+                            <CommandItem key={emp.id} value={emp.name} onSelect={() => { setForm(f => ({ ...f, employeeId: emp.id })); setComboOpen(false); }}>
+                              <Check className={cn('mr-2 h-4 w-4', form.employeeId === emp.id ? 'opacity-100' : 'opacity-0')} />
                               {emp.name}
                             </CommandItem>
                           ))}
@@ -226,157 +258,181 @@ export default function Rescissions() {
                 </Popover>
               </div>
 
+              {/* Tipo de Rescisão */}
               <div className="space-y-2">
-                <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest">Data de Demissão</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                  <Input 
-                    type="date" 
-                    value={form.terminationDate} 
-                    onChange={e => setForm(f => ({ ...f, terminationDate: e.target.value }))}
-                    className="pl-10 bg-white/5 border-white/10 h-10 text-[13px]"
-                  />
+                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Motivo do Desligamento</Label>
+                <RadioGroup value={form.type} onValueChange={(v: any) => setForm(f => ({ ...f, type: v }))} className="grid grid-cols-2 gap-2">
+                  {Object.entries(TYPE_NAMES).map(([val, label]) => (
+                    <div key={val} className={cn('flex items-center space-x-2 p-3 rounded-xl border cursor-pointer transition-colors',
+                      form.type === val ? 'bg-rose-500/10 border-rose-500/30' : 'bg-white/5 border-white/10 hover:bg-white/10')}>
+                      <RadioGroupItem value={val} id={`r-${val}`} className="border-rose-500 text-rose-500" />
+                      <Label htmlFor={`r-${val}`} className={cn('text-[12px] cursor-pointer', val === 'COM_JUSTA_CAUSA' && 'text-rose-400')}>{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              {/* Datas */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Data de Admissão</Label>
+                  <Input type="date" value={form.admissionDate || selectedEmp?.admission_date || ''} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} className="bg-white/5 border-white/10 h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Data de Demissão</Label>
+                  <Input type="date" value={form.terminationDate} onChange={e => setForm(f => ({ ...f, terminationDate: e.target.value }))} className="bg-white/5 border-white/10 h-10" />
+                </div>
+              </div>
+
+              {/* Remuneração */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Último Salário</Label>
+                  <Input type="number" value={form.lastSalary || ''} onChange={e => setForm(f => ({ ...f, lastSalary: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="R$ 0,00" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Periculosidade</Label>
+                  <Input type="number" value={form.hazardPay || ''} onChange={e => setForm(f => ({ ...f, hazardPay: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="R$ 0,00" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Insalubridade</Label>
+                  <Input type="number" value={form.unhealthyPay || ''} onChange={e => setForm(f => ({ ...f, unhealthyPay: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="R$ 0,00" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest">Valor FGTS (R$)</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-                    <Input 
-                      type="number" 
-                      placeholder="0,00"
-                      value={form.fgtsValue} 
-                      onChange={e => setForm(f => ({ ...f, fgtsValue: e.target.value }))}
-                      className="pl-10 bg-white/5 border-white/10 h-10 text-[13px]"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Saldo FGTS (para multa)</Label>
+                  <Input type="number" value={form.fgtsBalance || ''} onChange={e => setForm(f => ({ ...f, fgtsBalance: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="Se 0, estima automaticamente" />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest">Valor Rescisão (R$)</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-                    <Input 
-                      type="number" 
-                      placeholder="0,00"
-                      value={form.rescissionValue} 
-                      onChange={e => setForm(f => ({ ...f, rescissionValue: e.target.value }))}
-                      className="pl-10 bg-white/5 border-white/10 h-10 text-[13px]"
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Dependentes (IRRF)</Label>
+                  <Input type="number" min={0} max={10} value={form.dependents || ''} onChange={e => setForm(f => ({ ...f, dependents: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-widest border-b border-white/5 pb-1 block">Motivo do Desligamento</Label>
-                <RadioGroup value={form.type} onValueChange={(val: any) => setForm(f => ({ ...f, type: val }))} className="grid grid-cols-1 gap-2">
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="PEDIDO" id="r1" className="border-primary text-primary" />
-                    <Label htmlFor="r1" className="text-[12px] cursor-pointer flex-1">Pedido de Demissão</Label>
+              {/* Switches */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 p-3">
+                  <div>
+                    <p className="text-[12px] font-bold text-white">Férias Vencidas</p>
+                    <p className="text-[10px] text-muted-foreground">Período anterior completo</p>
                   </div>
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="INDENIZADO" id="r2" className="border-primary text-primary" />
-                    <Label htmlFor="r2" className="text-[12px] cursor-pointer flex-1">Aviso Prévio Indenizado</Label>
+                  <Switch checked={form.hasVestedVacation} onCheckedChange={v => setForm(f => ({ ...f, hasVestedVacation: v }))} />
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 p-3">
+                  <div>
+                    <p className="text-[12px] font-bold text-white">Aviso Trabalhado</p>
+                    <p className="text-[10px] text-muted-foreground">Não desconta do líquido</p>
                   </div>
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="ACORDO" id="r3" className="border-primary text-primary" />
-                    <Label htmlFor="r3" className="text-[12px] cursor-pointer flex-1">Acordo</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="TRABALHADO" id="r4" className="border-primary text-primary" />
-                    <Label htmlFor="r4" className="text-[12px] cursor-pointer flex-1">Aviso Prévio Trabalhado</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="JUSTA_CAUSA" id="r5" className="border-primary text-primary" />
-                    <Label htmlFor="r5" className="text-[12px] cursor-pointer flex-1 text-rose-400">Justa Causa</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-colors">
-                    <RadioGroupItem value="TERMINO_CONTRATO" id="r6" className="border-primary text-primary" />
-                    <Label htmlFor="r6" className="text-[12px] cursor-pointer flex-1">Término de Contrato</Label>
-                  </div>
-                </RadioGroup>
+                  <Switch checked={form.noticePeriodWorked} onCheckedChange={v => setForm(f => ({ ...f, noticePeriodWorked: v }))} />
+                </div>
               </div>
 
-              <Button onClick={handleSave} className="w-full h-10 bg-primary hover:bg-primary/90 text-[13px] font-black uppercase tracking-widest mt-4">Confirmar Lançamento</Button>
+              {/* Preview */}
+              {preview && (
+                <div className="rounded-xl bg-rose-500/5 border border-rose-500/20 p-5 space-y-3">
+                  <h4 className="text-[11px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-2">
+                    <Calculator className="w-3.5 h-3.5" /> Demonstrativo Rescisório (Prévia)
+                  </h4>
+                  <div className="space-y-1.5">
+                    {preview.items.map(item => (
+                      <div key={item.description} className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">{item.description}</span>
+                        <span className={item.type === 'CREDIT' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          {item.type === 'DEDUCTION' ? '-' : '+'}{fmt(item.value)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-[14px] font-black pt-3 border-t border-rose-500/20 mt-2">
+                      <span className="text-white">Valor Líquido</span>
+                      <span className="text-white">{fmt(preview.valorLiquido)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleSave} className="w-full h-11 bg-rose-500 hover:bg-rose-600 font-black uppercase text-[12px] tracking-widest">
+                Confirmar Rescisão
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="relative mb-6">
+      {/* Busca */}
+      <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          value={search} 
-          onChange={e => setSearch(e.target.value)} 
-          placeholder="Buscar rescisão por funcionário..." 
-          className="pl-10 h-11 bg-white/5 border-white/5 rounded-xl text-[13px] focus:ring-primary/20 focus:border-primary/30 shadow-inner"
-        />
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar rescisão..." className="pl-10 h-11 bg-white/5 border-white/5 rounded-xl text-[13px]" />
       </div>
 
-      <div className="glass-card rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/5 bg-white/5 text-[11px] font-bold text-primary uppercase tracking-widest">
-              <th className="text-left px-6 py-4">Colaborador</th>
-              <th className="text-center px-6 py-4">Data Saída</th>
-              <th className="text-left px-6 py-4">Tipo</th>
-              <th className="text-right px-6 py-4">FGTS Rec.</th>
-              <th className="text-right px-6 py-4">Valor Total</th>
-              {isAdmin && <th className="text-center px-6 py-4">Ação</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(r => (
-              <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                      <UserMinus className="w-4 h-4 text-primary" />
-                    </div>
-                    <span className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{r.employeeName}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span className="text-[13px] font-medium text-white/70">{new Date(r.terminationDate).toLocaleDateString('pt-BR')}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
-                    r.type === 'JUSTA_CAUSA' 
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.1)]' 
-                      : 'bg-primary/10 text-primary border-primary/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
-                  }`}>
-                    {getTypeName(r.type)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right font-mono-data text-[13px] text-emerald-400">R$ {r.fgtsValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                <td className="px-6 py-4 text-right">
-                  <span className="text-[14px] font-black text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">R$ {r.rescissionValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </td>
-                {isAdmin && (
-                  <td className="px-6 py-4 text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                      onClick={() => handleDelete(r.id, r.employeeName)}
-                    >
+      {/* Lista */}
+      <div className="space-y-3">
+        {filtered.length === 0 && (
+          <div className="py-20 text-center border-2 border-dashed border-white/10 rounded-2xl">
+            <UserMinus className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-bold text-muted-foreground">Nenhuma rescisão encontrada</p>
+          </div>
+        )}
+        {filtered.map(r => (
+          <div key={r.id} className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+            <div
+              className="flex items-center justify-between p-5 cursor-pointer hover:bg-white/[0.02] transition-colors"
+              onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                  <UserMinus className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-white">{r.employee_name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {new Date(r.termination_date).toLocaleDateString('pt-BR')} · {TYPE_NAMES[r.type] || r.type}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-[14px] font-black text-white">{fmt(r.rescission_value)}</p>
+                  {r.fgts_value > 0 && <p className="text-[11px] text-amber-400">FGTS+Multa: {fmt(r.fgts_value)}</p>}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={e => { e.stopPropagation(); handlePrint(r); }}>
+                    <Printer className="w-3.5 h-3.5" />
+                  </Button>
+                  {isAdmin && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={e => { e.stopPropagation(); handleDelete(r.id, r.employee_name); }}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={isAdmin ? 6 : 5} className="px-6 py-20 text-center">
-                  <FileX className="w-12 h-12 text-white/5 mx-auto mb-3" />
-                  <p className="text-muted-foreground font-medium text-[14px]">Nenhum lançamento de rescisão encontrado.</p>
-                </td>
-              </tr>
+                  )}
+                  {expandedId === r.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </div>
+              </div>
+            </div>
+            {expandedId === r.id && (
+              <div className="border-t border-white/5 p-5 bg-white/[0.02]">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Último Salário', val: r.last_salary || 0 },
+                    { label: 'Total Bruto', val: r.gross_value || r.rescission_value },
+                    { label: '(-) INSS', val: -(r.inss_deduction || 0) },
+                    { label: '(-) IRRF', val: -(r.irrf_deduction || 0) },
+                    { label: 'FGTS + Multa', val: r.fgts_value || 0 },
+                    { label: 'Admissão', val: null, dateStr: r.admission_date ? new Date(r.admission_date).toLocaleDateString('pt-BR') : '—' },
+                    { label: 'Líquido Final', val: r.rescission_value },
+                  ].map(item => (
+                    <div key={item.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
+                      <p className={cn('text-[13px] font-bold', item.val != null && item.val < 0 ? 'text-rose-400' : 'text-white')}>
+                        {item.dateStr || (item.val != null ? fmt(Math.abs(item.val)) : '—')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-          </tbody>
-        </table>
+          </div>
+        ))}
       </div>
     </div>
   );

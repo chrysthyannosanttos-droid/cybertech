@@ -5,6 +5,9 @@ import { Tenant, Employee, Certificate, Store as StoreType, ServiceProvider } fr
 import { Building2, Users, DollarSign, TrendingUp, FileHeart, Store, Briefcase } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 
 function KpiCard({ icon: Icon, label, value, sub, delay }: { icon: any; label: string; value: string; sub?: string; delay: number }) {
@@ -37,6 +40,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -94,14 +99,41 @@ export default function Dashboard() {
   }, []);
 
   const filteredEmployees = useMemo(() => {
-    if (selectedStoreId === 'all') return employees;
-    return employees.filter(e => e.storeId === selectedStoreId);
+    let result = employees;
+    if (selectedStoreId !== 'all') {
+      result = result.filter(e => e.storeId === selectedStoreId);
+    }
+    return result;
   }, [selectedStoreId, employees]);
+
+  const newAdmissions = useMemo(() => {
+    return filteredEmployees.filter(e => {
+      if (!e.admissionDate) return false;
+      const date = parseISO(e.admissionDate);
+      return isWithinInterval(date, { 
+        start: parseISO(startDate), 
+        end: parseISO(endDate) 
+      });
+    }).length;
+  }, [filteredEmployees, startDate, endDate]);
 
   const activeClients = tenants.filter(t => t.subscription.status === 'active').length;
   const totalMRR = tenants.filter(t => t.subscription.status === 'active').reduce((s, t) => s + (t.subscription.monthlyFee || 0), 0);
   const totalEmployees = filteredEmployees.length;
-  const filteredCertificates = certificates.filter(c => filteredEmployees.some(e => e.id === c.employeeId));
+  
+  const filteredCertificates = useMemo(() => {
+    return certificates.filter(c => {
+      const matchStore = selectedStoreId === 'all' || filteredEmployees.some(e => e.id === c.employeeId);
+      if (!matchStore) return false;
+      
+      const date = parseISO(c.date);
+      return isWithinInterval(date, { 
+        start: parseISO(startDate), 
+        end: parseISO(endDate) 
+      });
+    });
+  }, [certificates, filteredEmployees, selectedStoreId, startDate, endDate]);
+
   const totalCertificates = filteredCertificates.length;
 
   const maleEmployees = filteredEmployees.filter(e => e.gender === 'M');
@@ -142,16 +174,27 @@ export default function Dashboard() {
   }));
 
   const providerCosts = useMemo(() => {
-    return providers.map(p => {
-      const extraTotal = p.additionalCosts?.reduce((s: number, c: any) => s + c.value, 0) || 0;
-      return {
-        name: p.name,
-        total: p.contractValue + extraTotal,
-        base: p.contractValue,
-        extra: extraTotal
-      };
-    }).sort((a, b) => b.total - a.total);
-  }, [providers]);
+    return providers
+      .filter(p => {
+        if (!p.startDate) return true;
+        const start = parseISO(p.startDate);
+        const rangeStart = parseISO(startDate);
+        const rangeEnd = parseISO(endDate);
+        
+        // Show if contract overlaps with selected period
+        const pEnd = p.endDate ? parseISO(p.endDate) : new Date(8640000000000000); // Far future
+        return start <= rangeEnd && pEnd >= rangeStart;
+      })
+      .map(p => {
+        const extraTotal = p.additionalCosts?.reduce((s: number, c: any) => s + c.value, 0) || 0;
+        return {
+          name: p.name,
+          total: p.contractValue + extraTotal,
+          base: p.contractValue,
+          extra: extraTotal
+        };
+      }).sort((a, b) => b.total - a.total);
+  }, [providers, startDate, endDate]);
 
   const mockMRRData = [
     { month: 'Jan', value: totalMRR * 0.9 },
@@ -186,23 +229,46 @@ export default function Dashboard() {
           <p className="text-[13px] text-muted-foreground">Visão geral e indicadores de desempenho</p>
         </div>
         
-        {!isSuperAdmin && (
-          <div className="flex items-center gap-3 glass p-1.5 px-4 rounded-full border border-white/10 shadow-lg">
-            <span className="text-[12px] font-bold text-muted-foreground whitespace-nowrap uppercase tracking-widest">Unidade</span>
-            <div className="h-4 w-[1px] bg-white/10 mx-1" />
-            <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-              <SelectTrigger className="w-[200px] h-8 text-[12px] border-none bg-transparent focus:ring-0">
-                <SelectValue placeholder="Todas as Lojas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Lojas</SelectItem>
-                {stores.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Period Filter */}
+          <div className="flex items-center gap-2 glass p-1.5 px-3 rounded-full border border-white/10 shadow-lg group">
+             <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Período</span>
+             <div className="h-4 w-[1px] bg-white/10 mx-1" />
+             <div className="flex items-center gap-1 group-hover:text-primary transition-colors">
+                <Input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={e => setStartDate(e.target.value)}
+                  className="h-7 w-[120px] bg-transparent border-none text-[11px] p-0 focus-visible:ring-0 cursor-pointer" 
+                />
+                <span className="text-muted-foreground text-[10px] font-bold">até</span>
+                <Input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)}
+                  className="h-7 w-[120px] bg-transparent border-none text-[11px] p-0 focus-visible:ring-0 cursor-pointer text-right px-1" 
+                />
+             </div>
           </div>
-        )}
+
+          {!isSuperAdmin && (
+            <div className="flex items-center gap-2 glass p-1.5 px-4 rounded-full border border-white/10 shadow-lg">
+              <span className="text-[10px] font-black text-muted-foreground whitespace-nowrap uppercase tracking-widest">Unidade</span>
+              <div className="h-4 w-[1px] bg-white/10 mx-1" />
+              <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+                <SelectTrigger className="w-[180px] h-7 text-[11px] border-none bg-transparent focus:ring-0 p-0 font-bold">
+                  <SelectValue placeholder="Todas as Lojas" />
+                </SelectTrigger>
+                <SelectContent className="glass-card border-white/10">
+                  <SelectItem value="all">Todas as Lojas</SelectItem>
+                  {stores.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -213,7 +279,13 @@ export default function Dashboard() {
             <KpiCard icon={DollarSign} label="Receita Mensal" value={`R$ ${totalMRR.toLocaleString('pt-BR')}`} delay={2} />
           </>
         )}
-        <KpiCard icon={Users} label="Colaboradores" value={String(totalEmployees)} delay={isSuperAdmin ? 3 : 1} />
+        <KpiCard 
+          icon={Users} 
+          label="Colaboradores" 
+          value={String(totalEmployees)} 
+          sub={newAdmissions > 0 ? `${newAdmissions} novas admissões` : 'Nenhuma admissão'} 
+          delay={isSuperAdmin ? 3 : 1} 
+        />
         <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
         {!isSuperAdmin && (
           <>
