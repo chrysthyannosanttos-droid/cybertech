@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 
-interface Employee { id: string; name: string; salary: number; hazard_pay?: number; unhealthy_pay?: number; admission_date?: string; }
+interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; }
 interface Vacation { id: string; employee_name: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
 
 const fmt = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -42,8 +42,9 @@ export default function Vacations() {
   const selectedEmp = employees.find(e => e.id === form.employeeId);
   const preview = selectedEmp ? calculateVacations({
     baseSalary: selectedEmp.salary,
-    hazardPay: selectedEmp.hazard_pay || 0,
-    unhealthyPay: selectedEmp.unhealthy_pay || 0,
+    hazardPay: selectedEmp.periculosidade || 0,
+    unhealthyPay: selectedEmp.insalubridade || 0,
+    bonus: selectedEmp.gratificacao || 0,
     vacationDays: form.vacationDays,
     sellBonus: form.sellBonus,
     dependents: form.dependents,
@@ -63,7 +64,7 @@ export default function Vacations() {
 
       const [{ data: vData }, { data: eData }] = await Promise.all([
         supabase.from('vacations').select('*').order('created_at', { ascending: false }),
-        supabase.from('employees').select('id, name, salary, hazard_pay, unhealthy_pay, admission_date').eq('status', 'ACTIVE').order('name'),
+        supabase.from('employees').select('id, name, salary, periculosidade, insalubridade, gratificacao, admission_date').eq('status', 'ACTIVE').order('name'),
       ]);
 
       if (vData) setVacations(vData as Vacation[]);
@@ -187,7 +188,7 @@ export default function Vacations() {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                     <div>
                       <p className="text-[13px] font-bold text-white">{selectedEmp.name}</p>
-                      <p className="text-[11px] text-muted-foreground">Salário: {fmt(selectedEmp.salary)}</p>
+                      <p className="text-[11px] text-muted-foreground">Salário: {fmt(selectedEmp.salary)}{(selectedEmp.periculosidade || 0) > 0 ? ` | Pericul.: ${fmt(selectedEmp.periculosidade!)}` : ''}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => setForm(f => ({ ...f, employeeId: '' }))}>
                       Trocar

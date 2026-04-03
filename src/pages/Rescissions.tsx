@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-interface Employee { id: string; name: string; salary: number; hazard_pay?: number; unhealthy_pay?: number; bonus?: number; admission_date?: string; }
+interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; }
 interface Rescission {
   id: string; employee_id: string; employee_name: string; termination_date: string;
   fgts_value: number; rescission_value: number; type: string; tenant_id: string;
@@ -90,7 +90,7 @@ export default function Rescissions() {
 
       const [{ data: rData }, { data: eData }] = await Promise.all([
         supabase.from('rescissions').select('*').order('created_at', { ascending: false }),
-        supabase.from('employees').select('id, name, salary, hazard_pay, unhealthy_pay, admission_date').eq('status', 'ACTIVE').order('name'),
+        supabase.from('employees').select('id, name, salary, periculosidade, insalubridade, gratificacao, admission_date').eq('status', 'ACTIVE').order('name'),
       ]);
 
       if (rData) setRescissions(rData as Rescission[]);
@@ -105,8 +105,8 @@ export default function Rescissions() {
       setForm(f => ({
         ...f,
         lastSalary: selectedEmp.salary,
-        hazardPay: selectedEmp.hazard_pay || 0,
-        unhealthyPay: selectedEmp.unhealthy_pay || 0,
+        hazardPay: selectedEmp.periculosidade || 0,
+        unhealthyPay: selectedEmp.insalubridade || 0,
         admissionDate: selectedEmp.admission_date || '',
       }));
     }
