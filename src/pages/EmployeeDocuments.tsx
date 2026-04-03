@@ -79,6 +79,7 @@ export default function EmployeeDocuments() {
   const [isDragging, setIsDragging] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
   const [viewingEmployee, setViewingEmployee] = useState<{id: string, name: string} | null>(null);
+  const [tenantIdState, setTenantIdState] = useState<string | null>(null);
   
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -101,6 +102,7 @@ export default function EmployeeDocuments() {
         const { data: tenantData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
         if (tenantData?.id) tenantId = tenantData.id;
       }
+      if (tenantId) setTenantIdState(tenantId);
 
       // Fetch documents
       let docsQuery = supabase
@@ -639,22 +641,138 @@ export default function EmployeeDocuments() {
               Documentos — {viewingEmployee?.name}
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-4 overflow-y-auto max-h-[65vh] custom-scrollbar space-y-3 pr-1">
+
+          <div className="mt-2 overflow-y-auto max-h-[65vh] custom-scrollbar space-y-4 pr-1">
+            {/* Seção de Upload Rápido */}
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+              <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                <Upload className="w-3.5 h-3.5" /> Enviar Novo Arquivo
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  placeholder="Nome do arquivo..."
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  className="h-9 bg-white/5 border-white/10 text-[12px]"
+                />
+                <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
+                  <SelectTrigger className="h-9 bg-white/5 border-white/10 text-[12px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div
+                className={cn(
+                  'relative p-4 border-2 border-dashed rounded-xl text-center transition-all cursor-pointer',
+                  isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 bg-white/5 hover:border-emerald-500/50',
+                  selectedFile && 'border-emerald-500/30 bg-emerald-500/5'
+                )}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('modal-file-input')?.click()}
+              >
+                <input
+                  id="modal-file-input"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                {selectedFile ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-emerald-400" /> : <FileIcon className="w-4 h-4 text-emerald-400" />}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-[11px] font-bold text-white truncate">{selectedFile.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:bg-rose-500/10" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}>
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <Upload className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-[11px] text-muted-foreground">Arraste ou clique — PDF, PNG, JPG (máx. 10MB)</p>
+                  </div>
+                )}
+              </div>
+              <Button
+                disabled={isUploading || !selectedFile || !form.name}
+                className="w-full h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] tracking-wider"
+                onClick={async () => {
+                  if (!viewingEmployee || !selectedFile || !form.name) return;
+                  setIsUploading(true);
+                  try {
+                    const ext = selectedFile.name.split('.').pop() || 'pdf';
+                    const filePath = `${viewingEmployee.id}/${Date.now()}_${form.name.replace(/\s+/g, '_')}.${ext}`;
+                    const { error: uploadError } = await supabase.storage
+                      .from('documents')
+                      .upload(filePath, selectedFile, { contentType: selectedFile.type, upsert: false });
+                    if (uploadError) throw uploadError;
+                    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+                    const { error } = await supabase.from('employee_documents').insert([{
+                      employee_id: viewingEmployee.id,
+                      name: form.name,
+                      category: form.category,
+                      file_url: urlData.publicUrl,
+                      file_type: selectedFile.type,
+                      tenant_id: tenantIdState || (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id
+                    }]);
+                    if (error) throw error;
+                    toast({ title: '✅ Documento enviado!', description: `${form.name} salvo com sucesso.` });
+                    setSelectedFile(null);
+                    setForm(f => ({ ...f, name: '', category: 'OTHER' }));
+                    fetchData();
+                  } catch (err: any) {
+                    toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                  } finally {
+                    setIsUploading(false);
+                  }
+                }}
+              >
+                {isUploading ? 'Enviando...' : '⬆ Enviar Arquivo'}
+              </Button>
+            </div>
+
+            {/* Linha separadora */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-white/10" />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                {documents.filter(d => d.employee_id === viewingEmployee?.id).length} arquivo(s) salvo(s)
+              </span>
+              <div className="flex-1 border-t border-white/10" />
+            </div>
+
+            {/* Lista de documentos */}
             {documents.filter(d => d.employee_id === viewingEmployee?.id).length === 0 ? (
-              <div className="py-16 text-center">
-                <FileCheck2 className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-bold text-muted-foreground">Nenhum documento encontrado para este funcionário</p>
+              <div className="py-12 text-center">
+                <FileCheck2 className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-30" />
+                <p className="text-sm font-bold text-muted-foreground">Nenhum documento encontrado</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Use o campo acima para enviar o primeiro arquivo</p>
               </div>
             ) : (
               documents.filter(d => d.employee_id === viewingEmployee?.id).map(doc => {
                 const isImage = doc.file_url && (doc.file_url.endsWith('.png') || doc.file_url.endsWith('.jpg') || doc.file_url.endsWith('.jpeg') || doc.file_url.endsWith('.webp') || (doc as any).file_type?.startsWith('image/'));
+                const isPdf = doc.file_url && (doc.file_url.endsWith('.pdf') || (doc as any).file_type === 'application/pdf');
                 const isValidFile = doc.file_url && !doc.file_url.includes('placeholder');
                 return (
                   <div key={doc.id} className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors">
                     {/* Preview de imagem */}
                     {isImage && isValidFile && (
-                      <div className="border-b border-white/10 bg-black/20 flex items-center justify-center max-h-[220px] overflow-hidden">
-                        <img src={doc.file_url} alt={doc.name} className="max-h-[220px] object-contain" />
+                      <div className="border-b border-white/10 bg-black/20 flex items-center justify-center max-h-[240px] overflow-hidden cursor-pointer" onClick={() => window.open(doc.file_url, '_blank')}>
+                        <img src={doc.file_url} alt={doc.name} className="max-h-[240px] object-contain hover:scale-105 transition-transform" />
+                      </div>
+                    )}
+                    {/* Preview de PDF */}
+                    {isPdf && isValidFile && (
+                      <div className="border-b border-white/10 bg-black/20 h-[200px] overflow-hidden">
+                        <iframe src={doc.file_url} className="w-full h-full" title={doc.name} />
                       </div>
                     )}
                     <div className="p-4 flex items-center justify-between gap-4">
@@ -677,54 +795,22 @@ export default function EmployeeDocuments() {
                       <div className="flex items-center gap-1 shrink-0">
                         {isValidFile && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
-                              title="Visualizar"
-                              onClick={() => window.open(doc.file_url, '_blank')}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10" title="Visualizar" onClick={() => window.open(doc.file_url, '_blank')}>
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"
-                              title="Copiar link"
-                              onClick={() => {
-                                navigator.clipboard.writeText(doc.file_url);
-                                toast({ title: 'Link copiado!', description: 'URL do documento copiada para a área de transferência.' });
-                              }}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10" title="Copiar link" onClick={() => { navigator.clipboard.writeText(doc.file_url); toast({ title: 'Link copiado!' }); }}>
                               <Copy className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"
-                              title="Enviar via WhatsApp"
-                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Documento: ${doc.name}\n${doc.file_url}`)}`, '_blank')}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10" title="WhatsApp" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Documento: ${doc.name}\n${doc.file_url}`)}`, '_blank')}>
                               <Share2 className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10"
-                              title="Download"
-                              onClick={() => window.open(doc.file_url, '_blank')}
-                            >
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10" title="Download" onClick={() => window.open(doc.file_url, '_blank')}>
                               <Download className="w-4 h-4" />
                             </Button>
                           </>
                         )}
                         {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
-                            onClick={() => handleDelete(doc.id, doc.name)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={() => handleDelete(doc.id, doc.name)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
