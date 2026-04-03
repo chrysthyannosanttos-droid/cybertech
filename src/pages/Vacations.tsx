@@ -2,24 +2,21 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateVacations } from '@/lib/cltEngine';
-import { TreePalm, Plus, Printer, Trash2, ChevronDown, ChevronUp, Check, ChevronsUpDown } from 'lucide-react';
+import { TreePalm, Plus, Printer, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, addYears, addDays } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 interface Employee { id: string; name: string; salary: number; hazard_pay?: number; unhealthy_pay?: number; admission_date?: string; }
 interface Vacation { id: string; employee_name: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
 
 const fmt = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const pct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
 export default function Vacations() {
   const { user } = useAuth();
@@ -29,10 +26,10 @@ export default function Vacations() {
   const [vacations, setVacations] = useState<Vacation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [comboOpen, setComboOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [empSearch, setEmpSearch] = useState('');
 
   const [form, setForm] = useState({
     employeeId: '',
@@ -55,6 +52,8 @@ export default function Vacations() {
   const vacationEnd = form.vacationStart
     ? format(addDays(new Date(form.vacationStart), form.vacationDays - 1), 'yyyy-MM-dd')
     : '';
+
+  const filteredEmps = employees.filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase()));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,7 +132,7 @@ export default function Vacations() {
       <h1>RECIBO DE FÉRIAS</h1>
       <div class="row"><span>Funcionário</span><strong>${v.employee_name}</strong></div>
       <div class="row"><span>Período de Gozo</span><span>${new Date(v.vacation_start).toLocaleDateString('pt-BR')} até ${new Date(v.vacation_end).toLocaleDateString('pt-BR')}</span></div>
-      <div class="row"><span>Dias de Férias</span><span>${v.vacation_days} dias${v.sell_bonus ? ' (+ 10 dias abono pecuniário' : ''}</span></div>
+      <div class="row"><span>Dias de Férias</span><span>${v.vacation_days} dias${v.sell_bonus ? ' (+ 10 dias abono pecuniário)' : ''}</span></div>
       <div class="row"><span>Remuneração de Férias</span><span>${(v.vacation_pay||0).toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>
       <div class="row"><span>1/3 Constitucional</span><span>${(v.one_third||0).toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>
       ${v.bonus_pay > 0 ? `<div class="row"><span>Abono Pecuniário</span><span>${v.bonus_pay.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>` : ''}
@@ -167,7 +166,7 @@ export default function Vacations() {
             Cálculo automático CLT — 1/3 constitucional + Abono pecuniário
           </p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(v) => { setIsOpen(v); if (!v) { setEmpSearch(''); } }}>
           <DialogTrigger asChild>
             <Button className="h-10 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 font-bold text-[13px] gap-2 shadow-lg shadow-emerald-500/20 text-black">
               <Plus className="w-4 h-4" /> Registrar Férias
@@ -181,41 +180,50 @@ export default function Vacations() {
             </DialogHeader>
 
             <div className="space-y-4 mt-2 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-              {/* Seleção de funcionário */}
+              {/* Seleção de funcionário — busca inline */}
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Funcionário</Label>
-                <Popover open={comboOpen} onOpenChange={setComboOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between bg-white/5 border-white/10 h-10 text-[13px] font-normal">
-                      {selectedEmp ? selectedEmp.name : 'Buscar colaborador...'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                {selectedEmp ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <div>
+                      <p className="text-[13px] font-bold text-white">{selectedEmp.name}</p>
+                      <p className="text-[11px] text-muted-foreground">Salário: {fmt(selectedEmp.salary)}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => setForm(f => ({ ...f, employeeId: '' }))}>
+                      Trocar
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-slate-900 border-white/10">
-                    <Command className="bg-transparent text-white">
-                      <CommandInput placeholder="Digite o nome..." className="h-9 text-white border-white/10" />
-                      <CommandList>
-                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {employees.map(emp => (
-                            <CommandItem key={emp.id} value={emp.name} onSelect={() => { setForm(f => ({ ...f, employeeId: emp.id })); setComboOpen(false); }} className="text-[13px] hover:bg-primary/20 cursor-pointer">
-                              <Check className={cn('mr-2 h-4 w-4', form.employeeId === emp.id ? 'opacity-100' : 'opacity-0')} />
-                              {emp.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="flex items-center px-3 border-b border-white/10">
+                      <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Buscar funcionário pelo nome..."
+                        value={empSearch}
+                        onChange={e => setEmpSearch(e.target.value)}
+                        className="w-full h-10 bg-transparent text-[13px] text-white outline-none placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
+                      {filteredEmps.length === 0 && (
+                        <p className="text-[12px] text-muted-foreground text-center py-4">Nenhum colaborador encontrado</p>
+                      )}
+                      {filteredEmps.map(emp => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => { setForm(f => ({ ...f, employeeId: emp.id })); setEmpSearch(''); }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
+                        >
+                          <span className="text-[13px] text-white">{emp.name}</span>
+                          <span className="text-[11px] text-muted-foreground">{fmt(emp.salary)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {selectedEmp && (
-                <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-[12px] text-muted-foreground">
-                  Salário Base: <span className="text-white font-bold">{fmt(selectedEmp.salary)}</span>
-                  {(selectedEmp.hazard_pay || 0) > 0 && <> | Periculosidade: <span className="text-white font-bold">{fmt(selectedEmp.hazard_pay!)}</span></>}
-                </div>
-              )}
 
               {/* Dias de férias */}
               <div className="space-y-1.5">

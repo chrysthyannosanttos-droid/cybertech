@@ -3,14 +3,12 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateRescission, RescissionType, monthsBetween } from '@/lib/cltEngine';
 import { addAuditLog } from '@/data/mockData';
-import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator, Check, ChevronsUpDown } from 'lucide-react';
+import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -44,9 +42,9 @@ export default function Rescissions() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [comboOpen, setComboOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [empSearch, setEmpSearch] = useState('');
 
   const [form, setForm] = useState({
     employeeId: '',
@@ -63,6 +61,7 @@ export default function Rescissions() {
   });
 
   const selectedEmp = employees.find(e => e.id === form.employeeId);
+  const filteredEmps = employees.filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase()));
 
   // preview dinâmico
   const preview = (form.admissionDate || selectedEmp?.admission_date) && form.terminationDate && form.lastSalary > 0
@@ -215,7 +214,7 @@ export default function Rescissions() {
             Calculadora automática CLT — Multa FGTS, Férias, 13º, INSS, IRRF
           </p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(v) => { setIsOpen(v); if (!v) setEmpSearch(''); }}>
           <DialogTrigger asChild>
             <Button className="h-10 px-6 rounded-xl bg-rose-500 hover:bg-rose-600 font-bold text-[13px] gap-2 shadow-lg shadow-rose-500/20">
               <Plus className="w-4 h-4" /> Nova Rescisão
@@ -229,33 +228,49 @@ export default function Rescissions() {
             </DialogHeader>
 
             <div className="max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar space-y-4 mt-2">
-              {/* Funcionário */}
+              {/* Funcionário — busca inline */}
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Funcionário</Label>
-                <Popover open={comboOpen} onOpenChange={setComboOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between bg-white/5 border-white/10 h-10 text-[13px] font-normal">
-                      {selectedEmp ? selectedEmp.name : 'Buscar colaborador...'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                {selectedEmp ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                    <div>
+                      <p className="text-[13px] font-bold text-white">{selectedEmp.name}</p>
+                      <p className="text-[11px] text-muted-foreground">Salário: {fmt(selectedEmp.salary)} · Admissão: {selectedEmp.admission_date ? new Date(selectedEmp.admission_date).toLocaleDateString('pt-BR') : '—'}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => setForm(f => ({ ...f, employeeId: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, admissionDate: '' }))}>
+                      Trocar
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-slate-900 border-white/10">
-                    <Command className="bg-transparent text-white">
-                      <CommandInput placeholder="Digite o nome..." className="h-9 text-white border-white/10" />
-                      <CommandList>
-                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {employees.map(emp => (
-                            <CommandItem key={emp.id} value={emp.name} onSelect={() => { setForm(f => ({ ...f, employeeId: emp.id })); setComboOpen(false); }}>
-                              <Check className={cn('mr-2 h-4 w-4', form.employeeId === emp.id ? 'opacity-100' : 'opacity-0')} />
-                              {emp.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="flex items-center px-3 border-b border-white/10">
+                      <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Buscar funcionário pelo nome..."
+                        value={empSearch}
+                        onChange={e => setEmpSearch(e.target.value)}
+                        className="w-full h-10 bg-transparent text-[13px] text-white outline-none placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
+                      {filteredEmps.length === 0 && (
+                        <p className="text-[12px] text-muted-foreground text-center py-4">Nenhum colaborador encontrado</p>
+                      )}
+                      {filteredEmps.map(emp => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          onClick={() => { setForm(f => ({ ...f, employeeId: emp.id })); setEmpSearch(''); }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
+                        >
+                          <span className="text-[13px] text-white">{emp.name}</span>
+                          <span className="text-[11px] text-muted-foreground">{fmt(emp.salary)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Tipo de Rescisão */}
@@ -424,7 +439,7 @@ export default function Rescissions() {
                     <div key={item.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
                       <p className={cn('text-[13px] font-bold', item.val != null && item.val < 0 ? 'text-rose-400' : 'text-white')}>
-                        {item.dateStr || (item.val != null ? fmt(Math.abs(item.val)) : '—')}
+                        {(item as any).dateStr || (item.val != null ? fmt(Math.abs(item.val)) : '—')}
                       </p>
                     </div>
                   ))}
