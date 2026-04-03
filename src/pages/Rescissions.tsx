@@ -85,13 +85,25 @@ export default function Rescissions() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
-      if (tData?.id) setTenantId(tData.id);
+      // Robust tenant_id resolution (same as Employees page)
+      let currentTenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      if (!currentTenantId) {
+        const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        if (tData?.id) currentTenantId = tData.id;
+      }
+      if (currentTenantId) setTenantId(currentTenantId);
 
-      const [{ data: rData }, { data: eData }] = await Promise.all([
-        supabase.from('rescissions').select('*').order('created_at', { ascending: false }),
-        supabase.from('employees').select('id, name, salary, periculosidade, insalubridade, gratificacao, admission_date').eq('status', 'ACTIVE').order('name'),
-      ]);
+      // Fetch rescissions
+      let resQuery = supabase.from('rescissions').select('*').order('created_at', { ascending: false });
+      if (currentTenantId) resQuery = resQuery.eq('tenant_id', currentTenantId);
+      const { data: rData } = await resQuery;
+
+      // Fetch employees (select * to avoid column mismatch errors)
+      let empQuery = supabase.from('employees').select('*').eq('status', 'ACTIVE').order('name');
+      if (currentTenantId) empQuery = empQuery.eq('tenant_id', currentTenantId);
+      const { data: eData, error: eError } = await empQuery;
+
+      if (eError) console.error('Erro ao buscar funcionários:', eError.message);
 
       if (rData) setRescissions(rData as Rescission[]);
       if (eData) setEmployees(eData as Employee[]);

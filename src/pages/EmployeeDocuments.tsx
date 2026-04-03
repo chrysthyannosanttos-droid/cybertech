@@ -13,8 +13,10 @@ import {
   Filter,
   FileCheck2,
   AlertCircle,
-  Check,
-  ChevronsUpDown
+  Upload,
+  X,
+  Image as ImageIcon,
+  File as FileIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,20 +37,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { addAuditLog } from '@/data/mockData';
@@ -82,7 +70,9 @@ export default function EmployeeDocuments() {
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [openCombo, setOpenCombo] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [empSearch, setEmpSearch] = useState('');
   
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -192,24 +182,70 @@ export default function EmployeeDocuments() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) validateAndSetFile(file);
+  };
+
+  const validateAndSetFile = (file: File) => {
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (file.size > maxSize) {
+      toast({ title: 'Arquivo muito grande', description: 'O limite é 10MB.', variant: 'destructive' });
+      return;
+    }
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: 'Tipo não permitido', description: 'Envie PDF, PNG, JPG ou WebP.', variant: 'destructive' });
+      return;
+    }
+    setSelectedFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) validateAndSetFile(file);
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.employeeId || !form.name) {
       toast({ title: 'Campos obrigatórios', description: 'Preencha o funcionário e o nome do arquivo.', variant: 'destructive' });
       return;
     }
+    if (!selectedFile) {
+      toast({ title: 'Arquivo obrigatório', description: 'Selecione um PDF ou imagem para enviar.', variant: 'destructive' });
+      return;
+    }
 
     setIsUploading(true);
     try {
       const selectedEmp = employees.find(e => e.id === form.employeeId);
-      
+      const ext = selectedFile.name.split('.').pop() || 'pdf';
+      const filePath = `${form.employeeId}/${Date.now()}_${form.name.replace(/\s+/g, '_')}.${ext}`;
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, selectedFile, {
+          contentType: selectedFile.type,
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+
       const { error } = await supabase
         .from('employee_documents')
         .insert([{
           employee_id: form.employeeId,
           name: form.name,
           category: form.category,
-          file_url: 'https://placeholder-url.com', 
+          file_url: urlData.publicUrl,
+          file_type: selectedFile.type,
           tenant_id: (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id || '9de674ac-807c-482a-a550-61014e7afee8'
         }]);
 
@@ -222,8 +258,10 @@ export default function EmployeeDocuments() {
         details: `[Arquivo Digital] Upload de ${form.name} para ${selectedEmp?.name}`
       });
 
-      toast({ title: 'Documento salvo', description: 'O registro foi criado com sucesso.' });
+      toast({ title: '✅ Documento enviado!', description: `${form.name} salvo com sucesso.` });
       setForm({ employeeId: '', category: 'OTHER', name: '' });
+      setSelectedFile(null);
+      setEmpSearch('');
       setIsSheetOpen(false);
       fetchData();
     } catch (err: any) {
@@ -275,88 +313,51 @@ export default function EmployeeDocuments() {
               <SheetDescription className="text-muted-foreground">Adicione PDFs ou imagens ao cadastro do funcionário.</SheetDescription>
             </SheetHeader>
             <form onSubmit={handleUpload} className="space-y-5">
+              {/* Funcionário — busca inline */}
               <div className="space-y-2">
                 <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Funcionário</Label>
-                <Popover open={openCombo} onOpenChange={setOpenCombo}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={openCombo}
-                      className="w-full h-11 justify-between bg-white/5 border-white/10 text-[13px] font-normal hover:bg-white/10"
-                    >
-                      {form.employeeId
-                        ? employees.find((emp) => emp.id === form.employeeId)?.name
-                        : "Selecione o colaborador..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                {form.employeeId ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <p className="text-[13px] font-bold text-white">
+                      {employees.find(e => e.id === form.employeeId)?.name}
+                    </p>
+                    <Button type="button" variant="ghost" size="sm" className="text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => setForm(f => ({ ...f, employeeId: '' }))}>
+                      Trocar
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[340px] p-0 glass-card border-white/10 shadow-2xl">
-                    <Command className="bg-transparent" shouldFilter={true}>
-                      <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
-                        <CommandList className="max-h-[300px] custom-scrollbar overflow-y-auto w-full">
-                          {isUploading ? (
-                            <div className="py-10 text-center text-xs text-muted-foreground animate-pulse">
-                              Carregando lista de funcionários...
-                            </div>
-                          ) : (
-                            <>
-                              <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
-                                {employees.length === 0 
-                                  ? "Nenhum funcionário cadastrado no sistema." 
-                                  : "Nenhum resultado para esta pesquisa."}
-                              </CommandEmpty>
-                              
-                              {employees.filter(e => e.status === 'ACTIVE').length > 0 && (
-                                <CommandGroup heading="Funcionários Ativos">
-                                  {employees.filter(e => e.status === 'ACTIVE').map((emp) => (
-                                    <CommandItem
-                                      key={emp.id}
-                                      value={emp.name}
-                                      onSelect={() => {
-                                        setForm(f => ({ ...f, employeeId: emp.id }));
-                                        setOpenCombo(false);
-                                      }}
-                                      className="text-[13px] py-3 cursor-pointer hover:bg-white/10 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                                    >
-                                      <div className="flex items-center flex-1">
-                                        <Check className={cn("mr-3 h-4 w-4 text-emerald-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                        <span className="font-medium text-white">{emp.name}</span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              )}
-
-                              {employees.filter(e => e.status === 'INACTIVE').length > 0 && (
-                                <>
-                                  <CommandSeparator className="bg-white/10 my-2" />
-                                  <CommandGroup heading="Arquivo Morto (Desativados)">
-                                    {employees.filter(e => e.status === 'INACTIVE').map((emp) => (
-                                      <CommandItem
-                                        key={emp.id}
-                                        value={emp.name}
-                                        onSelect={() => {
-                                          setForm(f => ({ ...f, employeeId: emp.id }));
-                                          setOpenCombo(false);
-                                        }}
-                                        className="text-[13px] py-3 cursor-pointer hover:bg-rose-500/5 flex items-center gap-2 rounded-lg px-3 mx-1 mb-1 transition-colors"
-                                      >
-                                        <div className="flex items-center flex-1">
-                                          <Check className={cn("mr-3 h-4 w-4 text-rose-500", form.employeeId === emp.id ? "opacity-100" : "opacity-0")} />
-                                          <span className="font-medium text-muted-foreground line-through decoration-rose-500/50">{emp.name}</span>
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="flex items-center px-3 border-b border-white/10">
+                      <Search className="w-4 h-4 text-muted-foreground mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Buscar funcionário..."
+                        value={empSearch}
+                        onChange={e => setEmpSearch(e.target.value)}
+                        className="w-full h-10 bg-transparent text-[13px] text-white outline-none placeholder:text-muted-foreground"
+                      />
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {employees.filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase())).length === 0 ? (
+                        <p className="text-[12px] text-muted-foreground text-center py-4">Nenhum colaborador encontrado</p>
+                      ) : (
+                        employees.filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase())).map(emp => (
+                          <button
+                            key={emp.id}
+                            type="button"
+                            onClick={() => { setForm(f => ({ ...f, employeeId: emp.id })); setEmpSearch(''); }}
+                            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
+                          >
+                            <span className="text-[13px] text-white">{emp.name}</span>
+                            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', emp.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400')}>
+                              {emp.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -381,17 +382,55 @@ export default function EmployeeDocuments() {
                 </Select>
               </div>
 
-              <div className="p-8 border-2 border-dashed border-white/10 rounded-2xl bg-white/5 text-center space-y-2 group hover:border-emerald-500/50 transition-colors cursor-pointer relative overflow-hidden">
-                  <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto text-emerald-500 group-hover:scale-110 transition-transform">
-                    <Plus className="w-6 h-6" />
+              {/* Drag & Drop area */}
+              <div
+                className={cn(
+                  'relative p-6 border-2 border-dashed rounded-2xl text-center space-y-2 transition-all cursor-pointer',
+                  isDragging ? 'border-emerald-500 bg-emerald-500/10 scale-[1.02]' : 'border-white/10 bg-white/5 hover:border-emerald-500/50',
+                  selectedFile && 'border-emerald-500/30 bg-emerald-500/5'
+                )}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('file-upload-input')?.click()}
+              >
+                <input
+                  id="file-upload-input"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                {selectedFile ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      {selectedFile.type.startsWith('image/') ? (
+                        <ImageIcon className="w-5 h-5 text-emerald-400" />
+                      ) : (
+                        <FileIcon className="w-5 h-5 text-emerald-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-[12px] font-bold text-white truncate max-w-[220px]">{selectedFile.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(0)} KB · {selectedFile.type.split('/')[1].toUpperCase()}</p>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:bg-rose-500/10" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}>
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <p className="text-xs font-bold text-muted-foreground group-hover:text-white transition-colors">Arraste seu PDF aqui</p>
-                  <p className="text-[10px] text-muted-foreground/60">(Ou clique para selecionar)</p>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto text-emerald-500">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground">Arraste seu PDF ou imagem aqui</p>
+                    <p className="text-[10px] text-muted-foreground/60">(PDF, PNG, JPG, WebP — máx. 10MB)</p>
+                  </>
+                )}
               </div>
 
               <Button disabled={isUploading} className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-lg shadow-emerald-500/10">
-                {isUploading ? 'Salvando...' : 'Salvar no Arquivo Digital'}
+                {isUploading ? 'Enviando...' : 'Salvar no Arquivo Digital'}
               </Button>
             </form>
           </SheetContent>
@@ -550,7 +589,7 @@ export default function EmployeeDocuments() {
                       </td>
                       <td className="px-6">
                         <div className="flex justify-end gap-2">
-                           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-emerald-500 hover:bg-emerald-500/10">
+                           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-emerald-500 hover:bg-emerald-500/10" onClick={() => doc.file_url && window.open(doc.file_url, '_blank')}>
                               <Download className="w-4 h-4" />
                            </Button>
                            {isAdmin && (

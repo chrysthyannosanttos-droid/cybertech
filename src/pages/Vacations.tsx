@@ -59,13 +59,26 @@ export default function Vacations() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
-      if (tData?.id) setTenantId(tData.id);
+      
+      // Robust tenant_id resolution (same as Employees page)
+      let currentTenantId = (user as any)?.tenantId || (user as any)?.tenant_id;
+      if (!currentTenantId) {
+        const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        if (tData?.id) currentTenantId = tData.id;
+      }
+      if (currentTenantId) setTenantId(currentTenantId);
 
-      const [{ data: vData }, { data: eData }] = await Promise.all([
-        supabase.from('vacations').select('*').order('created_at', { ascending: false }),
-        supabase.from('employees').select('id, name, salary, periculosidade, insalubridade, gratificacao, admission_date').eq('status', 'ACTIVE').order('name'),
-      ]);
+      // Fetch vacations
+      let vacQuery = supabase.from('vacations').select('*').order('created_at', { ascending: false });
+      if (currentTenantId) vacQuery = vacQuery.eq('tenant_id', currentTenantId);
+      const { data: vData } = await vacQuery;
+
+      // Fetch employees (select * to avoid column mismatch errors)
+      let empQuery = supabase.from('employees').select('*').eq('status', 'ACTIVE').order('name');
+      if (currentTenantId) empQuery = empQuery.eq('tenant_id', currentTenantId);
+      const { data: eData, error: eError } = await empQuery;
+
+      if (eError) console.error('Erro ao buscar funcionários:', eError.message);
 
       if (vData) setVacations(vData as Vacation[]);
       if (eData) setEmployees(eData as Employee[]);
