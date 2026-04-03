@@ -16,7 +16,11 @@ import {
   Upload,
   X,
   Image as ImageIcon,
-  File as FileIcon
+  File as FileIcon,
+  Eye,
+  Copy,
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +34,7 @@ import {
   SheetTrigger,
   SheetDescription
 } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Select, 
   SelectContent, 
@@ -73,6 +78,7 @@ export default function EmployeeDocuments() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
+  const [viewingEmployee, setViewingEmployee] = useState<{id: string, name: string} | null>(null);
   
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -564,12 +570,14 @@ export default function EmployeeDocuments() {
                         )}
                       </td>
                       <td className="px-6">
-                        <span className={cn(
-                          "text-[13px] font-bold block",
-                          doc.employee_status === 'INACTIVE' ? "text-muted-foreground line-through" : "text-white"
-                        )}>
+                        <button
+                          onClick={() => setViewingEmployee({ id: doc.employee_id, name: doc.employee_name || 'Funcionário' })}
+                          className={cn(
+                            "text-[13px] font-bold block hover:underline cursor-pointer transition-colors",
+                            doc.employee_status === 'INACTIVE' ? "text-muted-foreground line-through hover:text-rose-400" : "text-white hover:text-emerald-400"
+                          )}>
                           {doc.employee_name}
-                        </span>
+                        </button>
                       </td>
                       <td className="px-6">
                         <div className="flex items-center gap-3">
@@ -619,6 +627,116 @@ export default function EmployeeDocuments() {
           <p className="text-[11px] text-amber-200/60 font-medium">Apenas administradores podem excluir documentos permanentemente.</p>
         </div>
       )}
+
+      {/* Modal de visualização de documentos do funcionário */}
+      <Dialog open={!!viewingEmployee} onOpenChange={(open) => { if (!open) setViewingEmployee(null); }}>
+        <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e] max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-white font-black flex items-center gap-3 text-lg">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <FolderOpen className="w-5 h-5 text-emerald-400" />
+              </div>
+              Documentos — {viewingEmployee?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 overflow-y-auto max-h-[65vh] custom-scrollbar space-y-3 pr-1">
+            {documents.filter(d => d.employee_id === viewingEmployee?.id).length === 0 ? (
+              <div className="py-16 text-center">
+                <FileCheck2 className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-30" />
+                <p className="text-sm font-bold text-muted-foreground">Nenhum documento encontrado para este funcionário</p>
+              </div>
+            ) : (
+              documents.filter(d => d.employee_id === viewingEmployee?.id).map(doc => {
+                const isImage = doc.file_url && (doc.file_url.endsWith('.png') || doc.file_url.endsWith('.jpg') || doc.file_url.endsWith('.jpeg') || doc.file_url.endsWith('.webp') || (doc as any).file_type?.startsWith('image/'));
+                const isValidFile = doc.file_url && !doc.file_url.includes('placeholder');
+                return (
+                  <div key={doc.id} className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors">
+                    {/* Preview de imagem */}
+                    {isImage && isValidFile && (
+                      <div className="border-b border-white/10 bg-black/20 flex items-center justify-center max-h-[220px] overflow-hidden">
+                        <img src={doc.file_url} alt={doc.name} className="max-h-[220px] object-contain" />
+                      </div>
+                    )}
+                    <div className="p-4 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                          {isImage ? <ImageIcon className="w-5 h-5 text-blue-400" /> : <FileIcon className="w-5 h-5 text-amber-400" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold text-white truncate">{doc.name}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+                              {CATEGORIES.find(c => c.value === doc.category)?.label || 'Outros'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isValidFile && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10"
+                              title="Visualizar"
+                              onClick={() => window.open(doc.file_url, '_blank')}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"
+                              title="Copiar link"
+                              onClick={() => {
+                                navigator.clipboard.writeText(doc.file_url);
+                                toast({ title: 'Link copiado!', description: 'URL do documento copiada para a área de transferência.' });
+                              }}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"
+                              title="Enviar via WhatsApp"
+                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Documento: ${doc.name}\n${doc.file_url}`)}`, '_blank')}
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10"
+                              title="Download"
+                              onClick={() => window.open(doc.file_url, '_blank')}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                            onClick={() => handleDelete(doc.id, doc.name)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
