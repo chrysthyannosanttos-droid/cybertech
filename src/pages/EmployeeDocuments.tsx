@@ -216,6 +216,27 @@ export default function EmployeeDocuments() {
     if (file) validateAndSetFile(file);
   };
 
+  // Garante que o bucket 'documents' existe no Supabase Storage
+  const ensureBucket = async () => {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some(b => b.name === 'documents');
+    if (!exists) {
+      await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
+    }
+  };
+
+  const uploadFileToStorage = async (file: File, employeeId: string, docName: string) => {
+    await ensureBucket();
+    const ext = file.name.split('.').pop() || 'pdf';
+    const filePath = `${employeeId}/${Date.now()}_${docName.replace(/\s+/g, '_')}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+    return { publicUrl: urlData.publicUrl, fileType: file.type };
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.employeeId || !form.name) {
@@ -230,21 +251,7 @@ export default function EmployeeDocuments() {
     setIsUploading(true);
     try {
       const selectedEmp = employees.find(e => e.id === form.employeeId);
-      const ext = selectedFile.name.split('.').pop() || 'pdf';
-      const filePath = `${form.employeeId}/${Date.now()}_${form.name.replace(/\s+/g, '_')}.${ext}`;
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, selectedFile, {
-          contentType: selectedFile.type,
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      const { publicUrl, fileType } = await uploadFileToStorage(selectedFile, form.employeeId, form.name);
 
       const { error } = await supabase
         .from('employee_documents')
@@ -252,9 +259,9 @@ export default function EmployeeDocuments() {
           employee_id: form.employeeId,
           name: form.name,
           category: form.category,
-          file_url: urlData.publicUrl,
-          file_type: selectedFile.type,
-          tenant_id: (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id || '9de674ac-807c-482a-a550-61014e7afee8'
+          file_url: publicUrl,
+          file_type: fileType,
+          tenant_id: tenantIdState || (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id
         }]);
 
       if (error) throw error;
@@ -709,19 +716,13 @@ export default function EmployeeDocuments() {
                   if (!viewingEmployee || !selectedFile || !form.name) return;
                   setIsUploading(true);
                   try {
-                    const ext = selectedFile.name.split('.').pop() || 'pdf';
-                    const filePath = `${viewingEmployee.id}/${Date.now()}_${form.name.replace(/\s+/g, '_')}.${ext}`;
-                    const { error: uploadError } = await supabase.storage
-                      .from('documents')
-                      .upload(filePath, selectedFile, { contentType: selectedFile.type, upsert: false });
-                    if (uploadError) throw uploadError;
-                    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+                    const { publicUrl, fileType } = await uploadFileToStorage(selectedFile, viewingEmployee.id, form.name);
                     const { error } = await supabase.from('employee_documents').insert([{
                       employee_id: viewingEmployee.id,
                       name: form.name,
                       category: form.category,
-                      file_url: urlData.publicUrl,
-                      file_type: selectedFile.type,
+                      file_url: publicUrl,
+                      file_type: fileType,
                       tenant_id: tenantIdState || (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id
                     }]);
                     if (error) throw error;
