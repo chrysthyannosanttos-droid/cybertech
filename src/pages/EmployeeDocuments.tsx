@@ -637,190 +637,195 @@ export default function EmployeeDocuments() {
         </div>
       )}
 
-      {/* Modal de visualização de documentos do funcionário */}
-      <Dialog open={!!viewingEmployee} onOpenChange={(open) => { if (!open) setViewingEmployee(null); }}>
-        <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e] max-h-[85vh] overflow-hidden">
+      {/* Modal de visualização de documentos do funcionário — Galeria */}
+      <Dialog open={!!viewingEmployee} onOpenChange={(open) => { if (!open) { setViewingEmployee(null); setSelectedFile(null); setForm(f => ({...f, name: '', category: 'OTHER'})); } }}>
+        <DialogContent className="max-w-4xl border-white/10 bg-[#0a0f1e] max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-white font-black flex items-center gap-3 text-lg">
               <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <FolderOpen className="w-5 h-5 text-emerald-400" />
               </div>
               Documentos — {viewingEmployee?.name}
+              <span className="ml-auto text-[10px] font-bold text-muted-foreground bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                {documents.filter(d => d.employee_id === viewingEmployee?.id).length} arquivo(s)
+              </span>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="mt-2 overflow-y-auto max-h-[65vh] custom-scrollbar space-y-4 pr-1">
-            {/* Seção de Upload Rápido */}
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
-              <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                <Upload className="w-3.5 h-3.5" /> Enviar Novo Arquivo
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  placeholder="Nome do arquivo..."
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="h-9 bg-white/5 border-white/10 text-[12px]"
-                />
-                <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
-                  <SelectTrigger className="h-9 bg-white/5 border-white/10 text-[12px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="mt-3 overflow-y-auto max-h-[62vh] custom-scrollbar pr-1">
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+
+              {/* Card "+" para adicionar novo arquivo */}
               <div
                 className={cn(
-                  'relative p-4 border-2 border-dashed rounded-xl text-center transition-all cursor-pointer',
-                  isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 bg-white/5 hover:border-emerald-500/50',
-                  selectedFile && 'border-emerald-500/30 bg-emerald-500/5'
+                  "aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group relative overflow-hidden",
+                  selectedFile 
+                    ? "border-emerald-500/40 bg-emerald-500/5" 
+                    : "border-white/10 bg-white/[0.02] hover:border-emerald-500/50 hover:bg-emerald-500/5"
                 )}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById('modal-file-input')?.click()}
+                onClick={() => {
+                  if (!selectedFile) document.getElementById('gallery-file-input')?.click();
+                }}
               >
                 <input
-                  id="modal-file-input"
+                  id="gallery-file-input"
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,.webp"
                   className="hidden"
                   onChange={handleFileChange}
                 />
                 {selectedFile ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                      {selectedFile.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-emerald-400" /> : <FileIcon className="w-4 h-4 text-emerald-400" />}
+                  <div className="absolute inset-0 p-3 flex flex-col">
+                    <div className="flex-1 flex items-center justify-center">
+                      {selectedFile.type.startsWith('image/') ? (
+                        <img src={URL.createObjectURL(selectedFile)} alt="preview" className="max-h-full max-w-full object-contain rounded-lg" />
+                      ) : (
+                        <FileIcon className="w-10 h-10 text-amber-400" />
+                      )}
                     </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-[11px] font-bold text-white truncate">{selectedFile.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{(selectedFile.size / 1024).toFixed(0)} KB</p>
+                    <div className="space-y-1.5 mt-2">
+                      <input
+                        type="text"
+                        placeholder="Nome..."
+                        value={form.name}
+                        onChange={e => setForm(f => ({...f, name: e.target.value}))}
+                        onClick={e => e.stopPropagation()}
+                        className="w-full h-7 px-2 rounded-lg bg-black/40 border border-white/10 text-[10px] text-white outline-none placeholder:text-muted-foreground"
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          disabled={isUploading || !form.name}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!viewingEmployee || !selectedFile || !form.name) return;
+                            setIsUploading(true);
+                            try {
+                              const { publicUrl, fileType } = await uploadFileToStorage(selectedFile, viewingEmployee.id, form.name);
+                              const { error } = await supabase.from('employee_documents').insert([{
+                                employee_id: viewingEmployee.id,
+                                name: form.name,
+                                category: form.category,
+                                file_url: publicUrl,
+                                file_type: fileType,
+                                tenant_id: tenantIdState || (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id
+                              }]);
+                              if (error) throw error;
+                              toast({ title: '✅ Enviado!', description: `${form.name} salvo.` });
+                              setSelectedFile(null);
+                              setForm(f => ({...f, name: '', category: 'OTHER'}));
+                              fetchData();
+                            } catch (err: any) {
+                              toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+                            } finally { setIsUploading(false); }
+                          }}
+                          className="flex-1 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-[10px] font-bold text-white disabled:opacity-40 transition-colors"
+                        >
+                          {isUploading ? '...' : '⬆ Enviar'}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                          className="h-7 w-7 rounded-lg bg-white/5 hover:bg-rose-500/10 flex items-center justify-center text-rose-400 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:bg-rose-500/10" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}>
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <Upload className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-[11px] text-muted-foreground">Arraste ou clique — PDF, PNG, JPG (máx. 10MB)</p>
-                  </div>
+                  <>
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <Plus className="w-7 h-7 text-emerald-500" />
+                    </div>
+                    <p className="text-[10px] font-bold text-muted-foreground group-hover:text-white transition-colors">Adicionar</p>
+                  </>
                 )}
               </div>
-              <Button
-                disabled={isUploading || !selectedFile || !form.name}
-                className="w-full h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] tracking-wider"
-                onClick={async () => {
-                  if (!viewingEmployee || !selectedFile || !form.name) return;
-                  setIsUploading(true);
-                  try {
-                    const { publicUrl, fileType } = await uploadFileToStorage(selectedFile, viewingEmployee.id, form.name);
-                    const { error } = await supabase.from('employee_documents').insert([{
-                      employee_id: viewingEmployee.id,
-                      name: form.name,
-                      category: form.category,
-                      file_url: publicUrl,
-                      file_type: fileType,
-                      tenant_id: tenantIdState || (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id
-                    }]);
-                    if (error) throw error;
-                    toast({ title: '✅ Documento enviado!', description: `${form.name} salvo com sucesso.` });
-                    setSelectedFile(null);
-                    setForm(f => ({ ...f, name: '', category: 'OTHER' }));
-                    fetchData();
-                  } catch (err: any) {
-                    toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
-                  } finally {
-                    setIsUploading(false);
-                  }
-                }}
-              >
-                {isUploading ? 'Enviando...' : '⬆ Enviar Arquivo'}
-              </Button>
-            </div>
 
-            {/* Linha separadora */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-white/10" />
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                {documents.filter(d => d.employee_id === viewingEmployee?.id).length} arquivo(s) salvo(s)
-              </span>
-              <div className="flex-1 border-t border-white/10" />
-            </div>
-
-            {/* Lista de documentos */}
-            {documents.filter(d => d.employee_id === viewingEmployee?.id).length === 0 ? (
-              <div className="py-12 text-center">
-                <FileCheck2 className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-bold text-muted-foreground">Nenhum documento encontrado</p>
-                <p className="text-[11px] text-muted-foreground/60 mt-1">Use o campo acima para enviar o primeiro arquivo</p>
-              </div>
-            ) : (
-              documents.filter(d => d.employee_id === viewingEmployee?.id).map(doc => {
+              {/* Miniaturas dos documentos */}
+              {documents.filter(d => d.employee_id === viewingEmployee?.id).map(doc => {
                 const isImage = doc.file_url && (doc.file_url.endsWith('.png') || doc.file_url.endsWith('.jpg') || doc.file_url.endsWith('.jpeg') || doc.file_url.endsWith('.webp') || (doc as any).file_type?.startsWith('image/'));
                 const isPdf = doc.file_url && (doc.file_url.endsWith('.pdf') || (doc as any).file_type === 'application/pdf');
                 const isValidFile = doc.file_url && !doc.file_url.includes('placeholder');
                 return (
-                  <div key={doc.id} className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors">
-                    {/* Preview de imagem */}
-                    {isImage && isValidFile && (
-                      <div className="border-b border-white/10 bg-black/20 flex items-center justify-center max-h-[240px] overflow-hidden cursor-pointer" onClick={() => window.open(doc.file_url, '_blank')}>
-                        <img src={doc.file_url} alt={doc.name} className="max-h-[240px] object-contain hover:scale-105 transition-transform" />
-                      </div>
-                    )}
-                    {/* Preview de PDF */}
-                    {isPdf && isValidFile && (
-                      <div className="border-b border-white/10 bg-black/20 h-[200px] overflow-hidden">
-                        <iframe src={doc.file_url} className="w-full h-full" title={doc.name} />
-                      </div>
-                    )}
-                    <div className="p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                          {isImage ? <ImageIcon className="w-5 h-5 text-blue-400" /> : <FileIcon className="w-5 h-5 text-amber-400" />}
+                  <div
+                    key={doc.id}
+                    className="aspect-square rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden relative group hover:border-emerald-500/30 transition-all cursor-pointer"
+                    onClick={() => isValidFile && window.open(doc.file_url, '_blank')}
+                  >
+                    {/* Thumbnail */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      {isImage && isValidFile ? (
+                        <img src={doc.file_url} alt={doc.name} className="w-full h-full object-cover" />
+                      ) : isPdf ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-14 h-14 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-rose-400" />
+                          </div>
+                          <span className="text-[9px] font-bold text-rose-400 uppercase">PDF</span>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-bold text-white truncate">{doc.name}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
-                              {CATEGORIES.find(c => c.value === doc.category)?.label || 'Outros'}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(doc.created_at).toLocaleDateString('pt-BR')}
-                            </span>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                            <FileIcon className="w-8 h-8 text-amber-400" />
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      )}
+                    </div>
+
+                    {/* Overlay ao hover com ações */}
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2.5">
+                      {/* Ações topo */}
+                      <div className="flex justify-end gap-1">
                         {isValidFile && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white hover:bg-white/10" title="Visualizar" onClick={() => window.open(doc.file_url, '_blank')}>
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10" title="Copiar link" onClick={() => { navigator.clipboard.writeText(doc.file_url); toast({ title: 'Link copiado!' }); }}>
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10" title="WhatsApp" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Documento: ${doc.name}\n${doc.file_url}`)}`, '_blank')}>
-                              <Share2 className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10" title="Download" onClick={() => window.open(doc.file_url, '_blank')}>
-                              <Download className="w-4 h-4" />
-                            </Button>
+                            <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(doc.file_url); toast({ title: 'Link copiado!' }); }} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-emerald-500/20 flex items-center justify-center transition-colors" title="Copiar link">
+                              <Copy className="w-3.5 h-3.5 text-white" />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/?text=${encodeURIComponent(`${doc.name}\n${doc.file_url}`)}`, '_blank'); }} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-emerald-500/20 flex items-center justify-center transition-colors" title="WhatsApp">
+                              <Share2 className="w-3.5 h-3.5 text-white" />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); window.open(doc.file_url, '_blank'); }} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-blue-500/20 flex items-center justify-center transition-colors" title="Download">
+                              <Download className="w-3.5 h-3.5 text-white" />
+                            </button>
                           </>
                         )}
                         {isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10" onClick={() => handleDelete(doc.id, doc.name)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id, doc.name); }} className="w-7 h-7 rounded-lg bg-white/10 hover:bg-rose-500/20 flex items-center justify-center transition-colors" title="Excluir">
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          </button>
                         )}
                       </div>
+                      {/* Info base */}
+                      <div>
+                        <p className="text-[11px] font-bold text-white truncate">{doc.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
+                            {CATEGORIES.find(c => c.value === doc.category)?.label || 'Outros'}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">
+                            {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Badge de tipo */}
+                    <div className="absolute top-2 left-2 opacity-80">
+                      {isImage ? (
+                        <div className="w-6 h-6 rounded-md bg-blue-500/20 flex items-center justify-center backdrop-blur-sm">
+                          <ImageIcon className="w-3 h-3 text-blue-400" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-md bg-amber-500/20 flex items-center justify-center backdrop-blur-sm">
+                          <FileIcon className="w-3 h-3 text-amber-400" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
-              })
-            )}
+              })}
+
+            </div>
           </div>
         </DialogContent>
       </Dialog>

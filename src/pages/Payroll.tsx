@@ -18,6 +18,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import { calculatePayroll } from '@/lib/cltEngine';
+import { processBatch, sendPayslipEmailMock } from '@/lib/payrollModule';
+import { Loader2, PlayCircle, Mail } from 'lucide-react';
 
 // Mock payroll verbas (códigos de verba)
 const VERBAS = [
@@ -45,6 +48,11 @@ export default function Payroll() {
   const [payrollData, setPayrollData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Batch processing state
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [batchResults, setBatchResults] = useState<{employeeId: string, pdfUrl: string}[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -163,6 +171,60 @@ export default function Payroll() {
     toast({ title: 'Registro removido da folha' });
   };
 
+  const handleProcessBatch = async () => {
+    if (!isAdmin || selectedIds.length === 0) return;
+    
+    setIsProcessing(true);
+    setBatchProgress({ current: 0, total: selectedIds.length });
+    
+    try {
+      const tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      if (!tenantId) throw new Error("Tenant ID não encontrado");
+
+      // 1. Prepara dados rodando o motor CLT
+      const dataToProcess = selectedIds.map(empId => {
+        const emp = dbEmployees.find(e => e.id === empId);
+        const pData = payrollData.find(p => p.employeeId === empId);
+        if (!emp || !pData) return null;
+
+        const result = calculatePayroll({
+          baseSalary: emp.salary,
+          absenceDays: pData.absences,
+          dependents: 0 // Simplificado
+        });
+
+        return { employeeId: emp.id, payrollResult: result, absences: pData.absences };
+      }).filter(Boolean) as any[];
+
+      const currentMonth = new Date().getMonth() + 1; // Simplificado para mes corrente
+      const currentYear = new Date().getFullYear();
+
+      const batchSummary = await processBatch({
+        tenantId,
+        employees: dbEmployees,
+        payrollData: dataToProcess,
+        referenceMonth: currentMonth,
+        referenceYear: currentYear
+      });
+
+      if (batchSummary.errors.length > 0) {
+        toast({ title: 'Concluído com falhas', description: `${batchSummary.errors.length} erros ocorridos.`, variant: 'destructive' });
+        console.error(batchSummary.errors);
+      } else {
+        toast({ title: 'Folha Processada!', description: `${batchSummary.results.length} holerites gerados e salvos com sucesso.` });
+      }
+
+      setBatchResults(prev => [...prev, ...batchSummary.results]);
+
+    } catch (e: any) {
+      toast({ title: 'Erro crítico', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsProcessing(false);
+      setSelectedIds([]); // limpa seleção
+    }
+  };
+
+
   const totalNet = payroll.reduce((s, p) => s + p.netSalary, 0);
 
   const exportExcel = () => {
@@ -246,9 +308,19 @@ export default function Payroll() {
         </div>
         <div className="flex gap-3 items-center">
           {isAdmin && selectedIds.length > 0 && (
-            <Button variant="destructive" size="sm" className="h-10 px-6 rounded-xl font-bold text-[12px] gap-2 animate-in fade-in zoom-in duration-200 mr-2" onClick={handleDeleteSelected}>
-              <Trash2 className="w-4 h-4" /> Excluir Selecionados ({selectedIds.length})
-            </Button>
+            <>
+              <Button variant="destructive" size="sm" className="h-10 px-6 rounded-xl font-bold text-[12px] gap-2 animate-in fade-in zoom-in duration-200" onClick={handleDeleteSelected}>
+                <Trash2 className="w-4 h-4" /> Excluir ({selectedIds.length})
+              </Button>
+              <Button 
+                onClick={handleProcessBatch} 
+                disabled={isProcessing}
+                className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[12px] gap-2 animate-in fade-in zoom-in duration-200"
+              >
+                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                {isProcessing ? `Processando...` : `Fechar Lote (${selectedIds.length})`}
+              </Button>
+            </>
           )}
           <Select value={storeFilter} onValueChange={setStoreFilter}>
             <SelectTrigger className="w-[200px] h-10 bg-white/5 border-white/10 rounded-xl text-white"><SelectValue /></SelectTrigger>
@@ -426,9 +498,22 @@ export default function Payroll() {
                   </td>
                   {isAdmin && (
                     <td className="px-6 py-4 text-center">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-1">
+                        {batchResults.find(r => r.employeeId === p.employeeId) && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
+                            onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
+                            title="Ver Holerite"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   )}
                 </tr>
