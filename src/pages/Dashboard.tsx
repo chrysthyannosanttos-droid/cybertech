@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [stores, setStores] = useState<StoreType[]>([]);
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
+  const [payrolls, setPayrolls] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -64,10 +65,12 @@ export default function Dashboard() {
         supabase.from('employees').select('*').eq('status', 'ACTIVE'),
         supabase.from('certificates').select('*'),
         supabase.from('stores').select('*'),
-        supabase.from('service_providers').select('*')
+        supabase.from('service_providers').select('*'),
+        supabase.from('payrolls').select('*')
       ]);
 
       if (tData) setTenants(tData.map(t => ({ ...t, employeeCount: t.employee_count, subscription: t.subscription || { status: 'active', monthlyFee: 0 } } as Tenant)));
+      if (payrollsData) setPayrolls(payrollsData);
       if (eData) setEmployees(eData.map(e => ({
         ...e,
         storeId: e.store_id,
@@ -173,6 +176,14 @@ export default function Dashboard() {
     count: employees.filter(e => e.storeId === store.id).length,
   }));
 
+  const expiringContracts = useMemo(() => {
+    return providers.filter(p => {
+      if (!p.endDate) return false;
+      const days = Math.ceil((new Date(p.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      return days <= 15 && days >= 0;
+    });
+  }, [providers]);
+
   const providerCosts = useMemo(() => {
     return providers
       .filter(p => {
@@ -202,8 +213,17 @@ export default function Dashboard() {
     { month: 'Mar', value: totalMRR },
   ];
 
-  const totalCertDays = filteredCertificates.reduce((s, c) => s + c.days, 0);
-  const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
+    const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
+
+  const processedPayrollTotal = useMemo(() => {
+    return payrolls
+      .filter(p => {
+        const month = parseInt(startDate.split('-')[1]);
+        const year = parseInt(startDate.split('-')[0]);
+        return p.reference_month === month && p.reference_year === year;
+      })
+      .reduce((s, p) => s + (p.net_salary || 0), 0);
+  }, [payrolls, startDate]);
 
   const costs = useMemo(() => {
     return filteredEmployees.reduce((acc, e) => ({
@@ -271,6 +291,36 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Alertas Críticos */}
+      {expiringContracts.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          {expiringContracts.map(p => (
+            <div key={p.id} className="glass-card rounded-2xl p-4 border border-rose-500/20 bg-rose-500/5 flex items-center justify-between group overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-full bg-rose-500/5 -skew-x-12 translate-x-16 group-hover:translate-x-8 transition-transform" />
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-400 animate-pulse">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-black text-white uppercase tracking-tighter">Contrato vencendo: {p.name}</h4>
+                  <p className="text-[11px] text-rose-400 font-bold uppercase tracking-widest">
+                    Vence em {Math.ceil((new Date(p.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} dias — {new Date(p.endDate).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 px-4 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] font-black uppercase tracking-widest relative z-10 transition-all active:scale-95"
+                onClick={() => window.location.href = '/service-providers'}
+              >
+                Gerenciar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {isSuperAdmin && (
@@ -289,8 +339,8 @@ export default function Dashboard() {
         <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
         {!isSuperAdmin && (
           <>
-            <KpiCard icon={Store} label="Lojas Ativas" value={String(stores.length)} delay={3} />
-            <KpiCard icon={TrendingUp} label="Folha Estimada" value={`R$ ${filteredEmployees.reduce((s, e) => s + (e.salary || 0), 0).toLocaleString('pt-BR')}`} delay={4} />
+            <KpiCard icon={DollarSign} label="Folha Processada" value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} sub="Lote do mês" delay={3} />
+            <KpiCard icon={TrendingUp} label="Custo Estimado" value={`R$ ${filteredEmployees.reduce((s, e) => s + (e.salary || 0), 0).toLocaleString('pt-BR')}`} sub="Base de ativos" delay={4} />
           </>
         )}
       </div>
