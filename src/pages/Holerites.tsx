@@ -19,13 +19,28 @@ export default function Holerites() {
   const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
-    // Carregar holerites do usuário (Simulado por enquanto)
-    const mockPayslips = [
-      { id: '1', month: 2, year: 2024, status: 'SIGNED', signed_at: '2024-03-05T10:00:00Z', net_salary: 2850.50 },
-      { id: '2', month: 3, year: 2024, status: 'PENDING', net_salary: 2850.50 },
-    ];
-    setPayslips(mockPayslips);
-  }, []);
+    const fetchPayslips = async () => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('payrolls')
+        .select('*')
+        .eq('employee_id', user.id)
+        .order('reference_year', { ascending: false })
+        .order('reference_month', { ascending: false });
+
+      if (error) {
+        toast({ title: 'Erro ao carregar holerites', description: error.message, variant: 'destructive' });
+      } else if (data) {
+        setPayslips(data.map(p => ({
+          ...p,
+          month: p.reference_month,
+          year: p.reference_year,
+          net_salary: p.net_salary
+        })));
+      }
+    };
+    fetchPayslips();
+  }, [user]);
 
   const handleStartSignature = (payslip: any) => {
     setSelectedPayslip(payslip);
@@ -66,18 +81,33 @@ export default function Holerites() {
   };
 
   const saveSignature = async () => {
-    if (!canvasRef.current) return;
-    const signatureData = canvasRef.current.toDataURL();
+    if (!canvasRef.current || !selectedPayslip) return;
     
-    // Simular salvamento
-    toast({
-      title: "Holerite Assinado!",
-      description: "O documento foi assinado digitalmente com sucesso.",
-    });
-    
-    setPayslips(prev => prev.map(p => p.id === selectedPayslip.id ? { ...p, status: 'SIGNED', signed_at: new Date().toISOString() } : p));
-    setIsSigning(false);
-    setSelectedPayslip(null);
+    setIsSigning(true);
+    try {
+        const { error } = await supabase
+        .from('payrolls')
+        .update({
+            status: 'SIGNED',
+            signed_at: new Date().toISOString(),
+            signature_ip: 'stored-in-db' // Ideally get real IP, but for now placeholder
+        })
+        .eq('id', selectedPayslip.id);
+
+        if (error) throw error;
+
+        toast({
+        title: "Holerite Assinado!",
+        description: "O documento foi assinado digitalmente com sucesso.",
+        });
+        
+        setPayslips(prev => prev.map(p => p.id === selectedPayslip.id ? { ...p, status: 'SIGNED', signed_at: new Date().toISOString() } : p));
+    } catch (e: any) {
+        toast({ title: 'Erro ao assinar', description: e.message, variant: 'destructive' });
+    } finally {
+        setIsSigning(false);
+        setSelectedPayslip(null);
+    }
   };
 
   return (
@@ -113,7 +143,11 @@ export default function Holerites() {
 
             <div className="pt-4 flex gap-2">
               {p.status === 'SIGNED' ? (
-                <Button variant="outline" className="flex-1 rounded-xl h-11 text-[11px] font-black uppercase gap-2">
+                <Button 
+                    variant="outline" 
+                    className="flex-1 rounded-xl h-11 text-[11px] font-black uppercase gap-2"
+                    onClick={() => p.pdf_url && window.open(p.pdf_url, '_blank')}
+                >
                   <Download className="w-4 h-4" /> Download
                 </Button>
               ) : (

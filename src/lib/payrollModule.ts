@@ -10,6 +10,24 @@ export interface ProcessBatchInput {
   payrollData: Array<{ employeeId: string; payrollResult: PayrollResult; absences: number }>;
   referenceMonth: number;
   referenceYear: number;
+  onProgress?: (current: number, total: number) => void;
+}
+
+// =======================
+// UTILS
+// =======================
+async function ensureBucket() {
+  try {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some(b => b.name === 'documents');
+    if (!exists) {
+      const { error } = await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
+      if (error) throw new Error(`Não foi possível criar o bucket 'documents': ${error.message}`);
+    }
+  } catch (err: any) {
+    console.error('Error ensuring bucket:', err);
+    throw err;
+  }
 }
 
 // =======================
@@ -145,7 +163,10 @@ async function uploadAndSavePayroll(
       upsert: true,
     });
 
-  if (uploadError) throw new Error(`Falha no upload do holerite: ${uploadError.message}`);
+  if (uploadError) {
+    console.error(`[STORAGE ERROR] ${employee.name}:`, uploadError);
+    throw new Error(`Falha no upload do holerite: ${uploadError.message}`);
+  }
 
   const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
 
@@ -166,7 +187,10 @@ async function uploadAndSavePayroll(
       status: 'GENERATED'
     }, { onConflict: 'employee_id,reference_month,reference_year' });
 
-  if (dbError) throw new Error(`Falha ao salvar registro no BD: ${dbError.message}`);
+  if (dbError) {
+    console.error(`[DATABASE ERROR] ${employee.name}:`, dbError);
+    throw new Error(`Falha ao salvar registro no BD: ${dbError.message}`);
+  }
 
   return urlData.publicUrl;
 }
@@ -174,13 +198,24 @@ async function uploadAndSavePayroll(
 // =======================
 // GERAÇÃO EM LOTE
 // =======================
-export async function processBatch({ tenantId, employees, payrollData, referenceMonth, referenceYear }: ProcessBatchInput) {
+export async function processBatch({ tenantId, employees, payrollData, referenceMonth, referenceYear, onProgress }: ProcessBatchInput) {
   const results = [];
   const errors = [];
+  const total = payrollData.length;
 
-  for (const item of payrollData) {
+  // Garante que o bucket existe antes de começar o upload em massa
+  await ensureBucket();
+
+  for (let i = 0; i < total; i++) {
+    const item = payrollData[i];
     const emp = employees.find(e => e.id === item.employeeId);
-    if (!emp) continue;
+    
+    if (onProgress) onProgress(i + 1, total);
+    
+    if (!emp) {
+      errors.push({ employeeName: 'Desconhecido', error: 'Funcionário não encontrado no banco' });
+      continue;
+    }
 
     try {
       // 1. Gera PDF do Holerite no Front
@@ -190,8 +225,14 @@ export async function processBatch({ tenantId, employees, payrollData, reference
       const pdfUrl = await uploadAndSavePayroll(tenantId, emp, item.payrollResult, pdfBlob, referenceMonth, referenceYear);
 
       results.push({ employeeId: emp.id, status: 'success', pdfUrl });
+      
+      // 3. Mock Email (opcional/futuro - podemos disparar aqui)
+      if (emp.email) {
+        await sendPayslipEmailMock(emp.name, emp.email, pdfUrl);
+      }
     } catch (e: any) {
-      errors.push({ employeeName: emp.name, error: e.message });
+      console.error(`Error processing ${emp.name}:`, e);
+      errors.push({ employeeName: emp.name, error: e.message || 'Erro desconhecido' });
     }
   }
 

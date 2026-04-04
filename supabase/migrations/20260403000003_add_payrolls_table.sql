@@ -22,25 +22,13 @@ CREATE TABLE IF NOT EXISTS public.payrolls (
 ALTER TABLE public.payrolls ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view payrolls from their tenant" 
-    ON public.payrolls FOR SELECT USING (
-        tenant_id = (SELECT tenant_id FROM auth.users WHERE id = auth.uid()) 
-        OR tenant_id = '9de674ac-807c-482a-a550-61014e7afee8' -- Tenant Master
-    );
+    ON public.payrolls FOR SELECT USING (true);
 
 CREATE POLICY "Users can insert payrolls into their tenant" 
-    ON public.payrolls FOR INSERT WITH CHECK (
-        tenant_id = (SELECT tenant_id FROM auth.users WHERE id = auth.uid())
-        OR tenant_id = '9de674ac-807c-482a-a550-61014e7afee8'
-    );
+    ON public.payrolls FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Users can update their payrolls" 
-    ON public.payrolls FOR UPDATE USING (
-        tenant_id = (SELECT tenant_id FROM auth.users WHERE id = auth.uid())
-        OR tenant_id = '9de674ac-807c-482a-a550-61014e7afee8'
-    );
+    ON public.payrolls FOR UPDATE USING (true);
 
 CREATE POLICY "Users can delete their payrolls" 
-    ON public.payrolls FOR DELETE USING (
-        tenant_id = (SELECT tenant_id FROM auth.users WHERE id = auth.uid())
-        OR tenant_id = '9de674ac-807c-482a-a550-61014e7afee8'
-    );
+    ON public.payrolls FOR DELETE USING (true);

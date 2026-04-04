@@ -48,6 +48,10 @@ export default function Payroll() {
   const [payrollData, setPayrollData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Period state
+  const [refMonth, setRefMonth] = useState(new Date().getMonth() + 1);
+  const [refYear, setRefYear] = useState(new Date().getFullYear());
+  
   // Batch processing state
   const [isProcessing, setIsProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
@@ -133,7 +137,7 @@ export default function Payroll() {
   }, [payroll]);
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === payrollData.length) {
+    if (selectedIds.length === payrollData.length && payrollData.length > 0) {
       setSelectedIds([]);
     } else {
       setSelectedIds(payrollData.map(p => p.employeeId));
@@ -178,8 +182,15 @@ export default function Payroll() {
     setBatchProgress({ current: 0, total: selectedIds.length });
     
     try {
-      const tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
-      if (!tenantId) throw new Error("Tenant ID não encontrado");
+      let tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      
+      // Fallback para superadmin sem tenantId vinculado (busca o primeiro tenant disponível)
+      if (!tenantId) {
+        const { data: tenantData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        tenantId = tenantData?.id;
+      }
+
+      if (!tenantId) throw new Error("ID da Unidade (Tenant) não encontrado. Verifique seu cadastro.");
 
       // 1. Prepara dados rodando o motor CLT
       const dataToProcess = selectedIds.map(empId => {
@@ -190,28 +201,38 @@ export default function Payroll() {
         const result = calculatePayroll({
           baseSalary: emp.salary,
           absenceDays: pData.absences,
-          dependents: 0 // Simplificado
+          hazardPay: emp.periculosidade || 0,
+          unhealthyPay: emp.insalubridade || 0,
+          bonus: emp.gratificacao || 0,
+          vtValue: emp.valeTransporte || 0,
+          vrValue: emp.valeRefeicao || 0,
+          dependents: 0 // Simplificado por enquanto
         });
 
         return { employeeId: emp.id, payrollResult: result, absences: pData.absences };
       }).filter(Boolean) as any[];
 
-      const currentMonth = new Date().getMonth() + 1; // Simplificado para mes corrente
-      const currentYear = new Date().getFullYear();
-
       const batchSummary = await processBatch({
         tenantId,
         employees: dbEmployees,
         payrollData: dataToProcess,
-        referenceMonth: currentMonth,
-        referenceYear: currentYear
+        referenceMonth: refMonth,
+        referenceYear: refYear,
+        onProgress: (current, total) => setBatchProgress({ current, total })
       });
 
       if (batchSummary.errors.length > 0) {
-        toast({ title: 'Concluído com falhas', description: `${batchSummary.errors.length} erros ocorridos.`, variant: 'destructive' });
-        console.error(batchSummary.errors);
+        toast({ 
+          title: 'Concluído com falhas', 
+          description: `${batchSummary.errors.length} erros. Verifique console para detalhes.`, 
+          variant: 'destructive' 
+        });
+        console.error('Erros no processamento em lote:', batchSummary.errors);
       } else {
-        toast({ title: 'Folha Processada!', description: `${batchSummary.results.length} holerites gerados e salvos com sucesso.` });
+        toast({ 
+          title: 'Folha Processada!', 
+          description: `${batchSummary.results.length} holerites gerados com sucesso.` 
+        });
       }
 
       setBatchResults(prev => [...prev, ...batchSummary.results]);
@@ -322,11 +343,37 @@ export default function Payroll() {
               </Button>
             </>
           )}
+          <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 gap-1">
+            <Select value={refMonth.toString()} onValueChange={(v) => setRefMonth(parseInt(v))}>
+              <SelectTrigger className="w-[120px] h-8 bg-transparent border-none text-white text-[11px] font-bold uppercase">
+                <SelectValue placeholder="Mês" />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-white/10 text-white">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <SelectItem key={m} value={m.toString()}>
+                    {format(new Date(2024, m - 1), 'MMMM', { locale: ptBR }).toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="w-[1px] h-4 bg-white/10 self-center" />
+            <Select value={refYear.toString()} onValueChange={(v) => setRefYear(parseInt(v))}>
+              <SelectTrigger className="w-[90px] h-8 bg-transparent border-none text-white text-[11px] font-bold">
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent className="glass-card border-white/10 text-white">
+                {[2024, 2025, 2026].map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Select value={storeFilter} onValueChange={setStoreFilter}>
-            <SelectTrigger className="w-[200px] h-10 bg-white/5 border-white/10 rounded-xl text-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[180px] h-10 bg-white/5 border-white/10 rounded-xl text-white font-bold text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent className="glass-card border-white/10 text-white">
-              <SelectItem value="all">Todas as Lojas</SelectItem>
-              {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '')}</SelectItem>)}
+              <SelectItem value="all">TODAS AS UNIDADES</SelectItem>
+              {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name.replace('SUPER ', '').toUpperCase()}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl text-white/60 hover:text-white hover:bg-white/10 font-bold text-[12px] gap-2 transition-all" onClick={exportExcel}>
@@ -435,6 +482,35 @@ export default function Payroll() {
           </Dialog>
         </div>
       </div>
+
+      {isProcessing && (
+        <div className="mb-6 glass-card rounded-2xl border border-primary/20 p-6 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                <Loader2 className="w-5 h-5 animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-tighter">Processando Lote de Holerites</h3>
+                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest text-primary/80">
+                  {batchProgress.current} de {batchProgress.total} Concluídos
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-black text-primary tracking-tighter">
+                {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+              </span>
+            </div>
+          </div>
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+            <div 
+              className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_15px_rgba(var(--primary),0.5)]"
+              style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">

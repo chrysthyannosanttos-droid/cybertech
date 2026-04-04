@@ -175,37 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('app_permissions');
   }, []);
 
-  // Limpeza ao fechar a aba
-  useEffect(() => {
-    const handleUnload = () => {
-      // Usar beacon ou feto síncrono é difícil, mas tentamos a deleção
-      // Como o browser fecha, o beacon é o mais recomendado, mas o supabase não expõe beacon direto.
-      // Vamos apenas registrar o listener para tentar agir no fechamento.
-      const userStr = sessionStorage.getItem('nexus_user');
-      if (userStr) {
-        // Tenta limpar se estiver logado
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/certificates?tenant_id=eq.t1`, {
-          method: 'DELETE',
-          keepalive: true,
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          }
-        });
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rescissions?tenant_id=eq.t1`, {
-          method: 'DELETE',
-          keepalive: true,
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          }
-        });
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, []);
+  // Persistência definitiva de dados garantida
 
   const changePassword = useCallback((newPassword: string) => {
     if (!user) return;

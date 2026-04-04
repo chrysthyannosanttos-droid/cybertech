@@ -211,7 +211,7 @@ export function calculatePayroll(input: PayrollInput | number): PayrollResult {
   if (bonus > 0) items.push({ code: 103, description: 'Gratificação', type: 'EARNING', amount: round(bonus) });
 
   const extras = extrasValue50 + extrasValue100;
-  const grossSalary = round(baseSalary + extras + extrasValue100 + nightValue + hazardPay + unhealthyPay + bonus);
+  const grossSalary = round(baseSalary + extras + nightValue + hazardPay + unhealthyPay + bonus);
 
   // Desconto por faltas
   const absenceDeduction = round(absenceDays * dailyRate);
