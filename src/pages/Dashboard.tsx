@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tenant, Employee, Certificate, Store as StoreType, ServiceProvider } from '@/types';
-import { Building2, Users, DollarSign, TrendingUp, FileHeart, Store, Briefcase } from 'lucide-react';
+import { Building2, Users, DollarSign, TrendingUp, FileHeart, Store, Briefcase, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 
@@ -59,7 +60,8 @@ export default function Dashboard() {
         { data: eData },
         { data: cData },
         { data: sData },
-        { data: pData }
+        { data: pData },
+        { data: pyData }
       ] = await Promise.all([
         supabase.from('tenants').select('*'),
         supabase.from('employees').select('*').eq('status', 'ACTIVE'),
@@ -70,7 +72,7 @@ export default function Dashboard() {
       ]);
 
       if (tData) setTenants(tData.map(t => ({ ...t, employeeCount: t.employee_count, subscription: t.subscription || { status: 'active', monthlyFee: 0 } } as Tenant)));
-      if (payrollsData) setPayrolls(payrollsData);
+      if (pyData) setPayrolls(pyData);
       if (eData) setEmployees(eData.map(e => ({
         ...e,
         storeId: e.store_id,
@@ -213,7 +215,11 @@ export default function Dashboard() {
     { month: 'Mar', value: totalMRR },
   ];
 
-    const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
+  const totalCertDays = useMemo(() => {
+    return filteredCertificates.reduce((sum, cert) => sum + (cert.days || 0), 0);
+  }, [filteredCertificates]);
+
+  const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
 
   const processedPayrollTotal = useMemo(() => {
     return payrolls

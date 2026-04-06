@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { calculatePayroll } from '@/lib/cltEngine';
+import { calculatePayroll, round } from '@/lib/cltEngine';
 import { processBatch, sendPayslipEmailMock } from '@/lib/payrollModule';
 import { Loader2, PlayCircle, Mail } from 'lucide-react';
 
@@ -114,10 +114,19 @@ export default function Payroll() {
       .map(emp => {
         const empCerts = dbCertificates.filter(c => c.employeeId === emp.id);
         const certDays = empCerts.reduce((s, c) => s + c.days, 0);
-        const dailyRate = emp.salary / 30;
-        // Keep it simple for now, can be expanded for real absences if a table exists
         const absences = 0; 
-        const deductions = absences * dailyRate;
+        
+        const calc = calculatePayroll({
+          baseSalary: emp.salary,
+          absenceDays: absences,
+          hazardPay: emp.periculosidade || 0,
+          unhealthyPay: emp.insalubridade || 0,
+          bonus: emp.gratificacao || 0,
+          vtValue: emp.valeTransporte || 0,
+          vrValue: emp.valeRefeicao || 0,
+          dependents: 0
+        });
+
         return {
           employeeId: emp.id,
           employeeName: emp.name,
@@ -125,8 +134,8 @@ export default function Payroll() {
           salary: emp.salary,
           absences,
           certificateDays: certDays,
-          deductions: Math.round(deductions * 100) / 100,
-          netSalary: Math.round((emp.salary - deductions) * 100) / 100,
+          deductions: round(calc.grossSalary - calc.netSalary),
+          netSalary: calc.netSalary,
         };
       });
   }, [storeFilter, dbEmployees, dbCertificates]);
