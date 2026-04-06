@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
 import { useAuth, AppModule } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
@@ -45,6 +47,26 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
 
 export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () => void; isMobile?: boolean }) {
   const { user, logout, currentPermissions, isEmployeeView } = useAuth();
+  const [lastDataSync, setLastDataSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSync = async () => {
+      try {
+        const { data } = await supabase
+          .from('attendance_devices')
+          .select('last_sync')
+          .not('last_sync', 'is', null)
+          .order('last_sync', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data?.last_sync) setLastDataSync(data.last_sync);
+      } catch (err) {
+        console.error('Erro ao buscar última sync:', err);
+      }
+    };
+    fetchSync();
+  }, []);
 
   const isCristiano = user?.email?.toLowerCase().includes('cristiano') || user?.name?.toLowerCase().includes('cristiano');
   const isSuperAdmin = user?.role === 'superadmin' || isCristiano;
@@ -116,9 +138,26 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
         ))}
       </nav>
 
-      {/* User & Logout */}
-      <div className="border-t border-border/50 p-4 space-y-3 bg-black/20">
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white/5 border border-white/5 mb-2">
+      {/* User & Status & Logout */}
+      <div className="border-t border-border/50 p-4 space-y-4 bg-black/20">
+        {/* Sync Status Box */}
+        <div className="px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
+           <div className="flex items-center gap-2">
+             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
+             <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500/80">Sistema Online</span>
+             <span className="ml-auto text-[9px] font-mono text-muted-foreground">06/04 20:05</span>
+           </div>
+           
+           <div className="flex items-center gap-2">
+             <div className={`w-1.5 h-1.5 rounded-full ${lastDataSync ? 'bg-primary' : 'bg-amber-500'} shadow-[0_0_8px_rgba(31,180,243,0.4)] animate-pulse`} />
+             <span className="text-[9px] font-black uppercase tracking-widest text-primary/80">Sinc. Ponto</span>
+             <span className="ml-auto text-[9px] font-mono text-muted-foreground whitespace-nowrap">
+               {lastDataSync ? new Date(lastDataSync).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'}
+             </span>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white/5 border border-white/5">
           <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[12px] border border-primary/20 shadow-[0_0_10px_rgba(31,180,243,0.1)]">
             {user?.name?.charAt(0)}
           </div>
