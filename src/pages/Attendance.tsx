@@ -179,6 +179,30 @@ export default function Attendance() {
     }
   };
 
+  const handleDeleteEntry = async (id: string, empName: string, time: string) => {
+    if (!isAdmin) return;
+    
+    if (!confirm(`Deseja realmente excluir a batida de ${empName} às ${new Date(time).toLocaleString('pt-BR')}?`)) return;
+
+    try {
+      const { error } = await supabase.from('time_entries').delete().eq('id', id);
+      if (error) throw error;
+
+      toast({ title: 'Batida excluída', description: 'O registro foi removido com sucesso.' });
+      
+      addAuditLog({
+        userId: user?.id || 'unknown',
+        userName: user?.name || 'Cristiano',
+        action: 'DELETE',
+        details: `[Ponto] Excluiu batida de ${empName} (${new Date(time).toLocaleString('pt-BR')})`
+      });
+
+      fetchData();
+    } catch (err: any) {
+      toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="animate-fade-in-up space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -311,7 +335,8 @@ export default function Attendance() {
                     <th className="px-6">Data / Hora</th>
                     <th className="px-6">Funcionário</th>
                     <th className="px-6">Tipo</th>
-                    <th className="px-6 text-right">Origem (Relógio)</th>
+                    <th className="px-6">Origem (Relógio)</th>
+                    {isAdmin && <th className="px-6 text-center">Ações</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -337,11 +362,23 @@ export default function Attendance() {
                             <span className="inline-flex items-center px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider">Saída</span>
                          )}
                       </td>
-                      <td className="px-6 text-right">
+                      <td className="px-6">
                          <span className="text-[11px] font-medium text-muted-foreground">
                            {devices.find(d => d.id === entry.device_id)?.name || 'Desconhecido'}
                          </span>
                       </td>
+                      {isAdmin && (
+                        <td className="px-6 text-center">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDeleteEntry(entry.id, entry.employee_name, entry.timestamp)}
+                            className="h-8 w-8 text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
