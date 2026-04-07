@@ -114,14 +114,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const channel = supabase
       .channel(`profile_sync_realtime_${user.id}`)
       .on('postgres_changes', { 
-        event: 'UPDATE', 
+        event: '*', 
         table: 'profiles', 
         schema: 'public', 
         filter: `id=eq.${user.id}` 
-      }, (payload) => {
-        const profile = payload.new;
+      }, async () => {
+        console.log('🔄 Detecção de alteração. Buscando perfil atualizado...');
+        // Refetch garantido direto do banco
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        
         if (profile) {
-          console.log('🔄 Perfil atualizado em tempo real:', profile.email);
           const userData: User = {
             id: profile.id,
             email: profile.email,
