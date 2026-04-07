@@ -57,7 +57,9 @@ export default function Attendance() {
   const [hourBank, setHourBank] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [editingDevice, setEditingDevice] = useState<AttendanceDevice | null>(null);
   const [adjustForm, setAdjustForm] = useState({ timestamp: '', reason: '' });
 
   const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
@@ -262,38 +264,48 @@ export default function Attendance() {
 
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.ip_address) return;
+    
+    // Pega os dados do formulário (funciona para o Cadastro e para a Edição)
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const name = formData.get('name') as string || form.name;
+    const ip_address = formData.get('ip_address') as string || form.ip_address;
+    const port = Number(formData.get('port')) || form.port;
+    const model = (formData.get('model') as string) || form.model;
+
+    if (!name || !ip_address) return;
 
     try {
       const tenantId = (user as any)?.tenantId || (user as any)?.tenant_id || '9de674ac-807c-482a-a550-61014e7afee8';
-      const { error } = await supabase
-        .from('attendance_devices')
-        .insert([{
-          name: form.name,
-          ip_address: form.ip_address,
-          port: form.port,
-          model: form.model,
-          tenant_id: tenantId,
-          status: 'ACTIVE'
-        }]);
+      
+      if (editingDevice) {
+        const { error } = await supabase
+          .from('attendance_devices')
+          .update({ name, ip_address, port, model })
+          .eq('id', editingDevice.id);
+        if (error) throw error;
+        toast({ title: 'Relógio atualizado', description: 'As configurações foram salvas.' });
+        setIsEditDialogOpen(false);
+        setEditingDevice(null);
+      } else {
+        const { error } = await supabase
+          .from('attendance_devices')
+          .insert([{
+            name,
+            ip_address,
+            port,
+            model,
+            tenant_id: tenantId,
+            status: 'ACTIVE'
+          }]);
+        if (error) throw error;
+        toast({ title: 'Relógio cadastrado', description: 'Dispositivo vinculado com sucesso.' });
+        setForm({ name: '', ip_address: '', port: 80, model: 'Generic ZKTeco' });
+        setIsDialogOpen(false);
+      }
 
-      if (error) throw error;
-
-      toast({ title: 'Relógio cadastrado', description: 'Dispositivo vinculado com sucesso.' });
-      setForm({ name: '', ip_address: '', port: 80, model: 'Generic ZKTeco' });
-      setIsDialogOpen(false);
       fetchData();
     } catch (err: any) {
-      if (err.message.includes('relation "public.attendance_devices" does not exist')) {
-         toast({ 
-           title: 'Atenção (Banco de Dados)', 
-           description: 'A tabela attendance_devices não existe no Supabase. Execute o script contido no Plano de Implementação.', 
-           variant: 'destructive',
-           duration: 10000 
-         });
-      } else {
-         toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' });
-      }
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -877,16 +889,29 @@ export default function Attendance() {
                     </div>
                   )}
 
-                  <div className="mt-2 flex justify-end">
+                  <div className="mt-2 flex justify-end gap-1">
                      {isAdmin && (
-                       <Button 
-                         variant="ghost" 
-                         size="icon" 
-                         onClick={() => handleDeleteDevice(device.id, device.name)}
-                         className="h-8 w-8 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10"
-                       >
-                         <Trash2 className="w-4 h-4" />
-                       </Button>
+                       <>
+                         <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           onClick={() => {
+                             setEditingDevice(device);
+                             setIsEditDialogOpen(true);
+                           }}
+                           className="h-8 w-8 text-white/40 hover:text-white"
+                         >
+                           <Settings className="w-4 h-4" />
+                         </Button>
+                         <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           onClick={() => handleDeleteDevice(device.id, device.name)}
+                           className="h-8 w-8 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10"
+                         >
+                           <Trash2 className="w-4 h-4" />
+                         </Button>
+                       </>
                      )}
                   </div>
 
@@ -1089,6 +1114,46 @@ export default function Attendance() {
               Salvar e Recalcular Banco
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE EDIÇÃO DE DISPOSITIVO */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] border-white/10 glass-card">
+          <DialogHeader>
+            <DialogTitle>Editar Equipamento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveDevice} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome do Dispositivo</Label>
+              <Input id="edit-name" name="name" defaultValue={editingDevice?.name} required className="bg-white/5 border-white/10" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-ip">Endereço IP</Label>
+                <Input id="edit-ip" name="ip_address" defaultValue={editingDevice?.ip_address} placeholder="192.168..." required className="bg-white/5 border-white/10" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-port">Porta</Label>
+                <Input id="edit-port" name="port" type="number" defaultValue={editingDevice?.port} required className="bg-white/5 border-white/10" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-model">Modelo do Equipamento</Label>
+              <Select name="model" defaultValue={editingDevice?.model}>
+                <SelectTrigger id="edit-model" className="bg-white/5 border-white/10">
+                  <SelectValue placeholder="Selecione o modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ControlID iDFace">ControlID iDFace</SelectItem>
+                  <SelectItem value="ControlID iDClass">ControlID iDClass</SelectItem>
+                  <SelectItem value="Intelbras BioInov">Intelbras BioInov</SelectItem>
+                  <SelectItem value="Topdata Inner">Topdata Inner</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full">Salvar Alterações</Button>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

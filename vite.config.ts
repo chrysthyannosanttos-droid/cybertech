@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
               if (!target) return next();
 
               // Log para debug no terminal do usuário
-              console.log(`[Proxy Ponto] Redirecionando para: ${target}`);
+              console.log(`[Ponto Proxy] 📡 Direcionando para: ${target}`);
 
               const chunks: any[] = [];
               req.on('data', chunk => chunks.push(chunk));
@@ -33,19 +33,29 @@ export default defineConfig(({ mode }) => ({
                 const body = Buffer.concat(chunks).toString();
                 
                 try {
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de limite
+
                   const response = await fetch(target, {
                     method: req.method,
                     headers: { 'Content-Type': 'application/json' },
-                    body: req.method !== 'GET' ? body : undefined
+                    body: req.method !== 'GET' ? body : undefined,
+                    signal: controller.signal
                   });
                   
+                  clearTimeout(timeoutId);
                   const data = await response.text();
+                  
                   res.setHeader('Content-Type', 'application/json');
                   res.setHeader('Access-Control-Allow-Origin', '*');
                   res.end(data);
                 } catch (err: any) {
-                  res.statusCode = 500;
-                  res.end(JSON.stringify({ error: err.message }));
+                  console.error(`[Ponto Proxy] ❌ Erro: ${err.message}`);
+                  res.statusCode = 502;
+                  res.end(JSON.stringify({ 
+                    error: "Não foi possível alcançar o Equipamento.",
+                    details: err.message 
+                  }));
                 }
               });
             } catch (e) {
