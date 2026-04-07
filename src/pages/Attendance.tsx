@@ -13,6 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { reprocessDay } from '@/modules/time-tracking/services/syncService';
+import { calculateWorkDay } from '@/modules/time-tracking/services/calculationService';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface AttendanceDevice {
   id: string;
@@ -48,6 +52,13 @@ export default function Attendance() {
   const [isUsbDialogOpen, setIsUsbDialogOpen] = useState(false);
   const [isUsbExporting, setIsUsbExporting] = useState(false);
   const [deviceStatus, setDeviceStatus] = useState<Record<string, 'online' | 'offline' | 'testing' | null>>({});
+
+  const [timeSheets, setTimeSheets] = useState<any[]>([]);
+  const [hourBank, setHourBank] = useState<any[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+  const [adjustForm, setAdjustForm] = useState({ timestamp: '', reason: '' });
 
   const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
 
@@ -100,8 +111,12 @@ export default function Attendance() {
     setDeviceStatus(prev => ({ ...prev, [device.id]: 'testing' }));
     
     try {
+      const isLocal = device.ip_address.startsWith('192.168.') || device.ip_address.startsWith('10.') || device.ip_address.startsWith('172.');
+      const fullUrl = `http://${device.ip_address}:${device.port}/ping.fcgi`;
+      const finalUrl = isLocal ? `/api-proxy?target=${encodeURIComponent(fullUrl)}` : fullUrl;
+
       // Tenta um Ping real no relógio (Control iD usa /ping.fcgi)
-      const response = await fetch(`http://${device.ip_address}:${device.port}/ping.fcgi`, {
+      const response = await fetch(finalUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session: "admin" })
@@ -191,19 +206,27 @@ export default function Attendance() {
 
       let devicesQuery = supabase.from('attendance_devices').select('*').order('name');
       let entriesQuery = supabase.from('time_entries').select('*').order('timestamp', { ascending: false }).limit(100);
+      let sheetsQuery = supabase.from('time_sheets').select('*').order('date', { ascending: false });
+      let hbQuery = supabase.from('hour_bank').select('*').order('date', { ascending: false });
 
       if (tenantId && !isAdmin) {
         devicesQuery = devicesQuery.eq('tenant_id', tenantId);
         entriesQuery = entriesQuery.eq('tenant_id', tenantId);
+        sheetsQuery = sheetsQuery.eq('tenant_id', tenantId);
+        hbQuery = hbQuery.eq('tenant_id', tenantId);
       }
 
-      const [{ data: devData }, { data: entData }] = await Promise.all([
+      const [{ data: devData }, { data: entData }, { data: sheetData }, { data: hbData }] = await Promise.all([
         devicesQuery,
-        entriesQuery
+        entriesQuery,
+        sheetsQuery,
+        hbQuery
       ]);
 
       if (devData) setDevices(devData as AttendanceDevice[]);
       if (entData) setEntries(entData as TimeEntry[]);
+      if (sheetData) setTimeSheets(sheetData);
+      if (hbData) setHourBank(hbData);
 
       // Carrega funcionários para o Lançamento em Massa (Incluindo CPF para USB e Sync Real)
       const { data: empData } = await supabase.from('employees').select('id, name, cpf, tenant_id').eq('status', 'ACTIVE').order('name');
@@ -296,13 +319,15 @@ export default function Attendance() {
       // Lógica de Integração Real para Control iD
       if (device.model?.includes('ControlID')) {
         try {
+          const isLocal = device.ip_address.startsWith('192.168.') || device.ip_address.startsWith('10.') || device.ip_address.startsWith('172.');
+          const fullUrl = `http://${device.ip_address}:${device.port}/load_events.fcgi`;
+          const finalUrl = isLocal ? `/api-proxy?target=${encodeURIComponent(fullUrl)}` : fullUrl;
+
           // Chamada real para a API do relógio (Control iD usa /load_events.fcgi)
-          // Nota: Requer que o relógio esteja acessível e o CORS permitido (ou rodando em localhost)
-          const response = await fetch(`http://${device.ip_address}:${device.port}/load_events.fcgi`, {
+          const response = await fetch(finalUrl, {
             method: 'POST',
             body: JSON.stringify({
-              // Pegar eventos do dia atual ou desde a última sync
-              session: "admin" // Simplificação: a maioria usa sessão admin persistente ou sem senha para leitura
+              session: "admin" 
             }),
             headers: { 'Content-Type': 'application/json' }
           });
@@ -393,6 +418,47 @@ export default function Attendance() {
     }
   };
 
+  const handleUpdateEntry = async () => {
+    if (!selectedEntry || !adjustForm.timestamp || !adjustForm.reason) return;
+    setIsProcessing(true);
+
+    try {
+      const originalTime = selectedEntry.timestamp;
+      const newTime = new Date(adjustForm.timestamp).toISOString();
+      const dateStr = format(new Date(newTime), 'yyyy-MM-dd');
+
+      // 1. Atualizar a batida
+      const { error: updError } = await supabase
+        .from('time_entries')
+        .update({ timestamp: newTime, status: 'SYNCED' })
+        .eq('id', selectedEntry.id);
+      
+      if (updError) throw updError;
+
+      // 2. Registrar Auditoria
+      await supabase.from('time_log_adjustments').insert({
+        employee_id: selectedEntry.employee_id,
+        time_entry_id: selectedEntry.id,
+        original_timestamp: originalTime,
+        new_timestamp: newTime,
+        reason: adjustForm.reason,
+        approved_by: user?.name || 'Admin',
+        tenant_id: (user as any)?.tenantId || (user as any)?.tenant_id
+      });
+
+      // 3. REPROCESSAR O DIA (Essencial SaaS)
+      await reprocessDay(selectedEntry.employee_id, dateStr);
+
+      toast({ title: 'Batida Ajustada', description: 'Folha e banco de horas recalculados.' });
+      setIsAdjustDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      toast({ title: 'Erro no ajuste', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
   const handleSaveBulkEntries = async () => {
     if (selectedEmpIds.length === 0) {
       toast({ title: 'Atenção', description: 'Selecione ao menos um funcionário.', variant: 'destructive' });
@@ -456,9 +522,110 @@ export default function Attendance() {
 
       <Tabs defaultValue="devices" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="devices" className="gap-2 text-[13px]"><HardDrive className="w-4 h-4" /> Relógios e Dispositivos</TabsTrigger>
-          <TabsTrigger value="entries" className="gap-2 text-[13px]"><History className="w-4 h-4" /> Histórico de Batidas</TabsTrigger>
+          <TabsTrigger value="devices" className="gap-2 text-[13px]"><HardDrive className="w-4 h-4" /> Dispositivos</TabsTrigger>
+          <TabsTrigger value="sheets" className="gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4" /> Relatório Diário</TabsTrigger>
+          <TabsTrigger value="hour_bank" className="gap-2 text-[13px]"><Users className="w-4 h-4" /> Banco de Horas</TabsTrigger>
+          <TabsTrigger value="entries" className="gap-2 text-[13px]"><History className="w-4 h-4" /> Log de Batidas</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="sheets" className="space-y-4">
+           <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+              <div className="flex gap-4">
+                 <div className="text-center px-4">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter">Total Horas</p>
+                    <p className="text-xl font-black text-white">{timeSheets.reduce((acc, s) => acc + (s.worked_hours || 0), 0).toFixed(1)}h</p>
+                 </div>
+                 <div className="text-center px-4 border-l border-white/10">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter">Extra Total</p>
+                    <p className="text-xl font-black text-primary">{timeSheets.reduce((acc, s) => acc + (s.extra_hours || 0), 0).toFixed(1)}h</p>
+                 </div>
+              </div>
+              <Button 
+                onClick={async () => {
+                  setIsProcessing(true);
+                  // Reprocessa os últimos 7 dias para todos
+                  const today = new Date().toISOString().split('T')[0];
+                  for (const emp of allEmployees) {
+                    await reprocessDay(emp.id, today);
+                  }
+                  await fetchData();
+                  setIsProcessing(false);
+                  toast({ title: 'Cálculo Finalizado', description: 'Folha de ponto e banco de horas atualizados.' });
+                }}
+                disabled={isProcessing}
+                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 font-black uppercase text-[11px]"
+              >
+                {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <RefreshCw className="w-3.5 h-3.5 mr-2" />}
+                Recalcular Folha (Hoje)
+              </Button>
+           </div>
+
+           <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+             <table className="w-full text-left">
+               <thead>
+                 <tr className="bg-white/5 border-b border-white/5 text-[10px] font-black text-primary uppercase h-12">
+                   <th className="px-6">Data</th>
+                   <th className="px-6">Colaborador</th>
+                   <th className="px-6">Entrada</th>
+                   <th className="px-6">Saída</th>
+                   <th className="px-6">Trabalhado</th>
+                   <th className="px-6">Extras</th>
+                   <th className="px-6 text-center">Status</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-white/5">
+                 {timeSheets.map(sheet => (
+                   <tr key={sheet.id} className="hover:bg-white/[0.02] h-14">
+                     <td className="px-6 text-[12px] font-bold text-muted-foreground">{sheet.date}</td>
+                     <td className="px-6 font-bold text-white text-[13px]">{allEmployees.find(e => e.id === sheet.employee_id)?.name}</td>
+                     <td className="px-6 font-mono-data text-[12px]">{sheet.first_entry ? new Date(sheet.first_entry).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
+                     <td className="px-6 font-mono-data text-[12px]">{sheet.last_exit ? new Date(sheet.last_exit).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
+                     <td className="px-6 text-[13px] font-black">{sheet.worked_hours?.toFixed(2)}h</td>
+                     <td className="px-6 text-[13px] font-black text-primary">+{sheet.extra_hours?.toFixed(2)}h</td>
+                     <td className="px-6 text-center">
+                        <span className={cn(
+                          "px-2 py-1 rounded text-[9px] font-black uppercase",
+                          sheet.status === 'OK' ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                        )}>{sheet.status}</span>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+        </TabsContent>
+
+        <TabsContent value="hour_bank" className="space-y-4">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allEmployees.map(emp => {
+                const total = hourBank.filter(h => h.employee_id === emp.id).reduce((acc, curr) => acc + curr.hours, 0);
+                return (
+                  <div key={emp.id} className="glass-card p-5 border border-white/5 rounded-2xl group hover:border-primary/30 transition-all">
+                     <div className="flex justify-between items-start mb-4">
+                        <div>
+                           <p className="text-[10px] font-black text-muted-foreground uppercase opacity-50">Saldo Acumulado</p>
+                           <h4 className="text-xl font-black text-white truncate max-w-[150px]">{emp.name}</h4>
+                        </div>
+                        <div className={cn(
+                          "p-4 rounded-xl font-black text-lg",
+                          total >= 0 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                        )}>
+                          {total >= 0 ? `+${total.toFixed(1)}h` : `${total.toFixed(1)}h`}
+                        </div>
+                     </div>
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       className="w-full text-xs font-bold text-muted-foreground hover:text-white border border-white/5"
+                       onClick={() => setSelectedDeviceId(emp.id)} // Reuse modal for history
+                     >
+                       Ver Extrato Detalhado
+                     </Button>
+                  </div>
+                );
+              })}
+           </div>
+        </TabsContent>
 
         {/* Tab DISPOSITIVOS */}
         <TabsContent value="devices" className="space-y-4 pt-2">
@@ -849,14 +1016,28 @@ export default function Attendance() {
                       </td>
                       {isAdmin && (
                         <td className="px-6 text-center">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteEntry(entry.id, entry.employee_name, entry.timestamp)}
-                            className="h-8 w-8 text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex justify-center gap-2">
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               onClick={() => {
+                                 setSelectedEntry(entry);
+                                 setAdjustForm({ timestamp: entry.timestamp.slice(0, 16), reason: '' });
+                                 setIsAdjustDialogOpen(true);
+                               }}
+                               className="h-8 w-8 text-primary/50 hover:text-primary hover:bg-primary/10"
+                             >
+                               <RefreshCw className="w-3.5 h-3.5" />
+                             </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="icon" 
+                               onClick={() => handleDeleteEntry(entry.id, entry.employee_name, entry.timestamp)}
+                               className="h-8 w-8 text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                             >
+                               <Trash2 className="w-3.5 h-3.5" />
+                             </Button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -866,6 +1047,50 @@ export default function Attendance() {
            </div>
         </TabsContent>
       </Tabs>
+
+      {/* DIALOG DE AJUSTE DE BATIDA */}
+      <Dialog open={isAdjustDialogOpen} onOpenChange={setIsAdjustDialogOpen}>
+        <DialogContent className="max-w-md border-white/10 glass-card">
+          <DialogHeader>
+            <DialogTitle>Ajuste Manual de Batida</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+               <p className="text-[11px] text-muted-foreground uppercase font-black">Colaborador</p>
+               <p className="text-sm font-bold text-white">{selectedEntry?.employee_name}</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-xs uppercase font-bold text-muted-foreground">Novo Horário</Label>
+              <Input 
+                type="datetime-local" 
+                value={adjustForm.timestamp} 
+                onChange={e => setAdjustForm(f => ({...f, timestamp: e.target.value}))}
+                className="bg-white/5 border-white/10" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs uppercase font-bold text-muted-foreground">Motivo do Ajuste (Auditoria)</Label>
+              <Input 
+                value={adjustForm.reason} 
+                onChange={e => setAdjustForm(f => ({...f, reason: e.target.value}))}
+                placeholder="Ex: Esqueceu de bater / Falha no relógio" 
+                className="bg-white/5 border-white/10" 
+              />
+            </div>
+
+            <Button 
+              onClick={handleUpdateEntry} 
+              disabled={isProcessing === true} 
+              className="w-full h-11 font-black uppercase text-[12px] shadow-lg shadow-primary/20"
+            >
+              {isProcessing === true ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Salvar e Recalcular Banco
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
