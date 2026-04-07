@@ -61,6 +61,19 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers();
+
+    // Sincronização em tempo real da lista de usuários
+    const channel = supabase
+      .channel('usermanagement_realtime')
+      .on('postgres_changes', { event: '*', table: 'profiles', schema: 'public' }, () => {
+        console.log('🔄 Atualizando lista de usuários (Realtime)...');
+        fetchUsers();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [getAllUsers]);
   const [open, setOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);

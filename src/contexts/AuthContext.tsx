@@ -107,6 +107,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem('is_employee_view', v ? 'true' : 'false');
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Sincronização em tempo real do perfil e permissões
+    const channel = supabase
+      .channel(`profile_sync_realtime_${user.id}`)
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        table: 'profiles', 
+        schema: 'public', 
+        filter: `id=eq.${user.id}` 
+      }, (payload) => {
+        const profile = payload.new;
+        if (profile) {
+          console.log('🔄 Perfil atualizado em tempo real:', profile.email);
+          const userData: User = {
+            id: profile.id,
+            email: profile.email,
+            name: profile.name,
+            role: profile.role,
+            tenantId: profile.tenant_id,
+            canEditEmployees: profile.can_edit_employees,
+            canDeleteEmployees: profile.can_delete_employees
+          };
+          
+          setUser(userData);
+          sessionStorage.setItem('nexus_user', JSON.stringify(userData));
+          
+          const perms = profile.role === 'superadmin' ? undefined : (profile.permissions ?? DEFAULT_PERMISSIONS);
+          setCurrentPermissions(perms);
+          sessionStorage.setItem('user_permissions', JSON.stringify(perms ?? null));
+          sessionStorage.setItem('app_permissions', JSON.stringify(profile.app_permissions || { 'ponto': true }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const login = useCallback(async (email: string, password: string) => {
     try {
       // 1. Tentar buscar do banco de dados (Sincronizado)

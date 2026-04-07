@@ -76,12 +76,20 @@ export default function Tenants() {
   useEffect(() => {
     fetchData();
 
-    // Realtime subscription for profiles (managed users)
+    // Assinaturas em Realtime para Sincronização Simultânea total
     const channel = supabase
-      .channel('profiles_realtime')
+      .channel('tenants_system_realtime')
       .on('postgres_changes', { event: '*', table: 'profiles', schema: 'public' }, async () => {
-        // Refresh users list whenever any profile changes
+        console.log('🔄 Usuários atualizados em tempo real');
         setManagedUsers(await getAllUsers());
+      })
+      .on('postgres_changes', { event: '*', table: 'tenants', schema: 'public' }, () => {
+        console.log('🔄 Empresas atualizadas em tempo real');
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', table: 'stores', schema: 'public' }, () => {
+        console.log('🔄 Unidades atualizadas em tempo real');
+        fetchData();
       })
       .subscribe();
 

@@ -97,6 +97,23 @@ export default function Attendance() {
 
   useEffect(() => {
     fetchData();
+
+    // Sincronização em tempo real do sistema de ponto (Simultâneo)
+    const channel = supabase
+      .channel('attendance_realtime')
+      .on('postgres_changes', { event: '*', table: 'attendance_devices', schema: 'public' }, () => {
+        console.log('🔄 Relógios atualizados em tempo real');
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', table: 'time_entries', schema: 'public' }, () => {
+        console.log('🔄 Batidas atualizadas em tempo real');
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleSaveDevice = async (e: React.FormEvent) => {
