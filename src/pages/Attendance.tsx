@@ -347,19 +347,25 @@ export default function Attendance() {
           if (!response.ok) throw new Error('Falha na resposta do relógio. Verifique se o IP e Porta estão corretos.');
           
           const rawData = await response.json();
-          // Eventos do Control iD vêm em rawData.events
           const deviceEvents = rawData.events || [];
 
-          // VALIDAR CADA EVENTO: "apenas funcionário cadastrado"
           for (const ev of deviceEvents) {
-             // O campo 'user_id' no Control iD deve bater com o CPF que exportamos
-             const emp = allEmployees.find(e => e.cpf?.replace(/\D/g, '') === ev.user_id.toString());
+             // O user_id no Control iD (iDClass/iDFace) é o ID numérico que vinculamos ao CPF ou ID do sistema
+             const emp = allEmployees.find(e => 
+               e.cpf?.replace(/\D/g, '') === ev.user_id.toString() || 
+               e.id === ev.user_id.toString()
+             );
              
              if (emp) {
+                // Mapeamento de Eventos Control iD:
+                // 1: Entrada, 2: Saída, 3: Início Intervalo, 4: Fim Intervalo
+                let entryType = 'ENTRY';
+                if (ev.event === 2 || ev.event === 4) entryType = 'EXIT';
+                
                 importedEntries.push({
                   employee_id: emp.id,
                   employee_name: emp.name,
-                  type: ev.event === 1 ? 'ENTRY' : 'EXIT', // 1=Entrada, 2=Saída no padrão iD
+                  type: entryType,
                   timestamp: new Date(ev.time * 1000).toISOString(),
                   tenant_id: emp.tenant_id,
                   device_id: device.id,
@@ -801,12 +807,12 @@ export default function Attendance() {
                          <SelectTrigger className="bg-white/5 border-white/10">
                            <SelectValue />
                          </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="ControlID Facial">Control iD (Reconhecimento Facial)</SelectItem>
+                         <SelectContent className="glass-card border-white/10 text-white">
+                           <SelectItem value="ControlID iDClass">Control iD iDClass (Físico/Biometria)</SelectItem>
+                           <SelectItem value="ControlID iDFace">Control iD iDFace (Reconhecimento Facial)</SelectItem>
                            <SelectItem value="Intelbras Facial">Intelbras (Reconhecimento Facial)</SelectItem>
                            <SelectItem value="Generic ZKTeco">ZKTeco (SDK) ou Biometria Digital</SelectItem>
-                           <SelectItem value="ControlID">Control iD API (Cartão/Digital)</SelectItem>
-                           <SelectItem value="Topdata">Topdata Inner</SelectItem>
+                           <SelectItem value="Topdata Inner">Topdata Inner</SelectItem>
                            <SelectItem value="Smartphone Geolocation">Aplicativo Mobile (Geolocalização)</SelectItem>
                          </SelectContent>
                       </Select>
@@ -1144,11 +1150,13 @@ export default function Attendance() {
                 <SelectTrigger id="edit-model" className="bg-white/5 border-white/10">
                   <SelectValue placeholder="Selecione o modelo" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ControlID iDFace">ControlID iDFace</SelectItem>
-                  <SelectItem value="ControlID iDClass">ControlID iDClass</SelectItem>
-                  <SelectItem value="Intelbras BioInov">Intelbras BioInov</SelectItem>
+                <SelectContent className="glass-card border-white/10 text-white">
+                  <SelectItem value="ControlID iDClass">Control iD iDClass (Físico/Biometria)</SelectItem>
+                  <SelectItem value="ControlID iDFace">Control iD iDFace (Reconhecimento Facial)</SelectItem>
+                  <SelectItem value="Intelbras Facial">Intelbras (Reconhecimento Facial)</SelectItem>
+                  <SelectItem value="Generic ZKTeco">ZKTeco (SDK) ou Biometria Digital</SelectItem>
                   <SelectItem value="Topdata Inner">Topdata Inner</SelectItem>
+                  <SelectItem value="Smartphone Geolocation">Aplicativo Mobile (Geolocalização)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
