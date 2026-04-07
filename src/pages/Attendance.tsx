@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle } from 'lucide-react';
+import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { addAuditLog } from '@/data/mockData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface AttendanceDevice {
   id: string;
@@ -291,7 +292,7 @@ export default function Attendance() {
              Controle de Ponto Digital
           </h1>
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1 ml-14">
-             Sincronização IP & Biometria
+             Biometria Digital, Reconhecimento Facial & IP
           </p>
         </div>
       </div>
@@ -416,10 +417,12 @@ export default function Attendance() {
                            <SelectValue />
                          </SelectTrigger>
                          <SelectContent>
-                           <SelectItem value="Generic ZKTeco">ZKTeco (SDK) ou Genérico</SelectItem>
-                           <SelectItem value="ControlID">Control iD API</SelectItem>
+                           <SelectItem value="ControlID Facial">Control iD (Reconhecimento Facial)</SelectItem>
+                           <SelectItem value="Intelbras Facial">Intelbras (Reconhecimento Facial)</SelectItem>
+                           <SelectItem value="Generic ZKTeco">ZKTeco (SDK) ou Biometria Digital</SelectItem>
+                           <SelectItem value="ControlID">Control iD API (Cartão/Digital)</SelectItem>
                            <SelectItem value="Topdata">Topdata Inner</SelectItem>
-                           <SelectItem value="Smartphone Geolocation">Aplicativo Mobile</SelectItem>
+                           <SelectItem value="Smartphone Geolocation">Aplicativo Mobile (Geolocalização)</SelectItem>
                          </SelectContent>
                       </Select>
                     </div>
@@ -447,11 +450,22 @@ export default function Attendance() {
                      )}
                   </div>
                   
-                  <HardDrive className="w-8 h-8 text-primary mb-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  {device.model?.includes('Facial') ? (
+                    <ScanFace className="w-8 h-8 text-indigo-400 mb-4 opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                  ) : (
+                    <HardDrive className="w-8 h-8 text-primary mb-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  )}
                   <h3 className="text-lg font-bold text-white mb-1">{device.name}</h3>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono-data text-muted-foreground">{device.ip_address}:{device.port}</span>
-                    <span className="text-[10px] font-bold text-primary">{device.model}</span>
+                  <div className="flex flex-col gap-2 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono-data text-muted-foreground">{device.ip_address}:{device.port}</span>
+                      <span className={cn("text-[10px] font-bold", device.model?.includes('Facial') ? "text-indigo-400" : "text-primary")}>{device.model}</span>
+                    </div>
+                    {device.model?.includes('Facial') && (
+                      <div className="inline-flex items-center w-fit gap-1.5 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black tracking-widest uppercase text-indigo-400">
+                        <ScanFace className="w-3 h-3" /> IA de Reconhecimento Facial Ativa
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-white/5 flex gap-2">

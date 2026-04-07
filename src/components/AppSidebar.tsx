@@ -145,7 +145,7 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
            <div className="flex items-center gap-2">
              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
              <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500/80">Sistema Online</span>
-             <span className="ml-auto text-[9px] font-mono text-muted-foreground">06/04 20:05</span>
+             <span className="ml-auto text-[9px] font-mono text-emerald-500">REALTIME</span>
            </div>
            
            <div className="flex items-center gap-2">
