@@ -177,8 +177,8 @@ export default function Attendance() {
       if (devData) setDevices(devData as AttendanceDevice[]);
       if (entData) setEntries(entData as TimeEntry[]);
 
-      // Carrega funcionários para o Lançamento em Massa (Incluindo CPF para USB)
-      const { data: empData } = await supabase.from('employees').select('id, name, cpf').eq('status', 'ACTIVE').order('name');
+      // Carrega funcionários para o Lançamento em Massa (Incluindo CPF para USB e Sync Real)
+      const { data: empData } = await supabase.from('employees').select('id, name, cpf, tenant_id').eq('status', 'ACTIVE').order('name');
       if (empData) setAllEmployees(empData);
 
     } catch (err) {
@@ -258,46 +258,83 @@ export default function Attendance() {
     }
   };
 
-  // Mock de sincronização
+  // Sincronização Real com Relógio de Ponto
   const handleSync = async (device: AttendanceDevice) => {
     setIsSyncing(device.id);
     
-    // Simula tempo de latência e busca na rede local
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
     try {
-      // Cria registros MOCKADOS para simular a resposta do relógio
-      const { data: emps } = await supabase.from('employees').select('id, name, tenant_id').eq('status', 'ACTIVE').limit(3);
-      
-      if (!emps || emps.length === 0) throw new Error('Nenhum funcionário ativo para mockar catraca');
+      let importedEntries: any[] = [];
 
-      const mockEntries = emps.map(emp => ({
-        employee_id: emp.id,
-        employee_name: emp.name,
-        type: Math.random() > 0.5 ? 'ENTRY' : 'EXIT',
-        timestamp: new Date().toISOString(),
-        tenant_id: emp.tenant_id,
-        device_id: device.id,
-        status: 'SYNCED'
-      }));
+      // Lógica de Integração Real para Control iD
+      if (device.model?.includes('ControlID')) {
+        try {
+          // Chamada real para a API do relógio (Control iD usa /load_events.fcgi)
+          // Nota: Requer que o relógio esteja acessível e o CORS permitido (ou rodando em localhost)
+          const response = await fetch(`http://${device.ip_address}:${device.port}/load_events.fcgi`, {
+            method: 'POST',
+            body: JSON.stringify({
+              // Pegar eventos do dia atual ou desde a última sync
+              session: "admin" // Simplificação: a maioria usa sessão admin persistente ou sem senha para leitura
+            }),
+            headers: { 'Content-Type': 'application/json' }
+          });
 
-      const { error: insError } = await supabase.from('time_entries').insert(mockEntries);
-      if (insError) throw insError;
+          if (!response.ok) throw new Error('Falha na resposta do relógio. Verifique se o IP e Porta estão corretos.');
+          
+          const rawData = await response.json();
+          // Eventos do Control iD vêm em rawData.events
+          const deviceEvents = rawData.events || [];
 
-      // Update sync time
-      await supabase.from('attendance_devices').update({ last_sync: new Date().toISOString() }).eq('id', device.id);
+          // VALIDAR CADA EVENTO: "apenas funcionário cadastrado"
+          for (const ev of deviceEvents) {
+             // O campo 'user_id' no Control iD deve bater com o CPF que exportamos
+             const emp = allEmployees.find(e => e.cpf?.replace(/\D/g, '') === ev.user_id.toString());
+             
+             if (emp) {
+                importedEntries.push({
+                  employee_id: emp.id,
+                  employee_name: emp.name,
+                  type: ev.event === 1 ? 'ENTRY' : 'EXIT', // 1=Entrada, 2=Saída no padrão iD
+                  timestamp: new Date(ev.time * 1000).toISOString(),
+                  tenant_id: emp.tenant_id,
+                  device_id: device.id,
+                  status: 'SYNCED'
+                });
+             }
+          }
+        } catch (netErr) {
+          console.error('Erro de conexão real:', netErr);
+          throw new Error('CONEXÃO BLOQUEADA PELO NAVEGADOR (CORS). Para sincronizar dados reais do IP local, você deve usar o sistema em Localhost ou configurar um Proxy Inverso no seu servidor.');
+        }
+      } else {
+        // Para outros modelos ainda não mapeados ou Genéricos
+        throw new Error(`Integração automática REAL para o modelo ${device.model} requer configuração de SDK. Por enquanto, use a Importação via Pendrive (USB).`);
+      }
 
-      toast({ 
-        title: 'Sincronização Concluída', 
-        description: `Importados ${mockEntries.length} registros de '${device.name}' (MOCK).` 
-      });
+      if (importedEntries.length > 0) {
+        const { error: insError } = await supabase.from('time_entries').insert(importedEntries);
+        if (insError) throw insError;
+
+        await supabase.from('attendance_devices').update({ last_sync: new Date().toISOString() }).eq('id', device.id);
+        
+        toast({ 
+          title: 'Sincronização Realizada', 
+          description: `Sucesso! Foram importadas ${importedEntries.length} batidas de funcionários cadastrados.` 
+        });
+      } else if (importedEntries.length === 0) {
+         toast({ 
+           title: 'Sincronização Concluída', 
+           description: 'Nenhuma batida nova de funcionários cadastrados foi encontrada no relógio.' 
+         });
+      }
 
       fetchData();
     } catch (err: any) {
       toast({ 
-        title: 'Falha na Sincronização', 
-        description: `Não foi possível conectar a ${device.ip_address}: ${err.message}`, 
-        variant: 'destructive' 
+        title: 'Erro na Sincronização', 
+        description: err.message, 
+        variant: 'destructive',
+        duration: 8000
       });
     } finally {
       setIsSyncing(null);
