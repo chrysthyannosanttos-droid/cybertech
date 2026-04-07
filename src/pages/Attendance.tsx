@@ -47,6 +47,7 @@ export default function Attendance() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isUsbDialogOpen, setIsUsbDialogOpen] = useState(false);
   const [isUsbExporting, setIsUsbExporting] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState<Record<string, 'online' | 'offline' | 'testing' | null>>({});
 
   const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
 
@@ -93,6 +94,33 @@ export default function Attendance() {
     
     setIsCapturing(false);
     setIsFacialDialogOpen(false);
+  };
+
+  const handleTestConnection = async (device: AttendanceDevice) => {
+    setDeviceStatus(prev => ({ ...prev, [device.id]: 'testing' }));
+    
+    try {
+      // Tenta um Ping real no relógio (Control iD usa /ping.fcgi)
+      const response = await fetch(`http://${device.ip_address}:${device.port}/ping.fcgi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: "admin" })
+      }).catch(() => { throw new Error('Timeout or Network Error'); });
+
+      if (response.ok) {
+        setDeviceStatus(prev => ({ ...prev, [device.id]: 'online' }));
+        toast({ title: 'Equipamento Online!', description: `Comunicação com ${device.name} estabelecida.`, className: "bg-emerald-500 text-white" });
+      } else {
+        throw new Error('No response');
+      }
+    } catch (err) {
+      setDeviceStatus(prev => ({ ...prev, [device.id]: 'offline' }));
+      toast({ 
+        title: 'Sem Comunicação', 
+        description: `Não foi possível alcançar ${device.ip_address}. Verifique os cabos e rede.`, 
+        variant: 'destructive' 
+      });
+    }
   };
 
   const handleExportUsb = async () => {
@@ -657,10 +685,17 @@ export default function Attendance() {
                      </Button>
                      <Button 
                        variant="ghost"
-                       onClick={() => handleOpenExport(device.id)}
-                       className="flex-1 min-w-[100px] h-9 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white font-bold text-[11px] border border-white/5"
+                       onClick={() => handleTestConnection(device)}
+                       disabled={deviceStatus[device.id] === 'testing'}
+                       className={cn(
+                        "flex-1 min-w-[100px] h-9 font-bold text-[11px] border",
+                        deviceStatus[device.id] === 'online' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : 
+                        deviceStatus[device.id] === 'offline' ? "bg-rose-500/10 border-rose-500/20 text-rose-500" :
+                        "bg-white/5 border-white/5 text-muted-foreground"
+                       )}
                      >
-                       <Users className="w-3.5 h-3.5 mr-2" /> Enviar Colaboradores
+                       {deviceStatus[device.id] === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Smartphone className="w-3.5 h-3.5 mr-2" />}
+                       {deviceStatus[device.id] === 'online' ? 'Hardware Online' : deviceStatus[device.id] === 'offline' ? 'Hardware Offline' : 'Testar Comunicação'}
                      </Button>
                   </div>
 
@@ -764,7 +799,7 @@ export default function Attendance() {
 
                  <Button onClick={executeFacialCapture} disabled={isCapturing || !facialEmpId} className="w-full h-11 bg-indigo-500 hover:bg-indigo-600 text-white font-black uppercase text-[12px]">
                    {isCapturing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ScanFace className="w-4 h-4 mr-2" />}
-                   Ativar Câmera do Relógio
+                   {isCapturing ? "Aguardando Equipamento..." : "Ativar Câmera do Relógio"}
                  </Button>
                </div>
              </DialogContent>
