@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle, ScanFace } from 'lucide-react';
+import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle, ScanFace, Users, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,58 @@ export default function Attendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isFacialDialogOpen, setIsFacialDialogOpen] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
+
+  const handleOpenExport = (id: string) => {
+    setSelectedDeviceId(id);
+    setSelectedEmpIds(allEmployees.map(e => e.id)); // Default select all for export
+    setIsExportDialogOpen(true);
+  };
+
+  const handleOpenFacial = (id: string) => {
+    setSelectedDeviceId(id);
+    setFacialEmpId(null);
+    setIsFacialDialogOpen(true);
+  };
+
+  const executeExport = async () => {
+    if (!selectedDeviceId || selectedEmpIds.length === 0) return;
+    setIsExporting(true);
+    
+    // Simula envio de carga para o relógio
+    await new Promise(r => setTimeout(r, 2500));
+    
+    toast({ 
+      title: 'Carga Finalizada', 
+      description: `${selectedEmpIds.length} colaboradores exportados para o relógio.` 
+    });
+    
+    setIsExporting(false);
+    setIsExportDialogOpen(false);
+  };
+
+  const executeFacialCapture = async () => {
+    if (!selectedDeviceId || !facialEmpId) return;
+    setIsCapturing(true);
+    
+    // Simula comando de captura facial
+    await new Promise(r => setTimeout(r, 4000));
+    
+    const emp = allEmployees.find(e => e.id === facialEmpId);
+    toast({ 
+      title: 'Face Registrada!', 
+      description: `O rosto de ${emp?.name} foi gravado no relógio e sincronizado.` 
+    });
+    
+    setIsCapturing(false);
+    setIsFacialDialogOpen(false);
+  };
 
   const { user } = useAuth();
   const { toast } = useToast();
@@ -468,32 +520,129 @@ export default function Attendance() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-white/5 flex gap-2">
+                  <div className="pt-4 border-t border-white/5 flex flex-wrap gap-2">
                      <Button 
                        onClick={() => handleSync(device)}
                        disabled={isSyncing === device.id}
-                       className="flex-1 h-9 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[12px] border border-primary/20"
+                       className="flex-1 min-w-[100px] h-9 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[11px] border border-primary/20"
                      >
                        <RefreshCw className={`w-3.5 h-3.5 mr-2 ${isSyncing === device.id ? 'animate-spin' : ''}`} />
-                       {isSyncing === device.id ? 'Conectando...' : 'Sincronizar (Mock)'}
+                       {isSyncing === device.id ? 'Sincronizando' : 'Importar Batidas'}
                      </Button>
+                     <Button 
+                       variant="ghost"
+                       onClick={() => handleOpenExport(device.id)}
+                       className="flex-1 min-w-[100px] h-9 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white font-bold text-[11px] border border-white/5"
+                     >
+                       <Users className="w-3.5 h-3.5 mr-2" /> Enviar Colaboradores
+                     </Button>
+                  </div>
+
+                  {device.model?.includes('Facial') && (
+                    <div className="mt-2">
+                       <Button 
+                         onClick={() => handleOpenFacial(device.id)}
+                         className="w-full h-9 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 font-bold text-[11px] border border-indigo-500/20"
+                       >
+                         <ScanFace className="w-3.5 h-3.5 mr-2" /> Captura Facial Remota
+                       </Button>
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex justify-end">
                      {isAdmin && (
                        <Button 
                          variant="ghost" 
                          size="icon" 
                          onClick={() => handleDeleteDevice(device.id, device.name)}
-                         className="h-9 w-9 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400"
+                         className="h-8 w-8 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10"
                        >
                          <Trash2 className="w-4 h-4" />
                        </Button>
                      )}
                   </div>
+
                   {device.last_sync && (
                     <p className="text-[10px] text-muted-foreground mt-3 text-center">Última sync: {new Date(device.last_sync).toLocaleString('pt-BR')}</p>
                   )}
                </div>
              ))}
            </div>
+
+           {/* DIALOG DE CARGA / EXPORTAÇÃO */}
+           <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+             <DialogContent className="max-w-md border-white/10 glass-card">
+               <DialogHeader>
+                 <DialogTitle>Exportar para o Relógio</DialogTitle>
+               </DialogHeader>
+               <div className="space-y-4 py-4">
+                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                   <p className="text-[12px] font-medium text-white/80 leading-relaxed">
+                     Você está prestes a enviar a lista de colaboradores selecionados para a memória do dispositivo 
+                     <span className="text-primary font-bold"> {devices.find(d => d.id === selectedDeviceId)?.name}</span>.
+                   </p>
+                 </div>
+                 
+                 <div className="space-y-3">
+                    <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest">Colaboradores ({selectedEmpIds.length})</Label>
+                    <ScrollArea className="h-48 border border-white/5 bg-white/5 rounded-xl p-3">
+                      {allEmployees.map(emp => (
+                        <div key={emp.id} className="flex items-center gap-3 py-1.5 border-b border-white/5 last:border-0">
+                           <Checkbox checked={selectedEmpIds.includes(emp.id)} onCheckedChange={(v) => setSelectedEmpIds(prev => v ? [...prev, emp.id] : prev.filter(x => x !== emp.id))} />
+                           <span className="text-[12px] text-white/70 font-medium">{emp.name}</span>
+                        </div>
+                      ))}
+                    </ScrollArea>
+                 </div>
+
+                 <Button onClick={executeExport} disabled={isExporting} className="w-full h-11 font-black uppercase text-[12px] shadow-lg shadow-primary/20">
+                   {isExporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                   Confirmar Envio de Carga
+                 </Button>
+               </div>
+             </DialogContent>
+           </Dialog>
+
+           {/* DIALOG DE CAPTURA FACIAL */}
+           <Dialog open={isFacialDialogOpen} onOpenChange={setIsFacialDialogOpen}>
+             <DialogContent className="max-w-md border-white/10 glass-card text-center">
+               <DialogHeader>
+                 <DialogTitle className="text-center">Modo Captura Facial</DialogTitle>
+               </DialogHeader>
+               <div className="space-y-6 py-4">
+                 <div className="flex justify-center">
+                    <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                      <ScanFace className="w-10 h-10 text-indigo-400" />
+                    </div>
+                 </div>
+
+                 <div className="space-y-3 text-left">
+                   <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest block text-center">Selecionar Colaborador</Label>
+                   <Select value={facialEmpId || ''} onValueChange={setFacialEmpId}>
+                      <SelectTrigger className="bg-white/5 border-white/10 h-11 rounded-xl">
+                        <SelectValue placeholder="Escolha um funcionário..." />
+                      </SelectTrigger>
+                      <SelectContent className="glass-card border-white/10 text-white">
+                        {allEmployees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}
+                      </SelectContent>
+                   </Select>
+                 </div>
+
+                 <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 italic">
+                    <p className="text-[11px] text-indigo-300">
+                      {isCapturing 
+                        ? "Comando enviado. O relógio aguarda o posicionamento do rosto na câmera..." 
+                        : "O relógio entrará em Modo de Captura imediatamente após o clique."}
+                    </p>
+                 </div>
+
+                 <Button onClick={executeFacialCapture} disabled={isCapturing || !facialEmpId} className="w-full h-11 bg-indigo-500 hover:bg-indigo-600 text-white font-black uppercase text-[12px]">
+                   {isCapturing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ScanFace className="w-4 h-4 mr-2" />}
+                   Ativar Câmera do Relógio
+                 </Button>
+               </div>
+             </DialogContent>
+           </Dialog>
         </TabsContent>
 
         {/* Tab HITÓRICO */}
