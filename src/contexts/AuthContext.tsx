@@ -47,7 +47,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const DEFAULT_PERMISSIONS: AppModule[] = [
-  'dashboard', 'employees', 'certificates', 'payroll', 'reports', 'service-providers', 'rescissions', 'stores', 'attendance'
+  'dashboard', 'employees', 'certificates', 'payroll', 'reports', 'service-providers', 'rescissions', 'stores', 'attendance', 'settings'
 ];
 
 const DEFAULT_USERS: ManagedUser[] = [

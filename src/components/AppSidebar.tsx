@@ -109,7 +109,7 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {user?.email === 'teste' 
             ? (isEmployeeView ? '👤 Colaborador (Teste)' : '⚡ Ambiente de Teste') 
-            : user?.role === 'superadmin' ? 'Super Admin' : 'Empresa'}
+            : user?.role === 'superadmin' ? 'Super Administrador' : 'Empresa'}
         </span>
       </div>
 

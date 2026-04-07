@@ -370,7 +370,7 @@ export default function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tenant"><Building2 className="w-4 h-4 inline mr-2" />Empresa</SelectItem>
-                    {isSuperAdmin && <SelectItem value="superadmin"><ShieldCheck className="w-4 h-4 inline mr-2" />Super Admin</SelectItem>}
+                    {isSuperAdmin && <SelectItem value="superadmin"><ShieldCheck className="w-4 h-4 inline mr-2" />Super Administrador</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
