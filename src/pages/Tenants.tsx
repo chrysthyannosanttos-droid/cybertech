@@ -102,6 +102,7 @@ export default function Tenants() {
   
   // Forms for the Details View
   const [addStoreOpen, setAddStoreOpen] = useState(false);
+  const [editStoreId, setEditStoreId] = useState<string | null>(null);
   const [storeForm, setStoreForm] = useState({ name: '', cnpj: '' });
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
@@ -316,22 +317,46 @@ export default function Tenants() {
   const handleAddStore = async () => {
     if (!selectedTenant || !storeForm.name || !storeForm.cnpj) return;
     
-    const { error } = await supabase.from('stores').insert({
-      id: `s_${Date.now()}`,
-      tenant_id: selectedTenant.id,
-      name: storeForm.name,
-      cnpj: storeForm.cnpj
-    });
+    if (editStoreId) {
+      const { error } = await supabase
+        .from('stores')
+        .update({
+          name: storeForm.name,
+          cnpj: storeForm.cnpj
+        })
+        .eq('id', editStoreId);
 
-    if (error) {
-      toast({ title: 'Erro ao cadastrar loja', description: error.message, variant: 'destructive' });
-      return;
+      if (error) {
+        toast({ title: 'Erro ao atualizar loja', description: error.message, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Loja atualizada', description: `${storeForm.name} atualizada com sucesso.` });
+    } else {
+      const { error } = await supabase.from('stores').insert({
+        id: `s_${Date.now()}`,
+        tenant_id: selectedTenant.id,
+        name: storeForm.name,
+        cnpj: storeForm.cnpj
+      });
+
+      if (error) {
+        toast({ title: 'Erro ao cadastrar loja', description: error.message, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Loja cadastrada', description: `${storeForm.name} adicionada com sucesso.` });
     }
+
     setStoreForm({ name: '', cnpj: '' });
+    setEditStoreId(null);
     setAddStoreOpen(false);
     await fetchData();
-    toast({ title: 'Loja cadastrada', description: `${storeForm.name} adicionada com sucesso.` });
     setTimeout(() => window.location.reload(), 500);
+  };
+
+  const handleOpenEditStore = (s: StoreType) => {
+    setEditStoreId(s.id);
+    setStoreForm({ name: s.name, cnpj: s.cnpj });
+    setAddStoreOpen(true);
   };
 
   const handleAddUser = async () => {
@@ -425,13 +450,13 @@ export default function Tenants() {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-semibold tracking-tight">{selectedTenant.name}</h1>
                 <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 rounded-lg text-primary hover:bg-primary/10" 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-1.5 border-primary/20 text-primary hover:bg-primary/10 font-bold text-[11px] uppercase tracking-widest" 
                   onClick={() => handleOpenEdit(selectedTenant)}
-                  title="Editar dados da empresa"
                 >
-                  <Edit2 className="w-4 h-4" />
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Editar Cadastro
                 </Button>
               </div>
               <p className="text-[13px] text-muted-foreground mt-0.5">CNPJ: {selectedTenant.cnpj}</p>
@@ -481,13 +506,15 @@ export default function Tenants() {
 
           <TabsContent value="stores" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={addStoreOpen} onOpenChange={setAddStoreOpen}>
+              <Dialog open={addStoreOpen} onOpenChange={(v) => { setAddStoreOpen(v); if(!v) setEditStoreId(null); }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 gap-1.5"><Plus className="w-3.5 h-3.5" /> Nova Loja</Button>
+                  <Button size="sm" className="h-8 gap-1.5" onClick={() => { setEditStoreId(null); setStoreForm({ name: '', cnpj: '' }); }}>
+                    <Plus className="w-3.5 h-3.5" /> Nova Loja
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle className="text-[15px]">Cadastrar Loja: {selectedTenant.name}</DialogTitle>
+                    <DialogTitle className="text-[15px]">{editStoreId ? 'Editar Loja' : 'Cadastrar Loja'}: {selectedTenant.name}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 py-2 mt-2">
                     <div className="space-y-1.5">
@@ -503,7 +530,7 @@ export default function Tenants() {
                         setStoreForm(f => ({ ...f, cnpj: v }));
                       }} className="h-9 text-[13px]" placeholder="00.000.000/0001-00" />
                     </div>
-                    <Button onClick={handleAddStore} className="w-full h-9 text-[13px] mt-2">Salvar Loja</Button>
+                    <Button onClick={handleAddStore} className="w-full h-9 text-[13px] mt-2">{editStoreId ? 'Salvar Alterações' : 'Salvar Loja'}</Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -515,6 +542,7 @@ export default function Tenants() {
                   <tr className="border-b border-white/5 bg-white/5">
                     <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">Nome da Loja</th>
                     <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest">CNPJ</th>
+                    <th className="px-6 py-4 text-[11px] font-bold text-primary uppercase tracking-widest text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -526,6 +554,11 @@ export default function Tenants() {
                         <div className="flex items-center gap-3"><StoreIcon className="w-4 h-4 text-primary opacity-70 group-hover:opacity-100 transition-opacity" /> {s.name}</div>
                       </td>
                       <td className="px-6 py-4 text-[13px] font-mono-data text-muted-foreground group-hover:text-white transition-colors">{s.cnpj}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10" onClick={() => handleOpenEditStore(s)}>
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
