@@ -119,15 +119,106 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
 
     const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
     const isCsv = selectedFile.name.endsWith('.csv');
+    const isPdf = selectedFile.name.endsWith('.pdf');
 
-    if (!isExcel && !isCsv) {
-      toast({ title: 'Formato inválido', description: 'Por favor, envie um arquivo .xlsx ou .csv', variant: 'destructive' });
+    if (!isExcel && !isCsv && !isPdf) {
+      toast({ title: 'Formato inválido', description: 'Por favor, envie um arquivo .xlsx, .csv ou .pdf (Control iD)', variant: 'destructive' });
       return;
     }
 
     setFile(selectedFile);
     setFileName(selectedFile.name);
-    processFile(selectedFile);
+    
+    if (isPdf) {
+      processPdf(selectedFile);
+    } else {
+      processFile(selectedFile);
+    }
+  };
+
+  const processPdf = async (file: File) => {
+    setStep('IMPORTING');
+    setImportProgress(10);
+    
+    try {
+      // 1. Carregar PDF.js dinamicamente se não estiver disponível
+      if (!(window as any).pdfjsLib) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        document.head.appendChild(script);
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+        });
+      }
+
+      const pdfjsLib = (window as any).pdfjsLib;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map((item: any) => item.str);
+        fullText += strings.join(' ') + '\n';
+        setImportProgress(10 + Math.round((i / pdf.numPages) * 40));
+      }
+
+      // 2. Parser para Layout Control iD (conforme imagem)
+      const nameMatch = fullText.match(/NOME DO FUNCIONÁRIO:\s*([^\n\r]*)/i);
+      const cpfMatch = fullText.match(/CPF DO FUNCIONÁRIO:\s*([\d.-]*)/i);
+      const matriculaMatch = fullText.match(/NÚMERO DA MATRÍCULA:\s*(\d*)/i);
+
+      const empName = nameMatch ? nameMatch[1].trim() : '';
+      const rawCpf = cpfMatch ? cpfMatch[1].replace(/\D/g, '') : '';
+      const matricula = matriculaMatch ? matriculaMatch[1] : '';
+
+      // Tentar encontrar funcionário pela base
+      const emp = employees.find(e => e.cpf?.replace(/\D/g, '') === rawCpf || e.name === empName);
+
+      // 3. Extrair Linhas de Batidas
+      // Padrão: DD/MM/YYYY - SEMANA ... ENT1 SAI1 ENT2 SAI2 ...
+      // Exemplo na imagem: 01/04/2026 - QUA 18:00-23:00 00:00-04:00 Falta Falta Falta Falta
+      const dateRowRegex = /(\d{2}\/\d{2}\/\d{4})\s*-\s*[A-Z]{3}.*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO)/g;
+      
+      let match;
+      const rows: any[] = [];
+      while ((match = dateRowRegex.exec(fullText)) !== null) {
+        const date = match[1];
+        const hits = [match[2], match[3], match[4], match[5]].filter(h => h.includes(':'));
+        
+        if (hits.length > 0) {
+          hits.forEach((time, idx) => {
+            rows.push({
+              cpf: rawCpf,
+              name: empName,
+              date: date,
+              time: time,
+              type: idx % 2 === 0 ? 'ENTRY' : 'EXIT',
+              employee_id: emp?.id,
+              employee_name: emp?.name || empName,
+              _errors: emp ? {} : { cpf: 'Funcionário não cadastrado' }
+            });
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        throw new Error('Nenhuma batida encontrada no PDF. Verifique se o layout é Control iD.');
+      }
+
+      setImportRows(rows);
+      setStep('PREVIEW');
+      toast({ title: 'PDF Control iD Processado', description: `Identificado: ${empName}. Encontradas ${rows.length} batidas.` });
+
+    } catch (err: any) {
+      console.error('PDF Parse Error:', err);
+      toast({ title: 'Erro ao ler PDF', description: err.message, variant: 'destructive' });
+      setStep('UPLOAD');
+    }
   };
 
   const processFile = (file: File) => {
