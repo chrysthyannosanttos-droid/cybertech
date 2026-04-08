@@ -163,51 +163,67 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         const strings = content.items.map((item: any) => item.str);
-        fullText += strings.join(' ') + '\n';
+        // Usar duplo espaço para evitar que números colados se misturem
+        fullText += strings.join('  ') + '\n';
         setImportProgress(10 + Math.round((i / pdf.numPages) * 40));
       }
 
+      console.log("Extracted PDF Text:", fullText);
+
       // 2. Parser para Layout Control iD (conforme imagem)
-      const nameMatch = fullText.match(/NOME DO FUNCIONÁRIO:\s*([^\n\r]*)/i);
+      // Ajustando regex para ser mais flexível com espaços
+      const nameMatch = fullText.match(/NOME DO FUNCIONÁRIO:\s*([^:\n\r]*?)(?=CPF DO FUNCIONÁRIO|PIS DO FUNCIONÁRIO|$)/i);
       const cpfMatch = fullText.match(/CPF DO FUNCIONÁRIO:\s*([\d.-]*)/i);
-      const matriculaMatch = fullText.match(/NÚMERO DA MATRÍCULA:\s*(\d*)/i);
 
       const empName = nameMatch ? nameMatch[1].trim() : '';
       const rawCpf = cpfMatch ? cpfMatch[1].replace(/\D/g, '') : '';
-      const matricula = matriculaMatch ? matriculaMatch[1] : '';
 
       // Tentar encontrar funcionário pela base
-      const emp = employees.find(e => e.cpf?.replace(/\D/g, '') === rawCpf || e.name === empName);
+      const emp = employees.find(e => 
+        (rawCpf && e.cpf?.replace(/\D/g, '') === rawCpf) || 
+        (empName && e.name?.toUpperCase() === empName.toUpperCase())
+      );
 
       // 3. Extrair Linhas de Batidas
-      // Padrão: DD/MM/YYYY - SEMANA ... ENT1 SAI1 ENT2 SAI2 ...
-      // Exemplo na imagem: 01/04/2026 - QUA 18:00-23:00 00:00-04:00 Falta Falta Falta Falta
-      const dateRowRegex = /(\d{2}\/\d{2}\/\d{4})\s*-\s*[A-Z]{3}.*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO).*?(\d{2}:\d{2}|Falta|Folha|Folga|FERIADO)/g;
-      
-      let match;
+      // Regex mais robusto para capturar colunas de horários
+      // Formato: DD/MM/YYYY - SEMANA ... HORARIOS
+      const lines = fullText.split('\n');
       const rows: any[] = [];
-      while ((match = dateRowRegex.exec(fullText)) !== null) {
-        const date = match[1];
-        const hits = [match[2], match[3], match[4], match[5]].filter(h => h.includes(':'));
-        
-        if (hits.length > 0) {
-          hits.forEach((time, idx) => {
-            rows.push({
-              cpf: rawCpf,
-              name: empName,
-              date: date,
-              time: time,
-              type: idx % 2 === 0 ? 'ENTRY' : 'EXIT',
-              employee_id: emp?.id,
-              employee_name: emp?.name || empName,
-              _errors: emp ? {} : { cpf: 'Funcionário não cadastrado' }
+      const timeRegex = /\d{2}:\d{2}/;
+      
+      lines.forEach(line => {
+        const dateMatch = line.match(/(\d{2}\/\d{2}\/\d{4})/);
+        if (dateMatch && dateMatch[1]) {
+          const dateStr = dateMatch[1];
+          // Encontrar todos os horários na linha
+          const times = line.match(/\d{2}:\d{2}/g);
+          
+          if (times && times.length > 0) {
+            let realHits = [...times];
+            if (times.length > 4) {
+              // Se tiver mais de 4, os 2 primeiros costumam ser a escala (Previsto)
+              // Pegamos os últimos 4 ou o que sobrar
+              realHits = times.slice(times.length - 4);
+            }
+
+            realHits.forEach((time, idx) => {
+              rows.push({
+                cpf: rawCpf,
+                name: empName,
+                date: dateStr,
+                time: time,
+                type: idx % 2 === 0 ? 'ENTRY' : 'EXIT',
+                employee_id: emp?.id,
+                employee_name: emp?.name || empName,
+                _errors: emp ? {} : { cpf: 'Funcionário não cadastrado' }
+              });
             });
-          });
+          }
         }
-      }
+      });
 
       if (rows.length === 0) {
-        throw new Error('Nenhuma batida encontrada no PDF. Verifique se o layout é Control iD.');
+        throw new Error('Nenhuma batida encontrada no PDF. Verifique se o arquivo contém batidas e se o layout é da Control iD.');
       }
 
       setImportRows(rows);
@@ -348,15 +364,18 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
     for (let i = 0; i < validRows.length; i++) {
       const row = validRows[i];
       try {
-        // Create full timestamp
-        const dateTimeStr = `${row.date} ${row.time}`;
-        const timestamp = new Date(dateTimeStr).toISOString();
+        // Parse DD/MM/YYYY format safely
+        const parsedDate = parse(row.date, 'dd/MM/yyyy', new Date());
+        const timeParts = row.time.split(':');
+        parsedDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), 0, 0);
+        
+        const timestamp = parsedDate.toISOString();
 
         const { error } = await supabase.from('time_entries').insert([{
           employee_id: row.employee_id,
           employee_name: row.employee_name,
           timestamp: timestamp,
-          type: row.type?.toUpperCase().includes('SAI') ? 'EXIT' : 'ENTRY',
+          type: row.type || 'ENTRY',
           tenant_id: tenantId,
           status: 'SYNCED',
           device_id: null
