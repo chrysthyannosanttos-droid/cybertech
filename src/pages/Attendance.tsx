@@ -18,6 +18,7 @@ import { calculateWorkDay } from '@/modules/time-tracking/services/calculationSe
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AttendanceImportModal } from '@/components/attendance/AttendanceImportModal';
+import { AttendanceStatementModal } from '@/components/attendance/AttendanceStatementModal';
 
 interface AttendanceDevice {
   id: string;
@@ -63,6 +64,8 @@ export default function Attendance() {
   const [editingDevice, setEditingDevice] = useState<AttendanceDevice | null>(null);
   const [adjustForm, setAdjustForm] = useState({ timestamp: '', reason: '' });
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isStatementOpen, setIsStatementOpen] = useState(false);
+  const [selectedStatementEmp, setSelectedStatementEmp] = useState<{ id: string, name: string } | null>(null);
 
   const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
 
@@ -656,7 +659,10 @@ export default function Attendance() {
                        variant="ghost" 
                        size="sm" 
                        className="w-full text-xs font-bold text-muted-foreground hover:text-white border border-white/5"
-                       onClick={() => setSelectedDeviceId(emp.id)} // Reuse modal for history
+                       onClick={() => {
+                         setSelectedStatementEmp({ id: emp.id, name: emp.name });
+                         setIsStatementOpen(true);
+                       }}
                      >
                        Ver Extrato Detalhado
                      </Button>
@@ -809,6 +815,14 @@ export default function Attendance() {
                 open={isImportDialogOpen} 
                 onOpenChange={setIsImportDialogOpen}
                 onImportComplete={() => fetchData()}
+                tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
+              />
+
+              <AttendanceStatementModal
+                open={isStatementOpen}
+                onOpenChange={setIsStatementOpen}
+                employeeId={selectedStatementEmp?.id || null}
+                employeeName={selectedStatementEmp?.name || null}
                 tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
               />
 
