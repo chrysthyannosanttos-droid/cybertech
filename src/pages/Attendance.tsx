@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle, ScanFace, Users, Loader2, Settings } from 'lucide-react';
+import { Clock, Plus, RefreshCw, Trash2, Smartphone, HardDrive, History, CheckCircle2, XCircle, ScanFace, Users, Loader2, Settings, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,7 @@ import { reprocessDay } from '@/modules/time-tracking/services/syncService';
 import { calculateWorkDay } from '@/modules/time-tracking/services/calculationService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AttendanceImportModal } from '@/components/attendance/AttendanceImportModal';
 
 interface AttendanceDevice {
   id: string;
@@ -61,6 +62,7 @@ export default function Attendance() {
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [editingDevice, setEditingDevice] = useState<AttendanceDevice | null>(null);
   const [adjustForm, setAdjustForm] = useState({ timestamp: '', reason: '' });
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const [facialEmpId, setFacialEmpId] = useState<string | null>(null);
 
@@ -794,6 +796,21 @@ export default function Attendance() {
                   </div>
                 </DialogContent>
               </Dialog>
+
+              <Button 
+                variant="outline" 
+                className="h-10 px-6 rounded-xl border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 font-bold text-[13px] gap-2"
+                onClick={() => setIsImportDialogOpen(true)}
+              >
+                <Sparkles className="w-4 h-4" /> Importar Batidas (IA)
+              </Button>
+
+              <AttendanceImportModal 
+                open={isImportDialogOpen} 
+                onOpenChange={setIsImportDialogOpen}
+                onImportComplete={() => fetchData()}
+                tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
+              />
 
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
