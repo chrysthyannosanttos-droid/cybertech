@@ -7,6 +7,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Tenants from "@/pages/Tenants";
+import CompanySettings from "@/pages/CompanySettings";
 import Stores from "@/pages/Stores";
 import Employees from "@/pages/Employees";
 import EmployeeDocuments from "@/pages/EmployeeDocuments";
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/service-providers" element={<ServiceProviders />} />
         <Route path="/rescissions" element={<Rescissions />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/company" element={<CompanySettings />} />
         <Route path="/settings/email" element={<EmailSettings />} />
         <Route path="/logs" element={<AuditLogs />} />
         <Route path="/users" element={<UserManagement />} />

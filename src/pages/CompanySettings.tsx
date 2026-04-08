@@ -1,0 +1,215 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Tenant } from '@/types';
+import { Building2, Save, X, ShieldCheck, CreditCard, Calendar, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { addAuditLog } from '@/data/mockData';
+
+export default function CompanySettings() {
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState({ name: '', cnpj: '' });
+
+  useEffect(() => {
+    const fetchTenant = async () => {
+      if (!currentUser?.tenantId) return;
+      
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', currentUser.tenantId)
+        .single();
+
+      if (data) {
+        setTenant({
+          id: data.id,
+          name: data.name,
+          cnpj: data.cnpj || '',
+          subscription: data.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
+          employeeCount: data.employee_count || 0
+        });
+        setForm({ name: data.name, cnpj: data.cnpj || '' });
+      }
+      setIsLoading(false);
+    };
+
+    fetchTenant();
+  }, [currentUser]);
+
+  const handleSave = async () => {
+    if (!tenant || !form.name || !form.cnpj) return;
+    setIsSaving(true);
+
+    const { error } = await supabase
+      .from('tenants')
+      .update({
+        name: form.name,
+        cnpj: form.cnpj
+      })
+      .eq('id', tenant.id);
+
+    if (error) {
+      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+    } else {
+      addAuditLog({
+        userId: currentUser?.id || 'unknown',
+        userName: currentUser?.name || 'Sistema',
+        action: 'EDIT_MY_COMPANY',
+        details: `[Configuração] Empresa ${tenant.name} atualizou dados para: ${form.name} (CNPJ: ${form.cnpj})`,
+        tenantId: tenant.id
+      });
+      toast({ title: 'Dados atualizados', description: 'As informações da sua empresa foram salvas com sucesso.' });
+      setTenant(prev => prev ? { ...prev, name: form.name, cnpj: form.cnpj } : null);
+    }
+    setIsSaving(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!tenant) {
+    return (
+      <div className="text-center p-12">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold">Empresa não encontrada</h2>
+        <p className="text-muted-foreground">Não foi possível carregar os dados da sua empresa.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-black text-white tracking-tighter">Minha Empresa</h1>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Gerencie as informações cadastrais da sua empresa</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <Card className="glass border-white/5 shadow-2xl overflow-hidden relative">
+            <CardHeader className="border-b border-white/5 bg-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
+                  <Building2 className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-[14px] font-black uppercase tracking-widest text-white">Dados Cadastrais</CardTitle>
+                  <CardDescription className="text-[11px] font-medium text-muted-foreground">Informações públicas e de faturamento</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nome da Empresa / Razão Social</Label>
+                  <Input 
+                    value={form.name} 
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="h-11 bg-white/[0.03] border-white/10"
+                    placeholder="Nome da sua empresa"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">CNPJ</Label>
+                  <Input 
+                    value={form.cnpj} 
+                    onChange={e => {
+                      let v = e.target.value.replace(/\D/g, '');
+                      if(v.length > 14) v = v.slice(0, 14);
+                      v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+                      setForm(f => ({ ...f, cnpj: v }));
+                    }}
+                    className="h-11 bg-white/[0.03] border-white/10 font-mono"
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/5">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                  className="w-full md:w-auto px-8 h-11 font-bold gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="glass border-white/5 bg-primary/5 shadow-inner">
+            <CardHeader>
+              <CardTitle className="text-[12px] font-black uppercase text-primary">Plano e Assinatura</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[12px] text-white/80">Status:</span>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  tenant.subscription.status === 'active' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                }`}>
+                  {tenant.subscription.status === 'active' ? 'ATIVO' : 'SUSPENSO'}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary/60" />
+                  <span className="text-[12px] text-white/80">Vencimento:</span>
+                </div>
+                <span className="text-[12px] font-mono text-white">
+                  {new Date(tenant.subscription.expiryDate).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-emerald-400/60" />
+                  <span className="text-[12px] text-white/80">Mensalidade:</span>
+                </div>
+                <span className="text-[13px] font-bold text-white">
+                  R$ {tenant.subscription.monthlyFee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/5 bg-amber-500/5 shadow-inner">
+            <CardHeader>
+              <CardTitle className="text-[12px] font-black uppercase text-amber-500 flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5" /> Atenção
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-[11px] text-amber-100/60 leading-relaxed">
+                Alterações no CNPJ podem impactar a geração de documentos legais e integração com o eSocial. Verifique antes de salvar.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

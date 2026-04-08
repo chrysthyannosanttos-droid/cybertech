@@ -373,9 +373,9 @@ export default function Attendance() {
                 });
              }
           }
-        } catch (netErr) {
+        } catch (netErr: any) {
           console.error('Erro de conexão real:', netErr);
-          throw new Error('CONEXÃO BLOQUEADA PELO NAVEGADOR (CORS). Para sincronizar dados reais do IP local, você deve usar o sistema em Localhost ou configurar um Proxy Inverso no seu servidor.');
+          throw netErr;
         }
       } else {
         // Para outros modelos ainda não mapeados ou Genéricos
@@ -401,11 +401,18 @@ export default function Attendance() {
 
       fetchData();
     } catch (err: any) {
+      const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+      
+      let errorMessage = err.message;
+      if (isProduction && err.name === 'TypeError') {
+        errorMessage = 'BLOQUEIO DE SEGURANÇA (CORS): O navegador não permite sincronizar aparelhos locais através do site online. Use o acesso LOCAL (localhost:5173) para importar as batidas.';
+      }
+
       toast({ 
-        title: 'Erro na Sincronização', 
-        description: err.message, 
+        title: 'Falha na Sincronização', 
+        description: errorMessage, 
         variant: 'destructive',
-        duration: 8000
+        duration: 10000
       });
     } finally {
       setIsSyncing(null);
@@ -537,6 +544,18 @@ export default function Attendance() {
           </p>
         </div>
       </div>
+
+      {(!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 animate-pulse">
+           <div className="p-2 bg-amber-500/20 rounded-lg">
+              <XCircle className="w-5 h-5 text-amber-500" />
+           </div>
+           <div>
+              <p className="text-[13px] font-black text-amber-500 uppercase">Aviso: Modo de Consulta Online</p>
+              <p className="text-[12px] text-amber-200/70">A sincronização direta com relógios IP requer o <strong>Acesso Local</strong>. Para importar novas batidas, use o sistema em seu computador da rede local.</p>
+           </div>
+        </div>
+      )}
 
       <Tabs defaultValue="devices" className="w-full">
         <TabsList className="mb-4">

@@ -416,13 +416,57 @@ export default function Tenants() {
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSelectedTenant(null)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{selectedTenant.name}</h1>
-            <p className="text-[13px] text-muted-foreground mt-0.5">CNPJ: {selectedTenant.cnpj}</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSelectedTenant(null)}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold tracking-tight">{selectedTenant.name}</h1>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 rounded-lg text-primary hover:bg-primary/10" 
+                  onClick={() => handleOpenEdit(selectedTenant)}
+                  title="Editar dados da empresa"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-[13px] text-muted-foreground mt-0.5">CNPJ: {selectedTenant.cnpj}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-8 gap-1.5 font-bold text-[11px] uppercase tracking-widest ${
+                selectedTenant.subscription.status === 'active'
+                  ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10'
+                  : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'
+              }`}
+              onClick={() => toggleStatus(selectedTenant.id)}
+            >
+              <PowerOff className="w-3.5 h-3.5" />
+              {selectedTenant.subscription.status === 'active' ? 'Suspender Empresa' : 'Ativar Empresa'}
+            </Button>
+            
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 font-bold text-[11px] uppercase tracking-widest"
+                onClick={() => handleBackup(selectedTenant)}
+                disabled={backupLoading === selectedTenant.id}
+              >
+                {backupLoading === selectedTenant.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Download className="w-3.5 h-3.5" />}
+                Backup
+              </Button>
+            )}
           </div>
         </div>
 

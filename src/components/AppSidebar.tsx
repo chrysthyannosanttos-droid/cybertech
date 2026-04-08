@@ -29,6 +29,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/dashboard',         module: 'dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/attendance',        module: 'attendance',        icon: Clock,           label: 'Ponto Eletrônico' },
   { to: '/tenants',           module: 'tenants',           icon: Building2,       label: 'Empresas',     superadminOnly: true },
+  { to: '/settings/company',   module: 'dashboard',         icon: Building2,       label: 'Minha Empresa' },
   { to: '/stores',            module: 'stores',            icon: Store,           label: 'Lojas' },
   { to: '/employees',         module: 'employees',         icon: Users,           label: 'Funcionários' },
   { to: '/documents',         module: 'employees',         icon: FolderOpen,      label: 'Arquivo Digital' },
