@@ -20,7 +20,10 @@ export default function CompanySettings() {
 
   useEffect(() => {
     const fetchTenant = async () => {
-      if (!currentUser?.tenantId) return;
+      if (!currentUser?.tenantId) {
+        setIsLoading(false);
+        return;
+      }
       
       const { data, error } = await supabase
         .from('tenants')
@@ -81,11 +84,37 @@ export default function CompanySettings() {
   }
 
   if (!tenant) {
+    const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.email?.toLowerCase().includes('cristiano');
+
     return (
-      <div className="text-center p-12">
-        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold">Empresa não encontrada</h2>
-        <p className="text-muted-foreground">Não foi possível carregar os dados da sua empresa.</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center border border-primary/20 mb-6 group hover:scale-110 transition-transform duration-500">
+          <Building2 className="w-10 h-10 text-primary" />
+        </div>
+        
+        {isSuperAdmin ? (
+          <>
+            <h2 className="text-2xl font-black text-white tracking-tighter mb-2">Ambiente Administrativo</h2>
+            <p className="text-muted-foreground text-[14px] max-w-md mx-auto leading-relaxed mb-8">
+              Como Super Administrador, você não está vinculado a uma única empresa específica. Para gerenciar todos os clientes, utilize o link principal de empresas.
+            </p>
+            <Button 
+              onClick={() => window.location.href = '/tenants'}
+              className="px-8 h-12 font-bold gap-2 shadow-[0_0_20px_rgba(31,180,243,0.2)]"
+            >
+              <Building2 className="w-4 h-4" />
+              Ir para Gestão de Empresas
+            </Button>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-white mb-2">Empresa não encontrada</h2>
+            <p className="text-muted-foreground max-w-xs mx-auto">
+              Não foi possível localizar os dados da sua empresa ou seu perfil ainda não está vinculado a um Tenant.
+            </p>
+          </>
+        )}
       </div>
     );
   }
