@@ -117,9 +117,10 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
-    const isCsv = selectedFile.name.endsWith('.csv');
-    const isPdf = selectedFile.name.endsWith('.pdf');
+    const fileNameLower = selectedFile.name.toLowerCase();
+    const isExcel = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
+    const isCsv = fileNameLower.endsWith('.csv');
+    const isPdf = fileNameLower.endsWith('.pdf');
 
     if (!isExcel && !isCsv && !isPdf) {
       toast({ title: 'Formato inválido', description: 'Por favor, envie um arquivo .xlsx, .csv ou .pdf (Control iD)', variant: 'destructive' });
@@ -408,9 +409,9 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
         <DialogHeader className="p-6">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-emerald-400" />
-            Importação de Batidas com IA
+            Importação de Batidas (IA)
           </DialogTitle>
-          <DialogDescription>Importe relatórios de ponto em CSV ou Excel com mapeamento automático.</DialogDescription>
+          <DialogDescription>Importe relatórios de ponto em CSV, Excel ou PDF (Control iD) com mapeamento automático.</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-6 pt-0">
@@ -419,9 +420,9 @@ export function AttendanceImportModal({ open, onOpenChange, onImportComplete, te
               <Upload className="w-12 h-12 text-muted-foreground" />
               <div className="text-center">
                 <p className="font-bold">Arraste seu relatório aqui</p>
-                <p className="text-xs text-muted-foreground">Suporta .csv, .xlsx, .xls</p>
+                <p className="text-xs text-muted-foreground">Suporta .csv, .xlsx, .pdf (Control iD)</p>
               </div>
-              <Input type="file" ref={fileInputRef} className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
+              <Input type="file" ref={fileInputRef} className="hidden" accept=".csv, .xlsx, .xls, .pdf" onChange={handleFileUpload} />
             </div>
           )}
 
