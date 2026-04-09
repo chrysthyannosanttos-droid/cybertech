@@ -811,20 +811,6 @@ export default function Attendance() {
                 <Sparkles className="w-4 h-4" /> Importar Batidas (IA)
               </Button>
 
-              <AttendanceImportModal 
-                open={isImportDialogOpen} 
-                onOpenChange={setIsImportDialogOpen}
-                onImportComplete={() => fetchData()}
-                tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
-              />
-
-              <AttendanceStatementModal
-                open={isStatementOpen}
-                onOpenChange={setIsStatementOpen}
-                employeeId={selectedStatementEmp?.id || null}
-                employeeName={selectedStatementEmp?.name || null}
-                tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
-              />
 
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
@@ -1214,6 +1200,21 @@ export default function Attendance() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AttendanceImportModal 
+        open={isImportDialogOpen} 
+        onOpenChange={setIsImportDialogOpen}
+        onImportComplete={() => fetchData()}
+        tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
+      />
+
+      <AttendanceStatementModal
+        open={isStatementOpen}
+        onOpenChange={setIsStatementOpen}
+        employeeId={selectedStatementEmp?.id || null}
+        employeeName={selectedStatementEmp?.name || null}
+        tenantId={(user as any)?.tenantId || (user as any)?.tenant_id}
+      />
     </div>
   );
 }

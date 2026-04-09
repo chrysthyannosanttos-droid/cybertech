@@ -88,6 +88,8 @@ export interface RescissionResult {
   valorLiquido: number;
   items: RescissionItem[];
   fgtsTotal: number;
+  dependents: number;
+  horasExtras: number;
 }
 
 // ── HELPER: INSS PROGRESSIVO ────────────────────────────────
@@ -341,6 +343,8 @@ export interface RescissionInput {
   noticePeriodWorked?: boolean; // Aviso prévio trabalhado (não desconta)
   fgtsBalance?: number;         // Saldo FGTS (para calcular multa 40%)
   dependents?: number;
+  extraHours?: number;          // Horas extras a pagar
+  extraHoursPercent?: number;   // Percentual (ex: 0.5 para 50%)
 }
 
 export function calculateRescission(input: RescissionInput): RescissionResult {
@@ -356,6 +360,8 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     noticePeriodWorked = false,
     fgtsBalance = 0,
     dependents = 0,
+    extraHours = 0,
+    extraHoursPercent = 0.5,
   } = input;
 
   const baseRemuneration = lastSalary + hazardPay + unhealthyPay + bonus;
@@ -416,17 +422,21 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     multaFGTS = round(fgtsBalance * 0.20);
   }
 
+  // Horas Extras
+  const hourlyRate = baseRemuneration / 220;
+  const valorHorasExtras = round(extraHours * hourlyRate * (1 + extraHoursPercent));
+
   // Total fgts acumulado estimado (8% por mês)
   const fgtsTotal = fgtsBalance > 0 ? fgtsBalance : round(lastSalary * 0.08 * completedMonths);
 
   // Créditos totais
   const totalCreditos = round(
     saldoSalario + avisoPrevio + feriasVencidas + tercoFeriasVencidas +
-    feriasProporcionais + tercoFeriasProporcionais + decimoTerceiroProporcional + multaFGTS
+    feriasProporcionais + tercoFeriasProporcionais + decimoTerceiroProporcional + multaFGTS + valorHorasExtras
   );
 
-  // Base INSS (sem multa FGTS, abono e aviso indenizado)
-  const inssBase = saldoSalario + feriasVencidas + tercoFeriasVencidas + feriasProporcionais + decimoTerceiroProporcional;
+  // Base INSS (sem multa FGTS e abono, mas inclui horas extras e saldo salário)
+  const inssBase = saldoSalario + feriasVencidas + tercoFeriasVencidas + feriasProporcionais + decimoTerceiroProporcional + valorHorasExtras;
   const inssResult = calcINSS(inssBase);
 
   // Base IRRF
@@ -449,6 +459,7 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
   if (tercoFeriasProporcionais > 0) items.push({ description: '1/3 Férias Proporcionais', value: tercoFeriasProporcionais, type: 'CREDIT' });
   if (decimoTerceiroProporcional > 0) items.push({ description: `13º Proporcional (${thirteenthMonths}/12 meses)`, value: decimoTerceiroProporcional, type: 'CREDIT' });
   if (multaFGTS > 0) items.push({ description: `Multa FGTS (${type === 'ACORDO' ? '20' : '40'}%)`, value: multaFGTS, type: 'CREDIT' });
+  if (valorHorasExtras > 0) items.push({ description: `Horas Extras (${extraHours}h a ${(extraHoursPercent * 100).toFixed(0)}%)`, value: valorHorasExtras, type: 'CREDIT' });
 
   if (inssResult.total > 0) items.push({ description: 'INSS Previdência', value: inssResult.total, type: 'DEDUCTION' });
   if (irrfValue > 0) items.push({ description: 'IRRF', value: irrfValue, type: 'DEDUCTION' });
@@ -471,6 +482,8 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     totalDescontos,
     valorLiquido,
     fgtsTotal,
+    dependents,
+    horasExtras: valorHorasExtras,
     items,
   };
 }

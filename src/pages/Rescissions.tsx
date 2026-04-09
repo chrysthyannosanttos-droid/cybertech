@@ -3,13 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateRescission, RescissionType, monthsBetween } from '@/lib/cltEngine';
 import { addAuditLog } from '@/data/mockData';
-import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator } from 'lucide-react';
+import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,7 @@ export default function Rescissions() {
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAiExp, setShowAiExp] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [empSearch, setEmpSearch] = useState('');
 
@@ -58,6 +60,8 @@ export default function Rescissions() {
     hasVestedVacation: false,
     noticePeriodWorked: false,
     dependents: 0,
+    extraHours: 0,
+    extraHoursPercent: 0.5,
   });
 
   const selectedEmp = employees.find(e => e.id === form.employeeId);
@@ -78,6 +82,8 @@ export default function Rescissions() {
             hasVestedVacation: form.hasVestedVacation,
             noticePeriodWorked: form.noticePeriodWorked,
             dependents: form.dependents,
+            extraHours: form.extraHours,
+            extraHoursPercent: form.extraHoursPercent,
           });
         } catch { return null; }
       })()
@@ -162,7 +168,7 @@ export default function Rescissions() {
 
     toast({ title: '✅ Rescisão calculada e registrada!', description: `${emp.name} — Líquido: ${fmt(preview.valorLiquido)}` });
     setIsOpen(false);
-    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0 });
+    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5 });
     setTimeout(() => window.location.reload(), 500);
   };
 
@@ -202,8 +208,11 @@ export default function Rescissions() {
     <div class="row"><span>Total Bruto (Proventos)</span><span class="credit">${fmt(r.gross_value || r.rescission_value)}</span></div>
     <div class="row"><span>INSS Descontado</span><span class="deduction">-${fmt(r.inss_deduction || 0)}</span></div>
     <div class="row"><span>IRRF Descontado</span><span class="deduction">-${fmt(r.irrf_deduction || 0)}</span></div>
-    <div class="row"><span>FGTS + Multa</span><span class="credit">+${fmt(r.fgts_value || 0)}</span></div>
-    <div class="total"><div class="row"><span>VALOR LÍQUIDO A RECEBER</span><strong>${fmt(r.rescission_value)}</strong></div></div>
+    <div class="row"><span>FGTS + Multa (Disponível para Saque)</span><span class="credit">+${fmt(r.fgts_value || 0)}</span></div>
+    <div class="total"><div class="row"><span>VALOR LÍQUIDO A RECEBER (DEPÓSITO)</span><strong>${fmt(r.rescission_value)}</strong></div></div>
+    <div style="margin-top:20px; font-size:10px; color:#666; text-align:justify; line-height:1.4;">
+      Nota: O valor acima refere-se às verbas rescisórias depositadas em conta. O saldo de FGTS e a multa de 40% (se aplicável) são movimentados via chave de saque na Caixa Econômica Federal.
+    </div>
     <div class="assin"><div>Assinatura da Empresa</div><div>Assinatura do Funcionário</div></div>
     </body></html>`);
     win?.document.close();
@@ -338,6 +347,26 @@ export default function Rescissions() {
                 </div>
               </div>
 
+              {/* Horas Extras */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Horas Extras a Pagar</Label>
+                  <Input type="number" value={form.extraHours || ''} onChange={e => setForm(f => ({ ...f, extraHours: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">% Hora Extra</Label>
+                  <Select value={String(form.extraHoursPercent)} onValueChange={v => setForm(f => ({ ...f, extraHoursPercent: Number(v) }))}>
+                    <SelectTrigger className="bg-white/5 border-white/10 h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="glass-card border-white/10 text-white">
+                      <SelectItem value="0.5">50% (Padrão)</SelectItem>
+                      <SelectItem value="1.0">100% (Feriados/Dom)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Switches */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 p-3">
@@ -376,6 +405,45 @@ export default function Rescissions() {
                       <span className="text-white">{fmt(preview.valorLiquido)}</span>
                     </div>
                   </div>
+
+                  {/* Timeline / Barra de Proporção (Premium Feature) */}
+                  <div className="pt-2">
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                      <span>Proporção FGTS + Multa</span>
+                      <span>{((preview.multaFGTS + preview.fgtsTotal) / (preview.valorLiquido + preview.multaFGTS + preview.fgtsTotal) * 100).toFixed(0)}% do montante</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-amber-500" 
+                        style={{ width: `${(preview.multaFGTS + preview.fgtsTotal) / (preview.valorLiquido + preview.multaFGTS + preview.fgtsTotal) * 100}%` }} 
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setShowAiExp(!showAiExp)}
+                    className="w-full text-[11px] font-bold text-rose-300 hover:text-rose-200 hover:bg-rose-500/10 gap-2 h-8"
+                  >
+                    {showAiExp ? <ChevronUp className="w-3 h-3" /> : <Sparkles className="w-3 h-3 text-amber-400" />}
+                    {showAiExp ? "Ocultar Explicação IA" : "IA: Por que este valor?"}
+                  </Button>
+
+                  {showAiExp && (
+                    <div className="p-3 rounded-lg bg-black/40 border border-white/5 text-[11px] text-muted-foreground leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300">
+                      <p className="font-bold text-white mb-1 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-400" /> RESUMO DO CÁLCULO
+                      </p>
+                      O cálculo considera <strong>{preview.type}</strong>. 
+                      O saldo de salário é proporcional aos dias trabalhados no mês. 
+                      {preview.avisoPrevio > 0 && " Inclui aviso prévio indenizado devido ao tipo de desligamento."}
+                      {preview.dependents > 0 && ` Foi aplicada dedução de R$ 189,59 por cada um dos ${preview.dependents} dependentes na base do IRRF.`}
+                      {preview.horasExtras > 0 && " As horas extras foram calculadas com divisor 220 e o adicional selecionado."}
+                      <br/><br/>
+                      <span className="text-rose-300">Nota: Valores de impostos (INSS/IRRF) seguem a tabela progressiva de 2024.</span>
+                    </div>
+                  )}
                 </div>
               )}
 
