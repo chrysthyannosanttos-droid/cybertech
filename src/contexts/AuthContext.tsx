@@ -50,33 +50,12 @@ const DEFAULT_PERMISSIONS: AppModule[] = [
   'dashboard', 'employees', 'certificates', 'payroll', 'reports', 'service-providers', 'rescissions', 'stores', 'attendance', 'settings'
 ];
 
+// AVISO DE SEGURANÇA: Credenciais NÃO devem ser armazenadas em código-fonte.
+// Este fallback é apenas para ambientes de desenvolvimento sem banco configurado.
+// Em produção, todos os usuários devem estar na tabela 'profiles' do Supabase.
 const DEFAULT_USERS: ManagedUser[] = [
-  {
-    email: 'cristiano',
-    password: '91126395',
-    user: { id: 'u1', email: 'cristiano', role: 'superadmin', name: 'Cristiano Admin' },
-    // undefined permissions = acesso total
-  },
-  {
-    email: 'teste',
-    password: '123',
-    mustChangePassword: true,
-    permissions: DEFAULT_PERMISSIONS,
-    user: { id: 'u2', email: 'teste', role: 'tenant', tenantId: 't1', name: 'Usuário Teste' },
-  },
-  {
-    email: 'tayna',
-    password: '123',
-    mustChangePassword: true,
-    permissions: DEFAULT_PERMISSIONS,
-    user: { id: 'u3', email: 'tayna', role: 'tenant', tenantId: 't1', name: 'Tayna Gomes da Silva' },
-  },
-  {
-    email: 'super',
-    password: '123',
-    permissions: DEFAULT_PERMISSIONS,
-    user: { id: 'u4', email: 'super', role: 'tenant', tenantId: 't1', name: 'Super Admin Atacado' },
-  },
+  // Fallback de emergência — sem senha em texto no código.
+  // Adicione usuários diretamente no Supabase (tabela profiles).
 ];
 
 function getStoredUsers(): ManagedUser[] {

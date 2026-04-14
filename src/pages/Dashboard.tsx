@@ -9,6 +9,7 @@ import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'da
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { MOCK_MRR_DATA } from '@/data/mockData';
 
 
 function KpiCard({ icon: Icon, label, value, sub, delay }: { icon: any; label: string; value: string; sub?: string; delay: number }) {
@@ -209,11 +210,8 @@ export default function Dashboard() {
       }).sort((a, b) => b.total - a.total);
   }, [providers, startDate, endDate]);
 
-  const mockMRRData = [
-    { month: 'Jan', value: totalMRR * 0.9 },
-    { month: 'Fev', value: totalMRR * 0.95 },
-    { month: 'Mar', value: totalMRR },
-  ];
+  // Usa dados históricos reais do mockData em vez de valores fabricados
+  const mrrChartData = MOCK_MRR_DATA;
 
   const totalCertDays = useMemo(() => {
     return filteredCertificates.reduce((sum, cert) => sum + (cert.days || 0), 0);
@@ -364,7 +362,7 @@ export default function Dashboard() {
                   <TrendingUp className="w-4 h-4 text-primary" /> Faturamento Recorrente (MRR)
                 </h3>
                 <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={mockMRRData}>
+                  <AreaChart data={mrrChartData}>
                     <defs>
                       <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.1}/>

@@ -185,7 +185,7 @@ export default function Attendance() {
 
   const { user } = useAuth();
   const { toast } = useToast();
-  const isAdmin = user?.role === 'superadmin' || user?.email === 'cristiano';
+  const isAdmin = user?.role === 'superadmin';
 
   const [form, setForm] = useState({
     name: '',

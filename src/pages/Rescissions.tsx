@@ -37,7 +37,7 @@ const TYPE_NAMES: Record<string, string> = {
 export default function Rescissions() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin';
 
   const [rescissions, setRescissions] = useState<Rescission[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -166,14 +166,27 @@ export default function Rescissions() {
       details: `[Rescisões] Rescisão de ${emp.name} — Tipo: ${TYPE_NAMES[form.type]} — Líquido: ${fmt(preview.valorLiquido)}`,
     });
 
+    // Atualiza o estado local sem recarregar a página
+    const { data: newRow } = await supabase
+      .from('rescissions')
+      .select('*')
+      .eq('employee_id', form.employeeId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (newRow) {
+      setRescissions(prev => [newRow as Rescission, ...prev]);
+    }
+
     toast({ title: '✅ Rescisão calculada e registrada!', description: `${emp.name} — Líquido: ${fmt(preview.valorLiquido)}` });
     setIsOpen(false);
     setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5 });
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (!isAdmin) return;
+    // Usa toast/confirm nativo apenas como fallback seguro
     if (!window.confirm(`Excluir rescisão de ${name}?`)) return;
     const { error } = await supabase.from('rescissions').delete().eq('id', id);
     if (!error) {

@@ -46,7 +46,10 @@ export default function Payroll() {
   const [dbCertificates, setDbCertificates] = useState<Certificate[]>([]);
   const [dbStores, setDbStores] = useState<Store[]>([]);
   const [payrollData, setPayrollData] = useState<any[]>([]);
+  const [dbTimeSheets, setDbTimeSheets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 20;
   
   // Period state
   const [refMonth, setRefMonth] = useState(new Date().getMonth() + 1);
@@ -63,12 +66,17 @@ export default function Payroll() {
       const [
         { data: empData },
         { data: certData },
-        { data: storesData }
+        { data: storesData },
+        { data: sheetsData }
       ] = await Promise.all([
         supabase.from('employees').select('*').eq('status', 'ACTIVE'),
         supabase.from('certificates').select('*'),
-        supabase.from('stores').select('*')
+        supabase.from('stores').select('*'),
+        // Busca folhas de ponto para calcular faltas reais
+        supabase.from('time_sheets').select('employee_id, date, status').eq('status', 'ABSENT')
       ]);
+
+      if (sheetsData) setDbTimeSheets(sheetsData);
 
       const storesList = (storesData || []).map(s => ({ ...s, tenantId: s.tenant_id } as Store));
       setDbStores(storesList);
@@ -106,7 +114,7 @@ export default function Payroll() {
     };
   }, []);
 
-  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin';
 
   const payroll: PayrollEntry[] = useMemo(() => {
     return dbEmployees
@@ -114,7 +122,13 @@ export default function Payroll() {
       .map(emp => {
         const empCerts = dbCertificates.filter(c => c.employeeId === emp.id);
         const certDays = empCerts.reduce((s, c) => s + c.days, 0);
-        const absences = 0; 
+        
+        // Calcula faltas reais a partir dos registros de ponto do mês de referência
+        const absences = dbTimeSheets.filter(s => {
+          if (s.employee_id !== emp.id) return false;
+          const sheetDate = new Date(s.date);
+          return sheetDate.getMonth() + 1 === refMonth && sheetDate.getFullYear() === refYear;
+        }).length;
         
         const calc = calculatePayroll({
           baseSalary: emp.salary,
@@ -138,10 +152,10 @@ export default function Payroll() {
           netSalary: calc.netSalary,
         };
       });
-  }, [storeFilter, dbEmployees, dbCertificates]);
+  }, [storeFilter, dbEmployees, dbCertificates, dbTimeSheets, refMonth, refYear]);
 
-  // Use a local state to allow deletions
-  useMemo(() => {
+  // Sincroniza payrollData com o cálculo derivado
+  useEffect(() => {
     setPayrollData(payroll);
   }, [payroll]);
 
@@ -298,8 +312,8 @@ export default function Payroll() {
         let valor = 0;
         switch (verba.code) {
           case 1: valor = emp.salary; break;
-          case 2: valor = Math.round(Math.random() * 500 * 100) / 100; break;
-          case 100: valor = Math.round(Math.random() * 200 * 100) / 100; break;
+          case 2: valor = 0; break; // Horas extras: use dados reais do módulo de ponto
+          case 100: valor = 0; break; // Adicional noturno: use dados reais do módulo de ponto
           case 200: valor = 220; break;
           case 300: valor = Math.round(emp.salary * 0.11 * 100) / 100; break;
           case 400: valor = Math.round(emp.salary * 0.075 * 100) / 100; break;
@@ -371,7 +385,7 @@ export default function Payroll() {
                 <SelectValue placeholder="Ano" />
               </SelectTrigger>
               <SelectContent className="glass-card border-white/10 text-white">
-                {[2024, 2025, 2026].map(y => (
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
                   <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
                 ))}
               </SelectContent>
@@ -518,95 +532,121 @@ export default function Payroll() {
               style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
             />
           </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-white/5 border-b border-white/5 text-[11px] font-bold text-primary uppercase tracking-widest leading-none">
-                <th className="px-6 py-4 w-[40px]">
-                  <Checkbox 
-                    checked={payrollData.length > 0 && selectedIds.length === payrollData.length} 
-                    onCheckedChange={toggleSelectAll}
-                    className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                  />
-                </th>
-                <th className="px-6 py-4">Colaborador</th>
-                <th className="px-6 py-4">Unidade</th>
-                <th className="px-6 py-4 text-right">Salário Base</th>
-                <th className="px-6 py-4 text-center">Intercorrências</th>
-                <th className="px-6 py-4 text-right">Total Descontos</th>
-                <th className="px-6 py-4 text-right">Saldo Líquido</th>
-                {isAdmin && <th className="px-6 py-4 text-center">Ações</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {payrollData.slice(0, 20).map(p => (
-                <tr key={p.employeeId} className={cn("hover:bg-white/[0.02] transition-colors group", selectedIds.includes(p.employeeId) && "bg-primary/5")}>
-                  <td className="px-6 py-4">
-                    <Checkbox 
-                      checked={selectedIds.includes(p.employeeId)} 
-                      onCheckedChange={() => toggleSelect(p.employeeId)}
-                      className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{p.employeeName}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{p.storeName.replace('SUPER ', '')}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="font-mono-data text-[13px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="flex flex-col items-center">
-                        <span className="text-[11px] font-black text-rose-500">{p.absences}</span>
-                        <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Faltas</span>
-                      </div>
-                      <div className="w-px h-4 bg-white/10" />
-                      <div className="flex flex-col items-center">
-                        <span className="text-[11px] font-black text-blue-400">{p.certificateDays}d</span>
-                        <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Atest.</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="font-mono-data text-[13px] text-rose-500/80 font-medium">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="font-mono-data text-[14px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {batchResults.find(r => r.employeeId === p.employeeId) && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
-                            onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
-                            title="Ver Holerite"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </Button>
+            {/* Table com Paginação */}
+      {(() => {
+        const totalPages = Math.ceil(payrollData.length / PAGE_SIZE);
+        const pageItems = payrollData.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+        return (
+          <>
+            <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-white/5 border-b border-white/5 text-[11px] font-bold text-primary uppercase tracking-widest leading-none">
+                      <th className="px-6 py-4 w-[40px]">
+                        <Checkbox 
+                          checked={payrollData.length > 0 && selectedIds.length === payrollData.length} 
+                          onCheckedChange={toggleSelectAll}
+                          className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </th>
+                      <th className="px-6 py-4">Colaborador</th>
+                      <th className="px-6 py-4">Unidade</th>
+                      <th className="px-6 py-4 text-right">Salário Base</th>
+                      <th className="px-6 py-4 text-center">Intercorrências</th>
+                      <th className="px-6 py-4 text-right">Total Descontos</th>
+                      <th className="px-6 py-4 text-right">Saldo Líquido</th>
+                      {isAdmin && <th className="px-6 py-4 text-center">Ações</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {pageItems.map(p => (
+                      <tr key={p.employeeId} className={cn("hover:bg-white/[0.02] transition-colors group", selectedIds.includes(p.employeeId) && "bg-primary/5")}>
+                        <td className="px-6 py-4">
+                          <Checkbox 
+                            checked={selectedIds.includes(p.employeeId)} 
+                            onCheckedChange={() => toggleSelect(p.employeeId)}
+                            className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{p.employeeName}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{p.storeName.replace('SUPER ', '')}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="font-mono-data text-[13px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[11px] font-black text-rose-500">{p.absences}</span>
+                              <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Faltas</span>
+                            </div>
+                            <div className="w-px h-4 bg-white/10" />
+                            <div className="flex flex-col items-center">
+                              <span className="text-[11px] font-black text-blue-400">{p.certificateDays}d</span>
+                              <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Atest.</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="font-mono-data text-[13px] text-rose-500/80 font-medium">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="font-mono-data text-[14px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {batchResults.find(r => r.employeeId === p.employeeId) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
+                                  onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
+                                  title="Ver Holerite"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Exibindo <span className="text-white font-bold">{currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, payrollData.length)}</span> de <span className="text-white font-bold">{payrollData.length}</span> colaboradores
+                </p>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                    ← Anterior
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <Button key={i} variant="ghost" size="sm" onClick={() => setCurrentPage(i)}
+                      className={cn("h-8 w-8 text-[11px] font-bold rounded-lg", i === currentPage ? "bg-primary/20 text-primary border border-primary/30" : "text-white/50 hover:text-white hover:bg-white/10")}>
+                      {i + 1}
+                    </Button>
+                  ))}
+                  <Button variant="ghost" size="sm" disabled={currentPage === totalPages - 1} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                    Próxima →
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
-    }
+}
