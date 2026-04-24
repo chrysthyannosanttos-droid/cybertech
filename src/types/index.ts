@@ -10,6 +10,13 @@ export interface Tenant {
     additionalCosts: Array<{ desc: string; value: number; date: string }>;
   };
   employeeCount: number;
+  plan?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  branding?: {
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+    system_name?: string;
+  };
 }
 
 export interface Store {
@@ -43,7 +50,10 @@ export interface Employee {
   flexivel?: number;
   mobilidade?: number;
   valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
+  adicionalNoturno?: number;
+  flexivelSelo?: boolean; // Premiação Virtual
   email?: string;
+  phone?: string;
   photo_reference_url?: string;
   photo_references?: string[]; // Multiple face reference images
   // Work schedule (Jornada)
@@ -128,16 +138,38 @@ export interface PayrollEntry {
   netSalary: number;
 }
 
-export type UserRole = 'superadmin' | 'tenant';
+export type AppModule =
+  | 'dashboard'
+  | 'employees'
+  | 'certificates'
+  | 'payroll'
+  | 'reports'
+  | 'service-providers'
+  | 'rescissions'
+  | 'stores'
+  | 'tenants'
+  | 'logs'
+  | 'users'
+  | 'attendance'
+  | 'settings';
 
 export interface User {
   id: string;
   email: string;
-  role: UserRole;
+  role: 'superadmin' | 'tenant';
   tenantId?: string;
   name: string;
   canEditEmployees?: boolean;
   canDeleteEmployees?: boolean;
+  permissions?: AppModule[];
+  appPermissions?: Record<string, boolean>;
+  plan?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  tenantBranding?: {
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+    system_name?: string;
+  };
 }
 
 export interface AuditLog {

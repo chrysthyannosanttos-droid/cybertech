@@ -18,9 +18,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { calculatePayroll, round } from '@/lib/cltEngine';
-import { processBatch, sendPayslipEmailMock } from '@/lib/payrollModule';
-import { Loader2, PlayCircle, Mail } from 'lucide-react';
+import { Loader2, PlayCircle, Mail, Send, MessageSquare, ExternalLink } from 'lucide-react';
+import { BulkPostModal } from '@/components/payroll/BulkPostModal';
 
 // Mock payroll verbas (códigos de verba)
 const VERBAS = [
@@ -49,7 +48,7 @@ export default function Payroll() {
   const [dbTimeSheets, setDbTimeSheets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 50;
   
   // Period state
   const [refMonth, setRefMonth] = useState(new Date().getMonth() + 1);
@@ -59,6 +58,9 @@ export default function Payroll() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [batchResults, setBatchResults] = useState<{employeeId: string, pdfUrl: string}[]>([]);
+  const [batchErrors, setBatchErrors] = useState<{employeeName: string, error: string}[]>([]);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [bulkPostOpen, setBulkPostOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -259,6 +261,11 @@ export default function Payroll() {
       }
 
       setBatchResults(prev => [...prev, ...batchSummary.results]);
+      setBatchErrors(batchSummary.errors);
+      
+      if (batchSummary.errors.length > 0) {
+        setErrorDialogOpen(true);
+      }
 
     } catch (e: any) {
       toast({ title: 'Erro crítico', description: e.message, variant: 'destructive' });
@@ -268,6 +275,29 @@ export default function Payroll() {
     }
   };
 
+  const generateWALink = (phone: string, name: string, pdfUrl: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const message = encodeURIComponent(`Olá ${name}, segue seu holerite referente a ${refMonth}/${refYear}: ${pdfUrl}`);
+    return `https://wa.me/55${cleanPhone}?text=${message}`;
+  };
+
+  const handleSendSingleWhatsApp = async (p: any, result: any) => {
+    const emp = dbEmployees.find(e => e.id === p.employeeId);
+    if (!emp?.phone) {
+      toast({ title: 'Telefone não cadastrado', description: `O funcionário ${p.employeeName} não possui celular cadastrado.`, variant: 'destructive' });
+      return;
+    }
+    window.open(generateWALink(emp.phone, emp.employeeName, result.pdfUrl), '_blank');
+  };
+
+  const handleSendSingleEmail = async (p: any, result: any) => {
+    const emp = dbEmployees.find(e => e.id === p.employeeId);
+    if (!emp?.email) {
+      toast({ title: 'E-mail não cadastrado', description: `O funcionário ${p.employeeName} não possui e-mail cadastrado.`, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'E-mail enviado', description: `O holerite foi enviado para ${emp.email}` });
+  };
 
   const totalNet = payroll.reduce((s, p) => s + p.netSalary, 0);
 
@@ -364,6 +394,23 @@ export default function Payroll() {
                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
                 {isProcessing ? `Processando...` : `Fechar Lote (${selectedIds.length})`}
               </Button>
+              {batchResults.length > 0 && (
+                <Button 
+                  onClick={() => setBulkPostOpen(true)}
+                  className="h-10 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[12px] gap-2 animate-in fade-in zoom-in duration-200"
+                >
+                  <Send className="w-4 h-4" /> Enviar em Massa
+                </Button>
+              )}
+              {batchErrors.length > 0 && (
+                <Button 
+                  onClick={() => setErrorDialogOpen(true)}
+                  variant="outline"
+                  className="h-10 px-6 rounded-xl border-rose-500 text-rose-500 hover:bg-rose-500/10 font-black text-[12px] gap-2 animate-in fade-in zoom-in duration-200"
+                >
+                  <Trash2 className="w-4 h-4" /> Relatório de Erros ({batchErrors.length})
+                </Button>
+              )}
             </>
           )}
           <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 gap-1">
@@ -532,121 +579,184 @@ export default function Payroll() {
               style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
             />
           </div>
-            {/* Table com Paginação */}
-      {(() => {
-        const totalPages = Math.ceil(payrollData.length / PAGE_SIZE);
-        const pageItems = payrollData.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-        return (
-          <>
-            <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-white/5 border-b border-white/5 text-[11px] font-bold text-primary uppercase tracking-widest leading-none">
-                      <th className="px-6 py-4 w-[40px]">
-                        <Checkbox 
-                          checked={payrollData.length > 0 && selectedIds.length === payrollData.length} 
-                          onCheckedChange={toggleSelectAll}
-                          className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                      </th>
-                      <th className="px-6 py-4">Colaborador</th>
-                      <th className="px-6 py-4">Unidade</th>
-                      <th className="px-6 py-4 text-right">Salário Base</th>
-                      <th className="px-6 py-4 text-center">Intercorrências</th>
-                      <th className="px-6 py-4 text-right">Total Descontos</th>
-                      <th className="px-6 py-4 text-right">Saldo Líquido</th>
-                      {isAdmin && <th className="px-6 py-4 text-center">Ações</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {pageItems.map(p => (
-                      <tr key={p.employeeId} className={cn("hover:bg-white/[0.02] transition-colors group", selectedIds.includes(p.employeeId) && "bg-primary/5")}>
-                        <td className="px-6 py-4">
-                          <Checkbox 
-                            checked={selectedIds.includes(p.employeeId)} 
-                            onCheckedChange={() => toggleSelect(p.employeeId)}
-                            className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{p.employeeName}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{p.storeName.replace('SUPER ', '')}</span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="font-mono-data text-[13px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="flex flex-col items-center">
-                              <span className="text-[11px] font-black text-rose-500">{p.absences}</span>
-                              <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Faltas</span>
-                            </div>
-                            <div className="w-px h-4 bg-white/10" />
-                            <div className="flex flex-col items-center">
-                              <span className="text-[11px] font-black text-blue-400">{p.certificateDays}d</span>
-                              <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tighter">Atest.</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="font-mono-data text-[13px] text-rose-500/80 font-medium">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="font-mono-data text-[14px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </td>
-                        {isAdmin && (
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              {batchResults.find(r => r.employeeId === p.employeeId) && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
-                                  onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
-                                  title="Ver Holerite"
-                                >
-                                  <FileText className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
-                                <Trash2 className="w-3.5 h-3.5" />
+        </div>
+      )}
+
+        <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-white/5 border-b border-white/5 text-[11px] font-bold text-primary uppercase tracking-widest leading-none">
+                  <th className="px-3 py-4 w-[40px]">
+                    <Checkbox 
+                      checked={payrollData.length > 0 && selectedIds.length === payrollData.length} 
+                      onCheckedChange={toggleSelectAll}
+                      className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                  </th>
+                  <th className="px-3 py-4">Colaborador</th>
+                  <th className="px-3 py-4">Unidade</th>
+                  <th className="px-3 py-4 text-right">Salário Base</th>
+                  <th className="px-3 py-4 text-center">Intercorrências</th>
+                  <th className="px-3 py-4 text-right">Total Descontos</th>
+                  <th className="px-3 py-4 text-right">Saldo Líquido</th>
+                  {isAdmin && <th className="px-3 py-4 text-center">Ações</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {payrollData
+                  .slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+                  .map(p => (
+                  <tr key={p.employeeId} className={cn("hover:bg-white/[0.02] transition-colors group", selectedIds.includes(p.employeeId) && "bg-primary/5")}>
+                    <td className="px-3 py-3">
+                      <Checkbox 
+                        checked={selectedIds.includes(p.employeeId)} 
+                        onCheckedChange={() => toggleSelect(p.employeeId)}
+                        className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                      />
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-[12px] font-bold text-white group-hover:text-primary transition-colors truncate max-w-[150px] inline-block">{p.employeeName}</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{p.storeName.replace('SUPER ', '')}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="font-mono-data text-[12px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] font-black text-rose-500">{p.absences}</span>
+                          <span className="text-[7px] text-muted-foreground uppercase font-bold tracking-tighter">Faltas</span>
+                        </div>
+                        <div className="w-px h-3 bg-white/10" />
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] font-black text-blue-400">{p.certificateDays}d</span>
+                          <span className="text-[7px] text-muted-foreground uppercase font-bold tracking-tighter">Atest.</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="font-mono-data text-[12px] text-rose-500/80 font-medium">-R$ {p.deductions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="font-mono-data text-[13px] font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">R$ {p.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {batchResults.find(r => r.employeeId === p.employeeId) && (
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
+                                onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
+                                title="Ver Holerite"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10"
+                                onClick={() => handleSendSingleWhatsApp(p, batchResults.find(r => r.employeeId === p.employeeId))}
+                                title="Enviar por WhatsApp"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-blue-400 hover:bg-blue-500/10"
+                                onClick={() => handleSendSingleEmail(p, batchResults.find(r => r.employeeId === p.employeeId))}
+                                title="Enviar por E-mail"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
                               </Button>
                             </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {Math.ceil(payrollData.length / PAGE_SIZE) > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-[11px] text-muted-foreground">
+              Exibindo <span className="text-white font-bold">{currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, payrollData.length)}</span> de <span className="text-white font-bold">{payrollData.length}</span> colaboradores
+            </p>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                ← Anterior
+              </Button>
+              {Array.from({ length: Math.ceil(payrollData.length / PAGE_SIZE) }, (_, i) => (
+                <Button key={i} variant="ghost" size="sm" onClick={() => setCurrentPage(i)}
+                  className={cn("h-8 w-8 text-[11px] font-bold rounded-lg", i === currentPage ? "bg-primary/20 text-primary border border-primary/30" : "text-white/50 hover:text-white hover:bg-white/10")}>
+                  {i + 1}
+                </Button>
+              ))}
+              <Button variant="ghost" size="sm" disabled={currentPage === Math.ceil(payrollData.length / PAGE_SIZE) - 1} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
+                Próxima →
+              </Button>
             </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-2">
-                <p className="text-[11px] text-muted-foreground">
-                  Exibindo <span className="text-white font-bold">{currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, payrollData.length)}</span> de <span className="text-white font-bold">{payrollData.length}</span> colaboradores
-                </p>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
-                    ← Anterior
-                  </Button>
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <Button key={i} variant="ghost" size="sm" onClick={() => setCurrentPage(i)}
-                      className={cn("h-8 w-8 text-[11px] font-bold rounded-lg", i === currentPage ? "bg-primary/20 text-primary border border-primary/30" : "text-white/50 hover:text-white hover:bg-white/10")}>
-                      {i + 1}
-                    </Button>
+          </div>
+        )}
+
+      <BulkPostModal 
+        open={bulkPostOpen}
+        onOpenChange={setBulkPostOpen}
+        selectedEmployees={dbEmployees.filter(e => batchResults.some(r => r.employeeId === e.id))}
+        batchResults={batchResults}
+        referenceMonth={refMonth}
+        referenceYear={refYear}
+      />
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-2xl bg-slate-900 border-rose-500/30 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-500 font-black uppercase tracking-tighter">
+              <Trash2 className="w-5 h-5" /> Relatório de Erros do Processamento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-[12px] text-muted-foreground font-medium uppercase tracking-widest">
+              Identificamos falhas em {batchErrors.length} colaborador(es). Verifique os detalhes abaixo para ajuste manual:
+            </p>
+            <div className="max-h-[400px] overflow-y-auto rounded-xl border border-white/5 bg-white/5">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 text-[10px] font-black uppercase text-rose-400">
+                    <th className="px-4 py-3">Colaborador</th>
+                    <th className="px-4 py-3">Motivo da Falha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {batchErrors.map((err, idx) => (
+                    <tr key={idx} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3 text-[12px] font-bold text-white">{err.employeeName}</td>
+                      <td className="px-4 py-3 text-[11px] text-rose-300 font-medium">{err.error}</td>
+                    </tr>
                   ))}
-                  <Button variant="ghost" size="sm" disabled={currentPage === totalPages - 1} onClick={() => setCurrentPage(p => p + 1)} className="h-8 px-3 text-[11px] font-bold text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30">
-                    Próxima →
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setErrorDialogOpen(false)} className="bg-white/10 hover:bg-white/20 text-white font-bold uppercase text-[11px] rounded-xl px-8 h-10">
+                Fechar e Ajustar Manualmente
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

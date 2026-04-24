@@ -4,8 +4,10 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardLayout() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -25,10 +27,10 @@ export default function DashboardLayout() {
                   <Menu className="w-6 h-6" />
                 </Button>
               </SheetTrigger>
-              <span className="font-black tracking-tighter text-[15px] uppercase">CyberTech</span>
+              <span className="font-black tracking-tighter text-[15px] uppercase">{user?.tenantBranding?.system_name || "CyberTech"}</span>
             </div>
             <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
-              <img src="/logo-cybertech.png" alt="Logo" className="w-full h-full object-contain p-0.5" />
+              <img src={user?.tenantBranding?.logo_url || "/logo-cybertech.png"} alt="Logo" className="w-full h-full object-contain p-0.5" />
             </div>
           </div>
           <SheetContent side="left" className="p-0 w-[240px] bg-transparent border-none">

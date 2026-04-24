@@ -14,12 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; }
+interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; adicionalNoturno?: number; admission_date?: string; storeName?: string; }
 interface Rescission {
   id: string; employee_id: string; employee_name: string; termination_date: string;
   fgts_value: number; rescission_value: number; type: string; tenant_id: string;
   admission_date?: string; last_salary?: number; gross_value?: number;
   inss_deduction?: number; irrf_deduction?: number;
+  other_deductions?: number;
 }
 
 const fmt = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -62,6 +63,8 @@ export default function Rescissions() {
     dependents: 0,
     extraHours: 0,
     extraHoursPercent: 0.5,
+    additionalDeductions: 0,
+    nightShiftPay: 0,
   });
 
   const selectedEmp = employees.find(e => e.id === form.employeeId);
@@ -84,6 +87,8 @@ export default function Rescissions() {
             dependents: form.dependents,
             extraHours: form.extraHours,
             extraHoursPercent: form.extraHoursPercent,
+            additionalDeductions: form.additionalDeductions,
+            nightShiftPay: form.nightShiftPay,
           });
         } catch { return null; }
       })()
@@ -126,6 +131,7 @@ export default function Rescissions() {
         hazardPay: selectedEmp.periculosidade || 0,
         unhealthyPay: selectedEmp.insalubridade || 0,
         admissionDate: selectedEmp.admission_date || '',
+        nightShiftPay: selectedEmp.adicionalNoturno || 0,
       }));
     }
   }, [form.employeeId]);
@@ -142,6 +148,7 @@ export default function Rescissions() {
     const { error } = await supabase.from('rescissions').insert([{
       employee_id: form.employeeId,
       employee_name: emp.name,
+      store_name: emp.storeName,
       termination_date: form.terminationDate,
       fgts_value: preview.multaFGTS + preview.fgtsTotal,
       rescission_value: preview.valorLiquido,
@@ -152,6 +159,7 @@ export default function Rescissions() {
       gross_value: preview.totalCreditos,
       inss_deduction: preview.inss,
       irrf_deduction: preview.irrf,
+      other_deductions: form.additionalDeductions,
     }]);
 
     if (error) {
@@ -181,7 +189,7 @@ export default function Rescissions() {
 
     toast({ title: '✅ Rescisão calculada e registrada!', description: `${emp.name} — Líquido: ${fmt(preview.valorLiquido)}` });
     setIsOpen(false);
-    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5 });
+    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5, additionalDeductions: 0 });
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -213,6 +221,7 @@ export default function Rescissions() {
     </style></head><body>
     <h1>TERMO DE RESCISÃO DE CONTRATO DE TRABALHO</h1>
     <div class="row"><span>Funcionário</span><strong>${r.employee_name}</strong></div>
+    ${(r as any).store_name ? `<div class="row"><span>Unidade/Loja</span><span>${(r as any).store_name}</span></div>` : ''}
     <div class="row"><span>Data de Admissão</span><span>${r.admission_date ? new Date(r.admission_date).toLocaleDateString('pt-BR') : '—'}</span></div>
     <div class="row"><span>Data de Demissão</span><span>${new Date(r.termination_date).toLocaleDateString('pt-BR')}</span></div>
     <div class="row"><span>Tempo de Serviço</span><span>${months} meses</span></div>
@@ -221,6 +230,7 @@ export default function Rescissions() {
     <div class="row"><span>Total Bruto (Proventos)</span><span class="credit">${fmt(r.gross_value || r.rescission_value)}</span></div>
     <div class="row"><span>INSS Descontado</span><span class="deduction">-${fmt(r.inss_deduction || 0)}</span></div>
     <div class="row"><span>IRRF Descontado</span><span class="deduction">-${fmt(r.irrf_deduction || 0)}</span></div>
+    ${r.other_deductions ? `<div class="row"><span>Outros Descontos</span><span class="deduction">-${fmt(r.other_deductions)}</span></div>` : ''}
     <div class="row"><span>FGTS + Multa (Disponível para Saque)</span><span class="credit">+${fmt(r.fgts_value || 0)}</span></div>
     <div class="total"><div class="row"><span>VALOR LÍQUIDO A RECEBER (DEPÓSITO)</span><strong>${fmt(r.rescission_value)}</strong></div></div>
     <div style="margin-top:20px; font-size:10px; color:#666; text-align:justify; line-height:1.4;">
@@ -269,7 +279,7 @@ export default function Rescissions() {
                   <div className="flex items-center justify-between p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
                     <div>
                       <p className="text-[13px] font-bold text-white">{selectedEmp.name}</p>
-                      <p className="text-[11px] text-muted-foreground">Salário: {fmt(selectedEmp.salary)} · Admissão: {selectedEmp.admission_date ? new Date(selectedEmp.admission_date).toLocaleDateString('pt-BR') : '—'}</p>
+                      <p className="text-[11px] text-muted-foreground">Loja: {selectedEmp.storeName} · Salário: {fmt(selectedEmp.salary)} · Admissão: {selectedEmp.admission_date ? new Date(selectedEmp.admission_date).toLocaleDateString('pt-BR') : '—'}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" onClick={() => setForm(f => ({ ...f, employeeId: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, admissionDate: '' }))}>
                       Trocar
@@ -298,7 +308,10 @@ export default function Rescissions() {
                           onClick={() => { setForm(f => ({ ...f, employeeId: emp.id })); setEmpSearch(''); }}
                           className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
                         >
-                          <span className="text-[13px] text-white">{emp.name}</span>
+                          <div className="flex flex-col text-left">
+                            <span className="text-[13px] text-white font-bold">{emp.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">{emp.storeName}</span>
+                          </div>
                           <span className="text-[11px] text-muted-foreground">{fmt(emp.salary)}</span>
                         </button>
                       ))}
@@ -347,6 +360,10 @@ export default function Rescissions() {
                   <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Insalubridade</Label>
                   <Input type="number" value={form.unhealthyPay || ''} onChange={e => setForm(f => ({ ...f, unhealthyPay: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="R$ 0,00" />
                 </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Adic. Noturno</Label>
+                  <Input type="number" value={form.nightShiftPay || ''} onChange={e => setForm(f => ({ ...f, nightShiftPay: Number(e.target.value) }))} className="bg-white/5 border-white/10 h-10" placeholder="R$ 0,00" />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -377,6 +394,21 @@ export default function Rescissions() {
                       <SelectItem value="1.0">100% (Feriados/Dom)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Outros Descontos */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-rose-400">Outros Descontos (Manual)</Label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-rose-500/50">R$</div>
+                  <Input 
+                    type="number" 
+                    value={form.additionalDeductions || ''} 
+                    onChange={e => setForm(f => ({ ...f, additionalDeductions: Number(e.target.value) }))} 
+                    className="bg-rose-500/5 border-rose-500/20 h-10 pl-9 font-black text-rose-400 placeholder:text-rose-500/20" 
+                    placeholder="0,00" 
+                  />
                 </div>
               </div>
 
@@ -495,7 +527,7 @@ export default function Rescissions() {
                 <div>
                   <p className="text-[14px] font-bold text-white">{r.employee_name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {new Date(r.termination_date).toLocaleDateString('pt-BR')} · {TYPE_NAMES[r.type] || r.type}
+                    {(r as any).store_name ? `${(r as any).store_name} · ` : ''}{new Date(r.termination_date).toLocaleDateString('pt-BR')} · {TYPE_NAMES[r.type] || r.type}
                   </p>
                 </div>
               </div>
@@ -525,6 +557,7 @@ export default function Rescissions() {
                     { label: 'Total Bruto', val: r.gross_value || r.rescission_value },
                     { label: '(-) INSS', val: -(r.inss_deduction || 0) },
                     { label: '(-) IRRF', val: -(r.irrf_deduction || 0) },
+                    { label: '(-) Outros', val: -(r.other_deductions || 0) },
                     { label: 'FGTS + Multa', val: r.fgts_value || 0 },
                     { label: 'Admissão', val: null, dateStr: r.admission_date ? new Date(r.admission_date).toLocaleDateString('pt-BR') : '—' },
                     { label: 'Líquido Final', val: r.rescission_value },

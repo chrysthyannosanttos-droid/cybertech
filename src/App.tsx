@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { BrandingStyles } from "@/components/BrandingStyles";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -70,6 +71,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <AuthProvider>
+        <BrandingStyles />
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>

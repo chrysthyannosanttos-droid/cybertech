@@ -10,11 +10,21 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MOCK_MRR_DATA } from '@/data/mockData';
+import { RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { UserMinus, Calculator } from 'lucide-react';
 
 
-function KpiCard({ icon: Icon, label, value, sub, delay }: { icon: any; label: string; value: string; sub?: string; delay: number }) {
+function KpiCard({ icon: Icon, label, value, sub, delay, onClick }: { icon: any; label: string; value: string; sub?: string; delay: number; onClick?: () => void }) {
   return (
-    <div className={`glass-card rounded-2xl p-5 animate-fade-in-up stagger-${delay} border border-white/5 hover:border-primary/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(31,180,243,0.1)] group`}>
+    <div 
+      onClick={onClick}
+      className={cn(
+        `glass-card rounded-2xl p-5 animate-fade-in-up stagger-${delay} border border-white/5 hover:border-primary/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(31,180,243,0.1)] group`,
+        onClick && 'cursor-pointer hover:bg-white/[0.03]'
+      )}
+    >
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
           <Icon className="w-5 h-5 text-primary" />
@@ -30,7 +40,7 @@ function KpiCard({ icon: Icon, label, value, sub, delay }: { icon: any; label: s
 }
 
 const COLORS = [
-  '#0ea5e9', // Primary Cyan
+  'hsl(var(--primary))', // Dynamic Primary
   '#8b5cf6', // Violet
   '#10b981', // Emerald
   '#f59e0b', // Amber
@@ -40,6 +50,7 @@ const COLORS = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isSuperAdmin = user?.role === 'superadmin';
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -51,7 +62,9 @@ export default function Dashboard() {
   const [stores, setStores] = useState<StoreType[]>([]);
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
   const [payrolls, setPayrolls] = useState<any[]>([]);
+  const [rescissions, setRescissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showRescissionsList, setShowRescissionsList] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,14 +75,16 @@ export default function Dashboard() {
         { data: cData },
         { data: sData },
         { data: pData },
-        { data: pyData }
+        { data: pyData },
+        { data: rsData }
       ] = await Promise.all([
         supabase.from('tenants').select('*'),
         supabase.from('employees').select('*').eq('status', 'ACTIVE'),
         supabase.from('certificates').select('*'),
         supabase.from('stores').select('*'),
         supabase.from('service_providers').select('*'),
-        supabase.from('payrolls').select('*')
+        supabase.from('payrolls').select('*'),
+        supabase.from('rescissions').select('*').order('termination_date', { ascending: false })
       ]);
 
       if (tData) setTenants(tData.map(t => ({ ...t, employeeCount: t.employee_count, subscription: t.subscription || { status: 'active', monthlyFee: 0 } } as Tenant)));
@@ -98,11 +113,60 @@ export default function Dashboard() {
         endDate: p.end_date,
         additionalCosts: p.additional_costs || []
       } as ServiceProvider)));
+      if (rsData) setRescissions(rsData);
       
       setIsLoading(false);
     };
     fetchData();
   }, []);
+
+  const handleFixAllData = async () => {
+    if (!window.confirm('Deseja executar a manutenção global? Isso irá:\n1. Ativar todos os funcionários\n2. Corrigir salários > 30.000 (dividir por 100)\n3. Identificar gênero pelo nome')) return;
+    
+    setIsLoading(true);
+    try {
+      const { data: emps } = await supabase.from('employees').select('*');
+      if (!emps) return;
+
+      const guessGender = (name: string): 'M' | 'F' => {
+        const first = name.split(' ')[0].toUpperCase();
+        // Heurística simples para nomes brasileiros
+        if (first.endsWith('A') || ['BEATRIZ', 'ALICE', 'ESTER', 'RUTH', 'IRACEMA'].includes(first)) return 'F';
+        return 'M';
+      };
+
+      const updates = emps.map(e => {
+        let sal = Number(e.salary || 0);
+        if (sal > 30000) sal = sal / 100;
+        
+        return {
+          id: e.id,
+          status: 'ACTIVE',
+          salary: sal,
+          gender: e.gender || guessGender(e.name)
+        };
+      });
+
+      // Update in batches of 50 to avoid payload issues
+      for (let i = 0; i < updates.length; i += 50) {
+        const batch = updates.slice(i, i + 50);
+        await Promise.all(batch.map(u => 
+          supabase.from('employees').update({ 
+            status: u.status, 
+            salary: u.salary, 
+            gender: u.gender 
+          }).eq('id', u.id)
+        ));
+      }
+
+      toast({ title: 'Manutenção concluída!', description: `${updates.length} registros processados.` });
+      window.location.reload();
+    } catch (err: any) {
+      toast({ title: 'Erro na manutenção', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredEmployees = useMemo(() => {
     let result = employees;
@@ -229,6 +293,18 @@ export default function Dashboard() {
       .reduce((s, p) => s + (p.net_salary || 0), 0);
   }, [payrolls, startDate]);
 
+  const totalRescissionsValue = useMemo(() => {
+    return rescissions
+      .filter(r => {
+        const date = parseISO(r.termination_date);
+        return isWithinInterval(date, { 
+          start: parseISO(startDate), 
+          end: parseISO(endDate) 
+        });
+      })
+      .reduce((s, r) => s + (r.rescission_value || 0), 0);
+  }, [rescissions, startDate, endDate]);
+
   const costs = useMemo(() => {
     return filteredEmployees.reduce((acc, e) => ({
       salary: acc.salary + (e.salary || 0),
@@ -240,7 +316,8 @@ export default function Dashboard() {
       flex: acc.flex + (e.flexivel || 0),
       mobilidade: acc.mobilidade + (e.mobilidade || 0),
       valeFlex: acc.valeFlex + (e.valeFlexivel || 0),
-    }), { salary: 0, insalubridade: 0, periculosidade: 0, gratificacao: 0, vt: 0, vr: 0, flex: 0, mobilidade: 0, valeFlex: 0 });
+      adicionalNoturno: acc.adicionalNoturno + (Number(e.adicional_noturno) || 0),
+    }), { salary: 0, insalubridade: 0, periculosidade: 0, gratificacao: 0, vt: 0, vr: 0, flex: 0, mobilidade: 0, valeFlex: 0, adicionalNoturno: 0 });
   }, [filteredEmployees]);
 
   const totalCost = Object.values(costs).reduce((a, b) => a + b, 0);
@@ -254,6 +331,19 @@ export default function Dashboard() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          {/* Admin Tools */}
+          {user?.role === 'superadmin' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              onClick={handleFixAllData}
+              disabled={isLoading}
+            >
+              <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} /> Manutenção Global
+            </Button>
+          )}
+
           {/* Period Filter */}
           <div className="flex items-center gap-2 glass p-1.5 px-3 rounded-full border border-white/10 shadow-lg group">
              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1">Período</span>
@@ -343,8 +433,15 @@ export default function Dashboard() {
         <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
         {!isSuperAdmin && (
           <>
-            <KpiCard icon={DollarSign} label="Folha Processada" value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} sub="Lote do mês" delay={3} />
-            <KpiCard icon={TrendingUp} label="Custo Estimado" value={`R$ ${filteredEmployees.reduce((s, e) => s + (e.salary || 0), 0).toLocaleString('pt-BR')}`} sub="Base de ativos" delay={4} />
+            <KpiCard icon={DollarSign} label="Salário Líquido" value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} sub="Lote do mês" delay={3} />
+            <KpiCard 
+              icon={UserMinus} 
+              label="Rescisões Pagas" 
+              value={`R$ ${totalRescissionsValue.toLocaleString('pt-BR')}`} 
+              sub={`${rescissions.length} registros`} 
+              delay={4} 
+              onClick={() => setShowRescissionsList(true)}
+            />
           </>
         )}
       </div>
@@ -365,15 +462,15 @@ export default function Dashboard() {
                   <AreaChart data={mrrChartData}>
                     <defs>
                       <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.5)' }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.5)' }} tickFormatter={v => `R$${v/1000}k`} />
                     <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} />
-                    <Area type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                    <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -392,8 +489,8 @@ export default function Dashboard() {
                     <Bar dataKey="count" fill="url(#colorCyan)" radius={[4, 4, 0, 0]} barSize={32} />
                     <defs>
                       <linearGradient id="colorCyan" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity={1}/>
-                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.6}/>
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={1}/>
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.6}/>
                       </linearGradient>
                     </defs>
                   </BarChart>
@@ -420,7 +517,7 @@ export default function Dashboard() {
                       dataKey="value"
                     >
                       {overallGenderData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(221, 83%, 53%)' : 'hsl(210, 40%, 70%)'} />
+                        <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(210, 40%, 70%)'} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
@@ -429,7 +526,7 @@ export default function Dashboard() {
                 <div className="flex gap-6 mt-2">
                   {overallGenderData.map((d, i) => (
                     <div key={d.name} className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: i === 0 ? 'hsl(221, 83%, 53%)' : 'hsl(210, 40%, 70%)' }} />
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: i === 0 ? 'hsl(var(--primary))' : 'hsl(210, 40%, 70%)' }} />
                       <span className="text-[11px] font-medium">{d.name}: <span className="text-muted-foreground">{d.value}</span></span>
                     </div>
                   ))}
@@ -464,7 +561,7 @@ export default function Dashboard() {
                     contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }} 
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 20 }} />
-                  <Bar dataKey="H" name="Homens" fill="#0ea5e9" radius={[0, 4, 4, 0]} barSize={12} />
+                  <Bar dataKey="H" name="Homens" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={12} />
                   <Bar dataKey="M" name="Mulheres" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={12} />
                 </BarChart>
               </ResponsiveContainer>
@@ -517,7 +614,7 @@ export default function Dashboard() {
                   <Bar 
                     dataKey="base" 
                     name="Custo Base (Contrato)" 
-                    fill="#0ea5e9" 
+                    fill="hsl(var(--primary))" 
                     radius={[4, 4, 0, 0]}
                     barSize={8}
                   />
@@ -565,6 +662,13 @@ export default function Dashboard() {
               </div>
             ))}
             
+            <div className="relative pl-5 border-l-2 border-white/10 group hover:border-primary/50 transition-colors">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2 tracking-widest">Adicional Noturno</p>
+              <p className="text-xl font-bold tabular-nums text-indigo-400 tracking-tight">
+                R$ {costs.adicionalNoturno.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            
             <div className="xl:col-span-1 glass bg-primary/10 p-6 rounded-2xl border border-primary/20 flex flex-col justify-center shadow-[0_0_20px_rgba(14,165,233,0.1)]">
               <p className="text-[10px] font-bold text-primary uppercase mb-1 tracking-widest">Custo Total Consolidado</p>
               <p className="text-2xl font-black text-primary tabular-nums tracking-tighter">
@@ -574,6 +678,39 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Rescissions List Dialog */}
+      <Dialog open={showRescissionsList} onOpenChange={setShowRescissionsList}>
+        <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e]">
+          <DialogHeader>
+            <DialogTitle className="text-white font-black flex items-center gap-2">
+              <UserMinus className="w-5 h-5 text-rose-400" /> Histórico de Rescisões Pagas
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-3 mt-4">
+            {rescissions.length === 0 ? (
+              <p className="text-center py-10 text-muted-foreground">Nenhuma rescisão registrada.</p>
+            ) : (
+              rescissions.map(r => (
+                <div key={r.id} className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                  <div>
+                    <p className="text-[13px] font-bold text-white">{r.employee_name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {format(parseISO(r.termination_date), 'dd/MM/yyyy')} · {r.type}
+                    </p>
+                    {r.store_name && <p className="text-[10px] text-primary/70 font-bold uppercase">{r.store_name}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[14px] font-black text-white">R$ {Number(r.rescission_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    {r.fgts_value > 0 && <p className="text-[10px] text-amber-500">FGTS: R$ {Number(r.fgts_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

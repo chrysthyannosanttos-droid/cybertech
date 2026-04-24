@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 
-interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; }
-interface Vacation { id: string; employee_name: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
+interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; storeName?: string; }
+interface Vacation { id: string; employee_name: string; store_name?: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
 
 const fmt = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
@@ -74,6 +74,7 @@ export default function Vacations() {
       const { data: vData } = await vacQuery;
 
       // Fetch employees (select * to avoid column mismatch errors)
+      const { data: storesData } = await supabase.from('stores').select('id, name');
       let empQuery = supabase.from('employees').select('*').eq('status', 'ACTIVE').order('name');
       if (currentTenantId) empQuery = empQuery.eq('tenant_id', currentTenantId);
       const { data: eData, error: eError } = await empQuery;
@@ -81,7 +82,10 @@ export default function Vacations() {
       if (eError) console.error('Erro ao buscar funcionários:', eError.message);
 
       if (vData) setVacations(vData as Vacation[]);
-      if (eData) setEmployees(eData as Employee[]);
+      if (eData) setEmployees((eData || []).map(emp => ({
+        ...emp,
+        storeName: storesData?.find(s => s.id === emp.store_id)?.name || '—'
+      })) as Employee[]);
       setIsLoading(false);
     };
     fetchData();
@@ -230,7 +234,10 @@ export default function Vacations() {
                           onClick={() => { setForm(f => ({ ...f, employeeId: emp.id })); setEmpSearch(''); }}
                           className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0"
                         >
-                          <span className="text-[13px] text-white">{emp.name}</span>
+                          <div className="flex flex-col text-left">
+                            <span className="text-[13px] text-white font-bold">{emp.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">{emp.storeName}</span>
+                          </div>
                           <span className="text-[11px] text-muted-foreground">{fmt(emp.salary)}</span>
                         </button>
                       ))}

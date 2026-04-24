@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Tenant } from '@/types';
-import { Building2, Save, X, ShieldCheck, CreditCard, Calendar, AlertCircle } from 'lucide-react';
+import { Building2, Save, X, ShieldCheck, CreditCard, Calendar, AlertCircle, Palette, Layout } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,13 @@ export default function CompanySettings() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', cnpj: '' });
+  const [form, setForm] = useState({ 
+    name: '', 
+    cnpj: '',
+    system_name: '',
+    primary_color: '',
+    logo_url: ''
+  });
 
   useEffect(() => {
     const fetchTenant = async () => {
@@ -39,7 +45,13 @@ export default function CompanySettings() {
           subscription: data.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
           employeeCount: data.employee_count || 0
         });
-        setForm({ name: data.name, cnpj: data.cnpj || '' });
+        setForm({ 
+          name: data.name, 
+          cnpj: data.cnpj || '',
+          system_name: data.branding?.system_name || '',
+          primary_color: data.branding?.primary_color || '',
+          logo_url: data.branding?.logo_url || ''
+        });
       }
       setIsLoading(false);
     };
@@ -55,7 +67,12 @@ export default function CompanySettings() {
       .from('tenants')
       .update({
         name: form.name,
-        cnpj: form.cnpj
+        cnpj: form.cnpj,
+        branding: {
+          system_name: form.system_name,
+          primary_color: form.primary_color,
+          logo_url: form.logo_url
+        }
       })
       .eq('id', tenant.id);
 
@@ -179,6 +196,116 @@ export default function CompanySettings() {
                   {isSaving ? 'Salvando...' : 'Salvar Alterações'}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-white/5 shadow-2xl overflow-hidden relative mt-6">
+            <CardHeader className="border-b border-white/5 bg-white/5">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center border border-amber-500/20">
+                    <Palette className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-[14px] font-black uppercase tracking-widest text-white">White Label & Branding</CardTitle>
+                    <CardDescription className="text-[11px] font-medium text-muted-foreground">Personalize a identidade visual do seu sistema</CardDescription>
+                  </div>
+                </div>
+                {!currentUser?.email?.toLowerCase().includes('cristiano') && (
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">Somente Cristiano</span>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {!currentUser?.email?.toLowerCase().includes('cristiano') ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
+                  <Layout className="w-12 h-12 text-muted-foreground/20" />
+                  <p className="text-[13px] text-muted-foreground max-w-[280px]">
+                    As configurações de identidade visual (White-Label) são restritas e podem ser gerenciadas apenas pelo administrador <strong>Cristiano</strong>.
+                  </p>
+                  <Button variant="outline" size="sm" className="h-8 text-[11px] font-bold uppercase tracking-widest" disabled>
+                    Solicitar Alteração
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nome do Sistema Personalizado</Label>
+                      <Input 
+                        value={form.system_name} 
+                        onChange={e => setForm(f => ({ ...f, system_name: e.target.value }))}
+                        className="h-11 bg-white/[0.03] border-white/10"
+                        placeholder="Ex: Minha Empresa RH"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cor Principal (Hexadecimal)</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                        value={form.primary_color} 
+                        onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
+                        className="h-11 bg-white/[0.03] border-white/10 font-mono"
+                        placeholder="#0ea5e9"
+                      />
+                      <div 
+                        className="w-11 h-11 rounded-lg border border-white/10 shadow-inner shrink-0" 
+                        style={{ backgroundColor: form.primary_color || '#0ea5e9' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">URL da Logo (PNG transparente recomendada)</Label>
+                  <div className="flex gap-4 items-center">
+                    <Input 
+                      value={form.logo_url} 
+                      onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))}
+                      className="h-11 flex-1 bg-white/[0.03] border-white/10"
+                      placeholder="https://sua-empresa.com/logo.png"
+                    />
+                    {form.logo_url && (
+                      <div className="w-12 h-12 rounded-xl bg-black/40 p-1 border border-white/5 overflow-hidden">
+                        <img src={form.logo_url} alt="Preview Logo" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex gap-3">
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={isSaving}
+                    variant="outline"
+                    className="flex-1 md:flex-initial px-8 h-11 font-bold gap-2 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                  >
+                    <Save className="w-4 h-4" />
+                    Salvar Identidade Visual
+                  </Button>
+                  <Button 
+                    onClick={async () => {
+                      if (!window.confirm('Deseja resetar a identidade visual para o padrão CyberTech?')) return;
+                      setForm(f => ({ ...f, system_name: '', primary_color: '', logo_url: '' }));
+                      setIsSaving(true);
+                      const { error } = await supabase.from('tenants').update({ branding: null }).eq('id', tenant.id);
+                      if (error) toast({ title: 'Erro ao resetar', variant: 'destructive' });
+                      else toast({ title: 'Resetado com sucesso' });
+                      setIsSaving(false);
+                      window.location.reload();
+                    }}
+                    disabled={isSaving}
+                    variant="ghost"
+                    className="h-11 text-muted-foreground hover:text-white"
+                  >
+                    Resetar Padrão
+                  </Button>
+                </div>
+              </>
+            )}
             </CardContent>
           </Card>
         </div>

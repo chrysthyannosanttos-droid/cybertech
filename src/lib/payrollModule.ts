@@ -40,45 +40,68 @@ export async function generatePayslipBlob(
   year: number
 ): Promise<Blob> {
   const doc = new jsPDF();
-  
-  // Header
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text('RECIBO DE PAGAMENTO DE SALÁRIO', 14, 20);
-  
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Referência: ${month.toString().padStart(2, '0')}/${year}`, 14, 28);
-  
-  // Empregador Info (Simulado)
-  doc.setLineWidth(0.5);
-  doc.rect(14, 32, 182, 16);
-  doc.setFont("helvetica", "bold");
-  doc.text('Empregador:', 16, 38);
-  doc.setFont("helvetica", "normal");
-  doc.text(employee.storeName || 'Empresa Padrão', 42, 38);
-  
-  // Funcioário Info
-  doc.rect(14, 50, 182, 22);
-  doc.setFont("helvetica", "bold");
-  doc.text('Código:', 16, 56); doc.setFont("helvetica", "normal"); doc.text(employee.id.substring(0, 8), 35, 56);
-  doc.setFont("helvetica", "bold");
-  doc.text('Nome:', 16, 62); doc.setFont("helvetica", "normal"); doc.text(employee.name, 30, 62);
-  doc.setFont("helvetica", "bold");
-  doc.text('Cargo:', 16, 68); doc.setFont("helvetica", "normal"); doc.text(employee.role || 'Não informado', 30, 68);
-  doc.setFont("helvetica", "bold");
-  doc.text('Admissão:', 130, 62); doc.setFont("helvetica", "normal"); 
-  doc.text(new Date(employee.admissionDate || new Date()).toLocaleDateString('pt-BR'), 152, 62);
+  const primaryColor = [22, 22, 22];
+  const accentColor = [0, 102, 204];
+  const lightGrey = [245, 245, 245];
 
-  // Tabela de Vencimentos e Descontos
+  // --- Marca d'água ---
+  doc.setTextColor(230, 230, 230);
+  doc.setFontSize(50);
+  doc.setFont("helvetica", "bold");
+  doc.text('ORIGINAL - CYBERTECH RH', 105, 160, { 
+    angle: 45, 
+    align: 'center'
+  });
+
+
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.1);
+  doc.rect(10, 10, 190, 277);
+
+  doc.setFillColor(...primaryColor);
+  doc.rect(10, 10, 190, 25, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text('RECIBO DE PAGAMENTO', 14, 22);
+  
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`REFERÊNCIA: ${month.toString().padStart(2, '0')}/${year}`, 140, 20);
+  doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleDateString('pt-BR')}`, 140, 25);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text('EMPREGADOR', 14, 42);
+  doc.setDrawColor(...accentColor);
+  doc.setLineWidth(0.5);
+  doc.line(14, 44, 40, 44);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(employee.storeName || 'CyberTech RH - Unidade Principal', 14, 52);
+  doc.setFontSize(9);
+  doc.text('CNPJ: 00.000.000/0001-00', 14, 57);
+  
+  doc.setFillColor(...lightGrey);
+  doc.rect(110, 40, 85, 25, 'F');
+  doc.setFont("helvetica", "bold");
+  doc.text('COLABORADOR', 114, 46);
+  doc.setFont("helvetica", "normal");
+  doc.text(`NOME: ${employee.name}`, 114, 52);
+  doc.text(`CARGO: ${employee.role || 'Colaborador'}`, 114, 57);
+  doc.text(`ID: ${employee.id.substring(0, 8).toUpperCase()}`, 114, 62);
+
   const bodyData = payroll.items.map(item => {
     let provento = ''; let desconto = '';
-    if (item.type === 'EARNING') provento = item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    if (item.type === 'DEDUCTION') desconto = item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    if (item.type === 'EARNING') provento = 'R$ ' + item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    if (item.type === 'DEDUCTION') desconto = 'R$ ' + item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     
     return [
-      item.code.toString(),
-      item.description,
+      item.code.toString().padStart(3, '0'),
+      item.description.toUpperCase(),
       item.reference || '-',
       provento,
       desconto
@@ -87,56 +110,87 @@ export async function generatePayslipBlob(
 
   autoTable(doc, {
     startY: 75,
-    head: [['Cód.', 'Descrição', 'Ref.', 'Proventos', 'Descontos']],
+    head: [['CÓD', 'DESCRIÇÃO DA VERBA', 'REF', 'VENCIMENTOS', 'DESCONTOS']],
     body: bodyData,
-    theme: 'grid',
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: [20, 20, 20] },
+    theme: 'striped',
+    styles: { 
+      fontSize: 8, 
+      cellPadding: 3,
+      font: 'helvetica'
+    },
+    headStyles: { 
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      halign: 'center'
+    },
     columnStyles: {
-      0: { cellWidth: 15 },
-      2: { cellWidth: 20 },
-      3: { halign: 'right' },
-      4: { halign: 'right' }
-    }
+      0: { halign: 'center', cellWidth: 15 },
+      1: { halign: 'left' },
+      2: { halign: 'center', cellWidth: 20 },
+      3: { halign: 'right', cellWidth: 35 },
+      4: { halign: 'right', cellWidth: 35 }
+    },
+    margin: { left: 14, right: 14 }
   });
 
-  // Totais
   const finalY = (doc as any).lastAutoTable.finalY || 150;
-  
-  doc.rect(14, finalY + 5, 182, 20);
   const totalProv = payroll.items.filter(i => i.type === 'EARNING').reduce((a,b) => a + b.amount, 0);
   const totalDesc = payroll.items.filter(i => i.type === 'DEDUCTION').reduce((a,b) => a + b.amount, 0);
-  
-  doc.setFont("helvetica", "bold");
-  doc.text('Total Vencimentos:', 16, finalY + 12); 
-  doc.setFont("helvetica", "normal");
-  doc.text('R$ ' + totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 50, finalY + 12);
-  
-  doc.setFont("helvetica", "bold");
-  doc.text('Total Descontos:', 110, finalY + 12); 
-  doc.setFont("helvetica", "normal");
-  doc.text('R$ ' + totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, finalY + 12);
-  
-  doc.setFont("helvetica", "bold");
-  doc.text('Valor Líquido ===>', 14, finalY + 20);
-  doc.setFontSize(12);
-  doc.text('R$ ' + payroll.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 50, finalY + 20);
-  
-  // Rodapé (Bases)
-  doc.setFontSize(8);
-  doc.rect(14, finalY + 30, 182, 15);
-  doc.setFont("helvetica", "bold");
-  doc.text('Salário Base', 16, finalY + 35); doc.setFont("helvetica", "normal"); doc.text(payroll.baseSalary.toLocaleString('pt-BR'), 16, finalY + 40);
-  doc.setFont("helvetica", "bold");
-  doc.text('Base INSS', 55, finalY + 35); doc.setFont("helvetica", "normal"); doc.text(payroll.grossSalary.toLocaleString('pt-BR'), 55, finalY + 40);
-  doc.setFont("helvetica", "bold");
-  doc.text('Base FGTS', 95, finalY + 35); doc.setFont("helvetica", "normal"); doc.text(payroll.grossSalary.toLocaleString('pt-BR'), 95, finalY + 40);
-  doc.setFont("helvetica", "bold");
-  doc.text('FGTS Mês', 135, finalY + 35); doc.setFont("helvetica", "normal"); doc.text(payroll.fgts.toLocaleString('pt-BR'), 135, finalY + 40);
-  doc.setFont("helvetica", "bold");
-  doc.text('Base IRRF', 170, finalY + 35); doc.setFont("helvetica", "normal"); doc.text((payroll.grossSalary - payroll.inss).toLocaleString('pt-BR'), 170, finalY + 40);
 
-  // Buffer
+  doc.setDrawColor(230, 230, 230);
+  doc.line(14, finalY + 5, 196, finalY + 5);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text('TOTAL VENCIMENTOS', 100, finalY + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text('R$ ' + totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, finalY + 12, { align: 'right' });
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text('TOTAL DESCONTOS', 100, finalY + 18);
+  doc.setFont("helvetica", "normal");
+  doc.text('R$ ' + totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, finalY + 18, { align: 'right' });
+
+  doc.setFillColor(...accentColor);
+  doc.rect(145, finalY + 5, 51, 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.text('VALOR LÍQUIDO A RECEBER', 150, finalY + 11);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text('R$ ' + payroll.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 150, finalY + 19);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(8);
+  const baseBoxY = finalY + 30;
+  
+  doc.setFillColor(240, 240, 240);
+  doc.rect(14, baseBoxY, 182, 12, 'F');
+  
+  doc.setFont("helvetica", "bold");
+  doc.text('SALÁRIO BASE', 16, baseBoxY + 5);
+  doc.text('BASE INSS', 55, baseBoxY + 5);
+  doc.text('BASE FGTS', 95, baseBoxY + 5);
+  doc.text('FGTS MÊS', 135, baseBoxY + 5);
+  doc.text('BASE IRRF', 170, baseBoxY + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.text('R$ ' + payroll.baseSalary.toLocaleString('pt-BR'), 16, baseBoxY + 10);
+  doc.text('R$ ' + payroll.grossSalary.toLocaleString('pt-BR'), 55, baseBoxY + 10);
+  doc.text('R$ ' + payroll.grossSalary.toLocaleString('pt-BR'), 95, baseBoxY + 10);
+  doc.text('R$ ' + payroll.fgts.toLocaleString('pt-BR'), 135, baseBoxY + 10);
+  doc.text('R$ ' + (payroll.grossSalary - payroll.inss).toLocaleString('pt-BR'), 170, baseBoxY + 10);
+
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text('DECLARO TER RECEBIDO A IMPORTÂNCIA LÍQUIDA DISCRIMINADA NESTE RECIBO.', 14, baseBoxY + 30);
+  
+  doc.setDrawColor(0, 0, 0);
+  doc.line(100, baseBoxY + 55, 180, baseBoxY + 55);
+  doc.text('ASSINATURA DO COLABORADOR', 120, baseBoxY + 60);
+
   return doc.output('blob');
 }
 

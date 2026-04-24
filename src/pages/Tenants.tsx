@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Palette, Globe } from 'lucide-react';
 
 function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
   const map = {
@@ -56,7 +58,9 @@ export default function Tenants() {
         name: t.name,
         cnpj: t.cnpj || '',
         subscription: t.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
-        employeeCount: t.employee_count || 0
+        employeeCount: t.employee_count || 0,
+        plan: t.plan || 'BASIC',
+        branding: t.branding || {}
       })));
     }
 
@@ -98,7 +102,17 @@ export default function Tenants() {
     };
   }, [getAllUsers]);
 
-  const [form, setForm] = useState({ name: '', cnpj: '', monthlyFee: '', startDate: '', expiryDate: '' });
+  const [form, setForm] = useState({ 
+    name: '', 
+    cnpj: '', 
+    monthlyFee: '', 
+    startDate: '', 
+    expiryDate: '',
+    plan: 'BASIC' as 'BASIC' | 'PRO' | 'ENTERPRISE',
+    systemName: '',
+    primaryColor: '',
+    logoUrl: ''
+  });
   
   // Forms for the Details View
   const [addStoreOpen, setAddStoreOpen] = useState(false);
@@ -183,7 +197,17 @@ export default function Tenants() {
 
   const handleOpenAdd = () => {
     setEditTenantId(null);
-    setForm({ name: '', cnpj: '', monthlyFee: '', startDate: new Date().toISOString().split('T')[0], expiryDate: '' });
+    setForm({ 
+      name: '', 
+      cnpj: '', 
+      monthlyFee: '', 
+      startDate: new Date().toISOString().split('T')[0], 
+      expiryDate: '',
+      plan: 'BASIC',
+      systemName: '',
+      primaryColor: '',
+      logoUrl: ''
+    });
     setOpen(true);
   };
 
@@ -195,6 +219,10 @@ export default function Tenants() {
       monthlyFee: t.subscription.monthlyFee.toString(),
       startDate: t.subscription.startDate,
       expiryDate: t.subscription.expiryDate,
+      plan: t.plan || 'BASIC',
+      systemName: t.branding?.system_name || '',
+      primaryColor: t.branding?.primary_color || '',
+      logoUrl: t.branding?.logo_url || ''
     });
     setOpen(true);
   };
@@ -210,13 +238,21 @@ export default function Tenants() {
       additionalCosts: [],
     };
 
+    const branding = {
+      system_name: form.systemName,
+      primary_color: form.primaryColor,
+      logo_url: form.logoUrl
+    };
+
     if (editTenantId) {
       const { error } = await supabase
         .from('tenants')
         .update({
           name: form.name,
           cnpj: form.cnpj,
-          subscription
+          subscription,
+          plan: form.plan,
+          branding
         })
         .eq('id', editTenantId);
 
@@ -240,7 +276,9 @@ export default function Tenants() {
           id: `t${Date.now()}`,
           name: form.name,
           cnpj: form.cnpj,
-          subscription
+          subscription,
+          plan: form.plan,
+          branding
         });
 
       if (error) {
@@ -499,6 +537,7 @@ export default function Tenants() {
           <TabsList className="mb-4">
             <TabsTrigger value="stores" className="gap-2 text-[13px]"><StoreIcon className="w-4 h-4" /> Lojas da Rede</TabsTrigger>
             <TabsTrigger value="users" className="gap-2 text-[13px]"><Users className="w-4 h-4" /> Usuários Administrativos</TabsTrigger>
+            <TabsTrigger value="whitelabel" className="gap-2 text-[13px]"><Palette className="w-4 h-4" /> White Label</TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="logs" className="gap-2 text-[13px]"><History className="w-4 h-4" /> Logs de Auditoria</TabsTrigger>
             )}
@@ -725,6 +764,85 @@ export default function Tenants() {
             </div>
           </TabsContent>
 
+          <TabsContent value="whitelabel" className="space-y-6">
+            <div className="glass-card rounded-2xl border border-white/5 p-8 max-w-2xl mx-auto">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Palette className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Personalização White Label</h3>
+                  <p className="text-[13px] text-muted-foreground">Configure a identidade visual do cliente</p>
+                </div>
+              </div>
+
+              {selectedTenant.plan !== 'ENTERPRISE' ? (
+                <div className="flex flex-col items-center justify-center py-12 px-6 border-2 border-dashed border-white/10 rounded-2xl bg-white/[0.02] text-center">
+                  <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                    <ShieldAlert className="w-8 h-8 text-amber-500" />
+                  </div>
+                  <h4 className="text-[15px] font-bold text-white mb-2">Recurso Indisponível</h4>
+                  <p className="text-[13px] text-muted-foreground mb-6 max-w-sm">
+                    O plano atual ({selectedTenant.plan || 'BÁSICO'}) não possui suporte a White Label. 
+                    Faça o upgrade para o plano <strong>ENTERPRISE</strong> para habilitar.
+                  </p>
+                  <Button variant="outline" className="h-9 text-[12px] font-bold border-primary/20 text-primary hover:bg-primary/10" onClick={() => handleOpenEdit(selectedTenant)}>
+                    Alterar Plano do Cliente
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest">Nome do Sistema</Label>
+                      <Input 
+                        value={form.systemName} 
+                        onChange={e => setForm(f => ({ ...f, systemName: e.target.value }))}
+                        className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
+                        placeholder="Ex: Hub RH MARECHAL"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest">Cor Primária (Hex)</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          value={form.primaryColor} 
+                          onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
+                          className="bg-white/5 border-white/10 h-11 text-[13px] font-mono font-bold"
+                          placeholder="#0066FF"
+                        />
+                        <div className="w-11 h-11 rounded-xl border border-white/10" style={{ backgroundColor: form.primaryColor || '#0066FF' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[12px] font-black text-primary uppercase tracking-widest">URL do Logotipo / Favicon</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={form.logoUrl} 
+                        onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))}
+                        className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
+                        placeholder="https://exemplo.com/logo.png"
+                      />
+                      {form.logoUrl && (
+                        <div className="w-11 h-11 rounded-xl border border-white/10 bg-white flex items-center justify-center p-1 overflow-hidden">
+                          <img src={form.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <Button onClick={handleSave} className="h-11 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[12px] uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)]">
+                      <Save className="w-4 h-4 mr-2" /> Salvar Configurações
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           {isAdmin && (
             <TabsContent value="logs" className="space-y-4">
               <div className="flex items-center justify-between mb-2">
@@ -833,6 +951,19 @@ export default function Tenants() {
                 </div>
               </div>
               <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-muted-foreground">Plano de Assinatura *</label>
+                <Select value={form.plan} onValueChange={(v: any) => setForm(f => ({ ...f, plan: v }))}>
+                  <SelectTrigger className="h-9 text-[13px] bg-white/5 border-white/10">
+                    <SelectValue placeholder="Selecione o plano" />
+                  </SelectTrigger>
+                  <SelectContent className="glass-card border-white/10 text-white">
+                    <SelectItem value="BASIC">PLANO BÁSICO</SelectItem>
+                    <SelectItem value="PRO">PLANO PRO (MULTILojas)</SelectItem>
+                    <SelectItem value="ENTERPRISE">PLANO ENTERPRISE (WHITE LABEL)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <label className="text-[12px] font-medium text-muted-foreground">Mensalidade (R$)</label>
                 <Input type="number" value={form.monthlyFee} onChange={e => setForm(f => ({ ...f, monthlyFee: e.target.value }))} className="h-9 text-[13px]" placeholder="0.00" />
               </div>
@@ -868,7 +999,16 @@ export default function Tenants() {
                       <Building2 className="w-4 h-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{t.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[13px] font-bold text-white group-hover:text-primary transition-colors">{t.name}</p>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border ${
+                          t.plan === 'ENTERPRISE' ? 'border-amber-500/30 text-amber-500 bg-amber-500/10' : 
+                          t.plan === 'PRO' ? 'border-blue-500/30 text-blue-500 bg-blue-500/10' : 
+                          'border-white/10 text-muted-foreground bg-white/5'
+                        }`}>
+                          {t.plan || 'BÁSICO'}
+                        </span>
+                      </div>
                       <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{t.employeeCount} funcionários</p>
                     </div>
                   </div>

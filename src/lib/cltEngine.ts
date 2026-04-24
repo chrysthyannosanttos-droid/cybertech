@@ -345,6 +345,8 @@ export interface RescissionInput {
   dependents?: number;
   extraHours?: number;          // Horas extras a pagar
   extraHoursPercent?: number;   // Percentual (ex: 0.5 para 50%)
+  additionalDeductions?: number; // Outros descontos manuais
+  nightShiftPay?: number;       // Adicional noturno fixo/médio
 }
 
 export function calculateRescission(input: RescissionInput): RescissionResult {
@@ -362,16 +364,18 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     dependents = 0,
     extraHours = 0,
     extraHoursPercent = 0.5,
+    additionalDeductions = 0,
+    nightShiftPay = 0,
   } = input;
 
-  const baseRemuneration = lastSalary + hazardPay + unhealthyPay + bonus;
+  const baseRemuneration = lastSalary + hazardPay + unhealthyPay + bonus + nightShiftPay;
   const dailyRate = baseRemuneration / 30;
 
   // Meses trabalhados
   const totalMonths = monthsBetween(admissionDate, terminationDate);
   const completedMonths = totalMonths;
 
-  // Saldo de salário (dias do mês de demissão)
+  // Saldo de salário (dias do mês de demissão — inclui o dia da dispensa como trabalhado)
   const dayOfTermination = terminationDate.getDate();
   const saldoSalario = round(dailyRate * dayOfTermination);
 
@@ -444,7 +448,7 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
   const baseIRRF = inssBase - inssResult.total - (dependents * deductionPerDependent);
   const irrfValue = calcIRRF(baseIRRF);
 
-  const totalDescontos = round(inssResult.total + irrfValue + descontoAvisoPrevio);
+  const totalDescontos = round(inssResult.total + irrfValue + descontoAvisoPrevio + additionalDeductions);
   const valorLiquido = round(totalCreditos - totalDescontos);
 
   // Montar demonstrativo
@@ -464,6 +468,7 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
   if (inssResult.total > 0) items.push({ description: 'INSS Previdência', value: inssResult.total, type: 'DEDUCTION' });
   if (irrfValue > 0) items.push({ description: 'IRRF', value: irrfValue, type: 'DEDUCTION' });
   if (descontoAvisoPrevio > 0) items.push({ description: 'Desconto Aviso Prévio (Pedido)', value: descontoAvisoPrevio, type: 'DEDUCTION' });
+  if (additionalDeductions > 0) items.push({ description: 'Outros Descontos', value: additionalDeductions, type: 'DEDUCTION' });
 
   return {
     type,

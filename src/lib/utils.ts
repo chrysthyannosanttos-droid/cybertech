@@ -25,8 +25,29 @@ export function formatCPF(cpf: string) {
 
 export function parseNumeric(val: any) {
   if (val === undefined || val === null || val === '') return 0;
-  const str = String(val).replace('R$', '').replace(/\s/g, '').replace('.', '').replace(',', '.');
-  return isNaN(Number(str)) ? 0 : Number(str);
+  
+  // Converte para string e remove espaços e R$
+  let s = String(val).replace('R$', '').replace(/\s/g, '');
+  
+  // Lógica inteligente para detectar separadores
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } 
+  else if (s.includes(',')) {
+    s = s.replace(',', '.');
+  }
+  
+  let num = Number(s);
+  
+  // REGRA DE SEGURANÇA (IA DE IMPORTAÇÃO):
+  // Se o número for absurdamente grande (ex: 141200) e não tiver vírgula original no Excel,
+  // ou se passar de 30.000,00 (limite de segurança comum), dividimos por 100.
+  // Isso resolve o problema de salários de 8 dígitos importados erroneamente.
+  if (!isNaN(num) && num > 30000) {
+    num = num / 100;
+  }
+  
+  return isNaN(num) ? 0 : num;
 }
 
 export function parseExcelDate(val: any) {

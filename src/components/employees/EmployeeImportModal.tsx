@@ -407,6 +407,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
         // Prepare DB object
         const finalRow = {
             ...dbRow,
+            status: 'ACTIVE',
             tenant_id: finalTenantId,
             store_id: selectedStoreId,
             cpf: formatCPF(dbRow.cpf),

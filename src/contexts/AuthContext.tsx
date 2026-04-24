@@ -1,21 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, UserRole } from '@/types';
-
-export type AppModule =
-  | 'dashboard'
-  | 'employees'
-  | 'certificates'
-  | 'payroll'
-  | 'reports'
-  | 'service-providers'
-  | 'rescissions'
-  | 'stores'
-  | 'tenants'
-  | 'logs'
-  | 'users'
-  | 'attendance'
-  | 'settings';
+import { User, AppModule } from '@/types';
 
 export interface ManagedUser {
   email: string;
@@ -103,6 +88,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
         
         if (profile) {
+          let branding = undefined;
+          let plan = 'BASIC';
+          if (profile.tenant_id) {
+            const { data: tData } = await supabase.from('tenants').select('branding, plan').eq('id', profile.tenant_id).maybeSingle();
+            if (tData) {
+              plan = tData.plan || 'BASIC';
+              branding = plan === 'ENTERPRISE' ? tData.branding : undefined;
+            }
+          }
+
           const userData: User = {
             id: profile.id,
             email: profile.email,
@@ -110,7 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role: profile.role,
             tenantId: profile.tenant_id,
             canEditEmployees: profile.can_edit_employees,
-            canDeleteEmployees: profile.can_delete_employees
+            canDeleteEmployees: profile.can_delete_employees,
+            permissions: profile.permissions,
+            appPermissions: profile.app_permissions,
+            tenantBranding: branding,
+            plan: plan as any
           };
           
           setUser(userData);
@@ -140,6 +139,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (profile) {
+        let branding = undefined;
+        let plan = 'BASIC';
+        if (profile.tenant_id) {
+          const { data: tData } = await supabase.from('tenants').select('branding, plan').eq('id', profile.tenant_id).maybeSingle();
+          if (tData) {
+            plan = tData.plan || 'BASIC';
+            branding = plan === 'ENTERPRISE' ? tData.branding : undefined;
+          }
+        }
+
         const userData: User = {
           id: profile.id,
           email: profile.email,
@@ -147,7 +156,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: profile.role,
           tenantId: profile.tenant_id,
           canEditEmployees: profile.can_edit_employees,
-          canDeleteEmployees: profile.can_delete_employees
+          canDeleteEmployees: profile.can_delete_employees,
+          permissions: profile.permissions,
+          appPermissions: profile.app_permissions,
+          tenantBranding: branding,
+          plan: plan as any
         };
         
         setUser(userData);
@@ -236,7 +249,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: p.role,
           tenantId: p.tenant_id,
           canEditEmployees: p.can_edit_employees,
-          canDeleteEmployees: p.can_delete_employees
+          canDeleteEmployees: p.can_delete_employees,
+          permissions: p.permissions,
+          appPermissions: p.app_permissions
         }
       }));
 
