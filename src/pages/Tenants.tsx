@@ -1215,6 +1215,7 @@ export default function Tenants() {
           </tbody>
         </table>
         </div>
+        </div>
       )}
     </div>
   );
