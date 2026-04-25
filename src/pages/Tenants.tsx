@@ -30,6 +30,7 @@ function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
 }
 
 export default function Tenants() {
+  console.log("!!! AGENT VERSION 2.0 LOADED !!!");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [stores, setStores] = useState<StoreType[]>([]);
   
@@ -74,6 +75,23 @@ export default function Tenants() {
     }
 
     setManagedUsers(await getAllUsers());
+    
+    // Refresh selected tenant if we are in management view
+    if (selectedTenant) {
+      const updated = tData?.find(t => t.id === selectedTenant.id);
+      if (updated) {
+        setSelectedTenant({
+          id: updated.id,
+          name: updated.name,
+          cnpj: updated.cnpj || '',
+          subscription: updated.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
+          employeeCount: updated.employee_count || 0,
+          plan: updated.plan || 'BASIC',
+          branding: updated.branding || {}
+        });
+      }
+    }
+    
     setIsLoading(false);
   };
 
@@ -101,6 +119,23 @@ export default function Tenants() {
       supabase.removeChannel(channel);
     };
   }, [getAllUsers]);
+
+  // Sync form state with selected tenant for White Label
+  useEffect(() => {
+    if (selectedTenant) {
+      setForm({
+        name: selectedTenant.name,
+        cnpj: selectedTenant.cnpj,
+        monthlyFee: selectedTenant.subscription.monthlyFee.toString(),
+        startDate: selectedTenant.subscription.startDate,
+        expiryDate: selectedTenant.subscription.expiryDate,
+        plan: selectedTenant.plan || 'BASIC',
+        systemName: selectedTenant.branding?.system_name || '',
+        primaryColor: selectedTenant.branding?.primary_color || '',
+        logoUrl: selectedTenant.branding?.logo_url || ''
+      });
+    }
+  }, [selectedTenant]);
 
   const [form, setForm] = useState({ 
     name: '', 
@@ -244,7 +279,9 @@ export default function Tenants() {
       logo_url: form.logoUrl
     };
 
-    if (editTenantId) {
+    const targetId = editTenantId || selectedTenant?.id;
+
+    if (targetId) {
       const { error } = await supabase
         .from('tenants')
         .update({
@@ -254,7 +291,7 @@ export default function Tenants() {
           plan: form.plan,
           branding
         })
-        .eq('id', editTenantId);
+        .eq('id', targetId);
 
       if (error) {
         toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
@@ -266,7 +303,7 @@ export default function Tenants() {
         userName: currentUser?.name || 'Sistema',
         action: 'EDIT_TENANT',
         details: `[Tenants] Editou empresa ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: editTenantId
+        tenantId: targetId
       });
       toast({ title: 'Empresa atualizada', description: `${form.name} atualizada com sucesso.` });
     } else {
@@ -298,7 +335,6 @@ export default function Tenants() {
     await fetchData();
     setOpen(false);
     toast({ title: editTenantId ? 'Empresa atualizada' : 'Empresa cadastrada' });
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleDeleteTenant = async (id: string, name: string) => {
@@ -320,7 +356,6 @@ export default function Tenants() {
     
     await fetchData();
     toast({ title: 'Empresa excluída' });
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const toggleStatus = async (id: string) => {
@@ -349,7 +384,6 @@ export default function Tenants() {
     });
     
     await fetchData();
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleAddStore = async () => {
@@ -388,7 +422,6 @@ export default function Tenants() {
     setEditStoreId(null);
     setAddStoreOpen(false);
     await fetchData();
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleOpenEditStore = (s: StoreType) => {
@@ -443,7 +476,6 @@ export default function Tenants() {
     setAddUserOpen(false);
     setEditingEmail(null);
     toast({ title: isNew ? 'Usuário cadastrado' : 'Usuário atualizado' });
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const handleEditUser = (u: ManagedUser) => {
@@ -468,19 +500,68 @@ export default function Tenants() {
       } else {
         getAllUsers().then(setManagedUsers);
         toast({ title: 'Usuário removido' });
-        setTimeout(() => window.location.reload(), 500);
       }
     });
   };
 
-  if (selectedTenant) {
-    const tenantStores = stores.filter(s => s.tenantId === selectedTenant.id);
-    const tenantUsers = managedUsers.filter(u => u.user.tenantId === selectedTenant.id && u.user.role === 'tenant');
+  return (
+    <div className="space-y-6">
+      {/* Global Tenant Editor Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">{editTenantId ? 'Editar Empresa / Licença' : 'Cadastrar Empresa Cliente'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 mt-2">
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground">Nome da Empresa *</label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="h-9 text-[13px]" placeholder="Ex: Super Atacado Group" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground">CNPJ *</label>
+              <Input value={form.cnpj} onChange={e => {
+                let v = e.target.value.replace(/\D/g, '');
+                if(v.length > 14) v = v.slice(0, 14);
+                v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+                setForm(f => ({ ...f, cnpj: v }));
+              }} className="h-9 text-[13px]" placeholder="00.000.000/0001-00" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-muted-foreground">Início Licença</label>
+                <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="h-9 text-[13px]" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-muted-foreground">Vencimento Licença</label>
+                <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} className="h-9 text-[13px]" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground">Plano de Assinatura *</label>
+              <Select value={form.plan} onValueChange={(v: any) => setForm(f => ({ ...f, plan: v }))}>
+                <SelectTrigger className="h-9 text-[13px] bg-white/5 border-white/10">
+                  <SelectValue placeholder="Selecione o plano" />
+                </SelectTrigger>
+                <SelectContent className="glass-card border-white/10 text-white">
+                  <SelectItem value="BASIC">PLANO BÁSICO</SelectItem>
+                  <SelectItem value="PRO">PLANO PRO (MULTILojas)</SelectItem>
+                  <SelectItem value="ENTERPRISE">PLANO ENTERPRISE (WHITE LABEL)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground">Mensalidade (R$)</label>
+              <Input type="number" value={form.monthlyFee} onChange={e => setForm(f => ({ ...f, monthlyFee: e.target.value }))} className="h-9 text-[13px]" placeholder="0.00" />
+            </div>
+            <Button onClick={handleSave} className="w-full h-9 text-[13px] mt-2">{editTenantId ? 'Salvar Alterações' : 'Cadastrar Empresa'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-    return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
+      {selectedTenant ? (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSelectedTenant(null)}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
@@ -618,7 +699,6 @@ export default function Tenants() {
                 }
                 setManagedUsers(await getAllUsers());
                 toast({ title: 'Sincronização concluída!' });
-                setTimeout(() => window.location.reload(), 500);
               }}>
                 <RefreshCw className="w-3.5 h-3.5" /> Sincronizar Tudo
               </Button>
@@ -771,7 +851,7 @@ export default function Tenants() {
                   <Palette className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">Personalização White Label</h3>
+                  <h3 className="text-lg font-bold text-white tracking-tight">Personalização White Label <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded ml-2">V2.1</span></h3>
                   <p className="text-[13px] text-muted-foreground">Configure a identidade visual do cliente</p>
                 </div>
               </div>
@@ -811,30 +891,139 @@ export default function Tenants() {
                           className="bg-white/5 border-white/10 h-11 text-[13px] font-mono font-bold"
                           placeholder="#0066FF"
                         />
-                        <div className="w-11 h-11 rounded-xl border border-white/10" style={{ backgroundColor: form.primaryColor || '#0066FF' }} />
+                        <div className="relative">
+                          <input 
+                            type="color" 
+                            value={form.primaryColor || '#0066FF'} 
+                            onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
+                            className="w-11 h-11 rounded-xl border-none cursor-pointer p-0 overflow-hidden absolute inset-0 opacity-0"
+                          />
+                          <div className="w-11 h-11 rounded-xl border border-white/10 shadow-lg" style={{ backgroundColor: form.primaryColor || '#0066FF' }} />
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-[12px] font-black text-primary uppercase tracking-widest">URL do Logotipo / Favicon</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={form.logoUrl} 
-                        onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))}
-                        className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
-                        placeholder="https://exemplo.com/logo.png"
-                      />
-                      {form.logoUrl && (
-                        <div className="w-11 h-11 rounded-xl border border-white/10 bg-white flex items-center justify-center p-1 overflow-hidden">
-                          <img src={form.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                  <div className="space-y-4">
+                    <Label className="text-[12px] font-black text-primary uppercase tracking-widest">Logotipo do Sistema (Beta Upload)</Label>
+                    <div className="flex flex-col md:flex-row gap-4 items-start">
+                      <div className="flex-1 w-full space-y-2">
+                        <Input 
+                          value={form.logoUrl} 
+                          onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))}
+                          className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
+                          placeholder="Cole a URL ou faça o upload ao lado"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            className="h-9 text-[11px] font-bold border-white/10 hover:bg-white/5 relative"
+                            onClick={() => document.getElementById('logo-upload')?.click()}
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-2" /> Upload de Arquivo
+                            <input 
+                              id="logo-upload"
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                
+                                try {
+                                  const fileExt = file.name.split('.').pop();
+                                  const fileName = `${selectedTenant.id}_${Date.now()}.${fileExt}`;
+                                  const filePath = `logos/${fileName}`;
+                                  
+                                  const { error: uploadError } = await supabase.storage
+                                    .from('system-assets')
+                                    .upload(filePath, file);
+                                    
+                                  if (uploadError) throw uploadError;
+                                  
+                                  const { data: { publicUrl } } = supabase.storage
+                                    .from('system-assets')
+                                    .getPublicUrl(filePath);
+                                    
+                                  setForm(f => ({ ...f, logoUrl: publicUrl }));
+                                  toast({ title: 'Upload concluído!' });
+                                } catch (err: any) {
+                                  toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                                }
+                              }}
+                            />
+                          </Button>
+                          <span className="text-[10px] text-muted-foreground italic">Recomendado: PNG Transparente 512x512px</span>
                         </div>
-                      )}
+                      </div>
+                      
+                      <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex items-center justify-center p-2 overflow-hidden shrink-0 group relative">
+                        {form.logoUrl ? (
+                          <>
+                            <img src={form.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain transition-transform group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer" onClick={() => setForm(f => ({ ...f, logoUrl: '' }))}>
+                              <X className="w-6 h-6 text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center">
+                            <Plus className="w-6 h-6 text-white/20 mx-auto" />
+                            <span className="text-[9px] text-white/20 font-bold uppercase mt-1 block">Logo</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 flex justify-end">
-                    <Button onClick={handleSave} className="h-11 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[12px] uppercase tracking-widest shadow-[0_0_20px_rgba(var(--primary),0.3)]">
+                  <div className="pt-8 border-t border-white/10">
+                    <Label className="text-[12px] font-black text-primary uppercase tracking-widest mb-4 block">Prévia em Tempo Real</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white/[0.02] rounded-2xl p-6 border border-white/5">
+                      {/* Sidebar Preview */}
+                      <div className="space-y-4">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Interface do Sistema</p>
+                        <div className="flex gap-3">
+                          <div className="w-12 h-32 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center py-4 gap-4">
+                            <div className="w-6 h-6 rounded-lg" style={{ backgroundColor: form.primaryColor || '#0066FF' }} />
+                            <div className="w-6 h-0.5 bg-white/10" />
+                            <div className="w-6 h-0.5 bg-white/10" />
+                            <div className="w-6 h-0.5 bg-white/10" />
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <div className="h-6 w-3/4 rounded bg-white/5" />
+                            <div className="h-20 w-full rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col justify-between">
+                              <div className="h-2 w-1/2 rounded bg-white/10" />
+                              <div className="h-8 w-full rounded-lg flex items-center justify-center text-[10px] font-bold text-white shadow-lg" style={{ backgroundColor: form.primaryColor || '#0066FF', boxShadow: `0 4px 12px ${form.primaryColor}44` }}>
+                                BOTÃO DE AÇÃO
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/10">
+                            {form.logoUrl ? (
+                              <img src={form.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                            ) : (
+                              <Building2 className="w-5 h-5 text-zinc-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[14px] font-bold text-white">{form.systemName || 'CyberTech RH'}</p>
+                            <p className="text-[11px] text-muted-foreground">ID: {selectedTenant.id}</p>
+                          </div>
+                        </div>
+                        <p className="text-[12px] text-muted-foreground leading-relaxed">
+                          As alterações acima serão aplicadas a todos os usuários da empresa <strong>{selectedTenant.name}</strong> assim que você clicar em salvar.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 flex justify-end">
+                    <Button onClick={handleSave} className="h-12 px-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-[13px] uppercase tracking-widest shadow-[0_8px_30px_rgba(var(--primary),0.3)] transition-all hover:-translate-y-1 active:translate-y-0">
                       <Save className="w-4 h-4 mr-2" /> Salvar Configurações
                     </Button>
                   </div>
@@ -906,71 +1095,16 @@ export default function Tenants() {
           )}
         </Tabs>
       </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+      ) : (
+        <div className="animate-fade-in">
+          <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-semibold">Empresas</h1>
           <p className="text-[13px] text-muted-foreground">Gerencie clientes e licenças</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="h-8 text-[12px] gap-1.5" onClick={handleOpenAdd}>
-              <Plus className="w-3.5 h-3.5" /> Nova Empresa
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-[15px]">{editTenantId ? 'Editar Empresa / Licença' : 'Cadastrar Empresa Cliente'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2 mt-2">
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">Nome da Empresa *</label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="h-9 text-[13px]" placeholder="Ex: Super Atacado Group" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">CNPJ *</label>
-                <Input value={form.cnpj} onChange={e => {
-                  let v = e.target.value.replace(/\D/g, '');
-                  if(v.length > 14) v = v.slice(0, 14);
-                  v = v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-                  setForm(f => ({ ...f, cnpj: v }));
-                }} className="h-9 text-[13px]" placeholder="00.000.000/0001-00" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[12px] font-medium text-muted-foreground">Início Licença</label>
-                  <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="h-9 text-[13px]" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[12px] font-medium text-muted-foreground">Vencimento Licença</label>
-                  <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} className="h-9 text-[13px]" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">Plano de Assinatura *</label>
-                <Select value={form.plan} onValueChange={(v: any) => setForm(f => ({ ...f, plan: v }))}>
-                  <SelectTrigger className="h-9 text-[13px] bg-white/5 border-white/10">
-                    <SelectValue placeholder="Selecione o plano" />
-                  </SelectTrigger>
-                  <SelectContent className="glass-card border-white/10 text-white">
-                    <SelectItem value="BASIC">PLANO BÁSICO</SelectItem>
-                    <SelectItem value="PRO">PLANO PRO (MULTILojas)</SelectItem>
-                    <SelectItem value="ENTERPRISE">PLANO ENTERPRISE (WHITE LABEL)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">Mensalidade (R$)</label>
-                <Input type="number" value={form.monthlyFee} onChange={e => setForm(f => ({ ...f, monthlyFee: e.target.value }))} className="h-9 text-[13px]" placeholder="0.00" />
-              </div>
-              <Button onClick={handleSave} className="w-full h-9 text-[13px] mt-2">{editTenantId ? 'Salvar Alterações' : 'Cadastrar Empresa'}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" className="h-8 text-[12px] gap-1.5" onClick={handleOpenAdd}>
+          <Plus className="w-3.5 h-3.5" /> Nova Empresa
+        </Button>
       </div>
 
       <div className="relative mb-4">
@@ -1080,7 +1214,8 @@ export default function Tenants() {
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

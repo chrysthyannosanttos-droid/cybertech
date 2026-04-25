@@ -24,6 +24,14 @@ export default function CompanySettings() {
     logo_url: ''
   });
 
+  const [form, setForm] = useState({ 
+    name: '', 
+    cnpj: '',
+    systemName: '',
+    primaryColor: '',
+    logoUrl: ''
+  });
+
   useEffect(() => {
     const fetchTenant = async () => {
       if (!currentUser?.tenantId) {
@@ -48,9 +56,9 @@ export default function CompanySettings() {
         setForm({ 
           name: data.name, 
           cnpj: data.cnpj || '',
-          system_name: data.branding?.system_name || '',
-          primary_color: data.branding?.primary_color || '',
-          logo_url: data.branding?.logo_url || ''
+          systemName: data.branding?.system_name || '',
+          primaryColor: data.branding?.primary_color || '',
+          logoUrl: data.branding?.logo_url || ''
         });
       }
       setIsLoading(false);
@@ -69,9 +77,9 @@ export default function CompanySettings() {
         name: form.name,
         cnpj: form.cnpj,
         branding: {
-          system_name: form.system_name,
-          primary_color: form.primary_color,
-          logo_url: form.logo_url
+          system_name: form.systemName,
+          primary_color: form.primaryColor,
+          logo_url: form.logoUrl
         }
       })
       .eq('id', tenant.id);
@@ -207,7 +215,7 @@ export default function CompanySettings() {
                     <Palette className="w-5 h-5 text-amber-500" />
                   </div>
                   <div>
-                    <CardTitle className="text-[14px] font-black uppercase tracking-widest text-white">White Label & Branding</CardTitle>
+                    <CardTitle className="text-[14px] font-black uppercase tracking-widest text-white">White Label & Branding <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded ml-2">V2.1</span></CardTitle>
                     <CardDescription className="text-[11px] font-medium text-muted-foreground">Personalize a identidade visual do seu sistema</CardDescription>
                   </div>
                 </div>
@@ -236,8 +244,8 @@ export default function CompanySettings() {
                     <div className="space-y-2">
                       <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nome do Sistema Personalizado</Label>
                       <Input 
-                        value={form.system_name} 
-                        onChange={e => setForm(f => ({ ...f, system_name: e.target.value }))}
+                        value={form.systemName} 
+                        onChange={e => setForm(f => ({ ...f, systemName: e.target.value }))}
                         className="h-11 bg-white/[0.03] border-white/10"
                         placeholder="Ex: Minha Empresa RH"
                       />
@@ -246,33 +254,109 @@ export default function CompanySettings() {
                       <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cor Principal (Hexadecimal)</Label>
                       <div className="flex gap-2">
                         <Input 
-                        value={form.primary_color} 
-                        onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))}
+                        value={form.primaryColor} 
+                        onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
                         className="h-11 bg-white/[0.03] border-white/10 font-mono"
                         placeholder="#0ea5e9"
                       />
-                      <div 
-                        className="w-11 h-11 rounded-lg border border-white/10 shadow-inner shrink-0" 
-                        style={{ backgroundColor: form.primary_color || '#0ea5e9' }}
-                      />
+                      <div className="relative">
+                        <input 
+                          type="color" 
+                          value={form.primaryColor || '#0ea5e9'} 
+                          onChange={e => setForm(f => ({ ...f, primaryColor: e.target.value }))}
+                          className="w-11 h-11 rounded-lg border-none cursor-pointer p-0 overflow-hidden absolute inset-0 opacity-0"
+                        />
+                        <div 
+                          className="w-11 h-11 rounded-lg border border-white/10 shadow-inner shrink-0" 
+                          style={{ backgroundColor: form.primaryColor || '#0ea5e9' }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">URL da Logo (PNG transparente recomendada)</Label>
-                  <div className="flex gap-4 items-center">
-                    <Input 
-                      value={form.logo_url} 
-                      onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))}
-                      className="h-11 flex-1 bg-white/[0.03] border-white/10"
-                      placeholder="https://sua-empresa.com/logo.png"
-                    />
-                    {form.logo_url && (
-                      <div className="w-12 h-12 rounded-xl bg-black/40 p-1 border border-white/5 overflow-hidden">
-                        <img src={form.logo_url} alt="Preview Logo" className="w-full h-full object-contain" />
+                <div className="space-y-4">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Logotipo do Sistema</Label>
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="flex-1 w-full space-y-2">
+                      <Input 
+                        value={form.logoUrl} 
+                        onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))}
+                        className="h-11 bg-white/[0.03] border-white/10"
+                        placeholder="Cole a URL ou faça o upload ao lado"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="h-9 text-[10px] font-bold border-white/10 hover:bg-white/5 relative"
+                          onClick={() => document.getElementById('logo-upload-settings')?.click()}
+                        >
+                          <Palette className="w-3.5 h-3.5 mr-2" /> Upload de Arquivo
+                          <input 
+                            id="logo-upload-settings"
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !tenant) return;
+                              
+                              try {
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `${tenant.id}_${Date.now()}.${fileExt}`;
+                                const filePath = `logos/${fileName}`;
+                                
+                                const { error: uploadError } = await supabase.storage
+                                  .from('system-assets')
+                                  .upload(filePath, file);
+                                  
+                                if (uploadError) throw uploadError;
+                                
+                                const { data: { publicUrl } } = supabase.storage
+                                  .from('system-assets')
+                                  .getPublicUrl(filePath);
+                                  
+                                setForm(f => ({ ...f, logoUrl: publicUrl }));
+                                toast({ title: 'Upload concluído!' });
+                              } catch (err: any) {
+                                toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                              }
+                            }}
+                          />
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground italic">PNG Transparente Recomendado</span>
                       </div>
-                    )}
+                    </div>
+                    
+                    <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex items-center justify-center p-2 overflow-hidden shrink-0">
+                      {form.logoUrl ? (
+                        <img src={form.logoUrl} alt="Logo Preview" className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <Building2 className="w-8 h-8 text-white/10" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/10">
+                  <Label className="text-[11px] font-black text-primary uppercase tracking-widest mb-4 block">Prévia da Interface</Label>
+                  <div className="bg-white/[0.02] rounded-2xl p-6 border border-white/5 flex gap-6 items-center">
+                    <div className="w-12 h-24 rounded-xl bg-white/5 border border-white/10 flex flex-col items-center py-3 gap-3">
+                      <div className="w-6 h-6 rounded-lg shadow-lg" style={{ backgroundColor: form.primaryColor || '#0ea5e9' }} />
+                      <div className="w-6 h-0.5 bg-white/10" />
+                      <div className="w-6 h-0.5 bg-white/10" />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-2">
+                         <div className="w-6 h-6 rounded bg-white p-0.5">
+                            {form.logoUrl ? <img src={form.logoUrl} className="w-full h-full object-contain" /> : <Building2 className="w-full h-full text-zinc-400" />}
+                         </div>
+                         <span className="text-[12px] font-bold text-white">{form.systemName || 'CyberTech RH'}</span>
+                      </div>
+                      <div className="h-8 w-full rounded-lg flex items-center justify-center text-[10px] font-bold text-white shadow-lg" style={{ backgroundColor: form.primaryColor || '#0ea5e9' }}>
+                        BOTÃO EXEMPLO
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -289,7 +373,7 @@ export default function CompanySettings() {
                   <Button 
                     onClick={async () => {
                       if (!window.confirm('Deseja resetar a identidade visual para o padrão CyberTech?')) return;
-                      setForm(f => ({ ...f, system_name: '', primary_color: '', logo_url: '' }));
+                      setForm(f => ({ ...f, systemName: '', primaryColor: '', logoUrl: '' }));
                       setIsSaving(true);
                       const { error } = await supabase.from('tenants').update({ branding: null }).eq('id', tenant.id);
                       if (error) toast({ title: 'Erro ao resetar', variant: 'destructive' });
