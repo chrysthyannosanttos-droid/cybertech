@@ -19,14 +19,6 @@ export default function CompanySettings() {
   const [form, setForm] = useState({ 
     name: '', 
     cnpj: '',
-    system_name: '',
-    primary_color: '',
-    logo_url: ''
-  });
-
-  const [form, setForm] = useState({ 
-    name: '', 
-    cnpj: '',
     systemName: '',
     primaryColor: '',
     logoUrl: ''
