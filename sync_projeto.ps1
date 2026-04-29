@@ -1,4 +1,5 @@
 # Script de Sincronização Automática - CyberTech RH
+Set-Location $PSScriptRoot
 # Este script envia as alterações para o GitHub e realiza o Deploy na Vercel
 
 Write-Host "==========================================" -ForegroundColor Cyan
