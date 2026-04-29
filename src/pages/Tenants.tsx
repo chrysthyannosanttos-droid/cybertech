@@ -46,6 +46,10 @@ export default function Tenants() {
   const [backupLoading, setBackupLoading] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Variáveis derivadas para filtrar dados da empresa selecionada
+  const tenantStores = stores.filter(s => s.tenantId === selectedTenant?.id);
+  const tenantUsers = managedUsers.filter(u => u.user.tenantId === selectedTenant?.id);
+
   const fetchData = async () => {
     setIsLoading(true);
     const [{ data: tData }, { data: sData }] = await Promise.all([
