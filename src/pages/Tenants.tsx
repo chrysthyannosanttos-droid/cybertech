@@ -935,6 +935,12 @@ export default function Tenants() {
                                 if (!file) return;
                                 
                                 try {
+                                  // Garantir que o bucket 'system-assets' existe
+                                  const { data: buckets } = await supabase.storage.listBuckets();
+                                  if (!buckets?.some(b => b.name === 'system-assets')) {
+                                    await supabase.storage.createBucket('system-assets', { public: true });
+                                  }
+                                  
                                   const fileExt = file.name.split('.').pop();
                                   const fileName = `${selectedTenant.id}_${Date.now()}.${fileExt}`;
                                   const filePath = `logos/${fileName}`;
