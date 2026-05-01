@@ -1,3 +1,4 @@
+// v1.1.2 - Sorting Filters Implementation
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
