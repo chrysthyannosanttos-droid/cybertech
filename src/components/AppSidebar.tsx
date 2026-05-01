@@ -41,6 +41,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/vacations',          module: 'rescissions',       icon: TreePalm,        label: 'Férias' },
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
   { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
+  { to: '/commercial',        module: 'dashboard',         icon: FileText,        label: 'Proposta Comercial', superadminOnly: true, cristianoOnly: true },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
   { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
   { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
@@ -77,6 +78,9 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
     if (user?.email === 'teste' && isEmployeeView) {
       return ['/holerites', '/dashboard'].includes(link.to);
     }
+
+    // Links exclusivos para Cristiano (Dono do Sistema)
+    if ((link as any).cristianoOnly && !isCristiano) return false;
 
     // Links exclusivos de superadmin só aparecem para cristiano/superadmin
     if (link.superadminOnly && !isSuperAdmin) return false;

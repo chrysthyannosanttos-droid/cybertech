@@ -25,6 +25,7 @@ import EmailSettings from "@/pages/EmailSettings";
 import NotFound from "@/pages/NotFound";
 import Attendance from "@/pages/Attendance";
 import Vacations from "@/pages/Vacations";
+import Commercial from "@/pages/Commercial";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ function AppRoutes() {
         <Route path="/holerites" element={<Holerites />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/vacations" element={<Vacations />} />
+        <Route path="/commercial" element={<Commercial />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
