@@ -49,9 +49,9 @@ const COLORS = [
 ];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isImpersonating } = useAuth();
   const { toast } = useToast();
-  const isSuperAdmin = user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin' && !isImpersonating;
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -69,6 +69,24 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      let qTenants = supabase.from('tenants').select('*');
+      let qEmployees = supabase.from('employees').select('*').eq('status', 'ACTIVE');
+      let qCertificates = supabase.from('certificates').select('*');
+      let qStores = supabase.from('stores').select('*');
+      let qProviders = supabase.from('service_providers').select('*');
+      let qPayrolls = supabase.from('payrolls').select('*');
+      let qRescissions = supabase.from('rescissions').select('*').order('termination_date', { ascending: false });
+
+      // Se não for superadmin (ou estiver emulando), filtrar por tenant_id
+      if (!isSuperAdmin && user?.tenantId) {
+        qEmployees = qEmployees.eq('tenant_id', user.tenantId);
+        qCertificates = qCertificates.eq('tenant_id', user.tenantId);
+        qStores = qStores.eq('tenant_id', user.tenantId);
+        qProviders = qProviders.eq('tenant_id', user.tenantId);
+        qPayrolls = qPayrolls.eq('tenant_id', user.tenantId);
+        qRescissions = qRescissions.eq('tenant_id', user.tenantId);
+      }
+
       const [
         { data: tData },
         { data: eData },
@@ -78,13 +96,13 @@ export default function Dashboard() {
         { data: pyData },
         { data: rsData }
       ] = await Promise.all([
-        supabase.from('tenants').select('*'),
-        supabase.from('employees').select('*').eq('status', 'ACTIVE'),
-        supabase.from('certificates').select('*'),
-        supabase.from('stores').select('*'),
-        supabase.from('service_providers').select('*'),
-        supabase.from('payrolls').select('*'),
-        supabase.from('rescissions').select('*').order('termination_date', { ascending: false })
+        qTenants,
+        qEmployees,
+        qCertificates,
+        qStores,
+        qProviders,
+        qPayrolls,
+        qRescissions
       ]);
 
       if (tData) setTenants(tData.map(t => ({ ...t, employeeCount: t.employee_count, subscription: t.subscription || { status: 'active', monthlyFee: 0 } } as Tenant)));

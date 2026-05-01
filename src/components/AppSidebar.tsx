@@ -70,8 +70,8 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
     fetchSync();
   }, []);
 
-  const isCristiano = user?.email?.toLowerCase().includes('cristiano') || user?.name?.toLowerCase().includes('cristiano');
-  const isSuperAdmin = user?.role === 'superadmin' || isCristiano;
+  const isCristiano = (user?.email?.toLowerCase().includes('cristiano') || user?.name?.toLowerCase().includes('cristiano')) && !isImpersonating;
+  const isSuperAdmin = (user?.role === 'superadmin' || isCristiano) && !isImpersonating;
 
   const links = ALL_LINKS.filter(link => {
     // Se visão de colaborador estiver ativa, mostrar apenas Holerites
@@ -167,8 +167,12 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
             {user?.name?.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-bold truncate text-white">{user?.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+            <p className="text-[12px] font-black text-white truncate leading-tight uppercase tracking-tighter">
+              {user?.name} {isImpersonating && "(Simulação)"}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate font-medium">
+              {isImpersonating ? "Acesso Temporário" : (user?.role === 'superadmin' ? 'Super Administrador' : 'Administrador')}
+            </p>
           </div>
         </div>
         <Button
