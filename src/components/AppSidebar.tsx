@@ -48,7 +48,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
 ];
 
 export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () => void; isMobile?: boolean }) {
-  const { user, logout, currentPermissions, isEmployeeView } = useAuth();
+  const { user, logout, currentPermissions, isEmployeeView, isImpersonating } = useAuth();
   const [lastDataSync, setLastDataSync] = useState<string | null>(null);
 
   useEffect(() => {
