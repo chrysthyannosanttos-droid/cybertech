@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Clock, Plus, History, HardDrive, RefreshCw, XCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Clock, Plus, History, HardDrive, RefreshCw, XCircle, Sparkles, CheckCircle2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
