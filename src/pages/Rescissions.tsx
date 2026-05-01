@@ -21,6 +21,7 @@ interface Rescission {
   admission_date?: string; last_salary?: number; gross_value?: number;
   inss_deduction?: number; irrf_deduction?: number;
   other_deductions?: number;
+  items?: any[];
 }
 
 const fmt = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -160,6 +161,7 @@ export default function Rescissions() {
       inss_deduction: preview.inss,
       irrf_deduction: preview.irrf,
       other_deductions: form.additionalDeductions,
+      items: preview.items,
     }]);
 
     if (error) {
@@ -551,24 +553,51 @@ export default function Rescissions() {
             </div>
             {expandedId === r.id && (
               <div className="border-t border-white/5 p-5 bg-white/[0.02]">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Último Salário', val: r.last_salary || 0 },
-                    { label: 'Total Bruto', val: r.gross_value || r.rescission_value },
-                    { label: '(-) INSS', val: -(r.inss_deduction || 0) },
-                    { label: '(-) IRRF', val: -(r.irrf_deduction || 0) },
-                    { label: '(-) Outros', val: -(r.other_deductions || 0) },
-                    { label: 'FGTS + Multa', val: r.fgts_value || 0 },
-                    { label: 'Admissão', val: null, dateStr: r.admission_date ? new Date(r.admission_date).toLocaleDateString('pt-BR') : '—' },
-                    { label: 'Líquido Final', val: r.rescission_value },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 rounded-xl bg-white/5 border border-white/5">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
-                      <p className={cn('text-[13px] font-bold', item.val != null && item.val < 0 ? 'text-rose-400' : 'text-white')}>
-                        {(item as any).dateStr || (item.val != null ? fmt(Math.abs(item.val)) : '—')}
-                      </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Detalhamento de Itens */}
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-black text-rose-400 uppercase tracking-widest mb-3">Detalhamento da Rescisão</p>
+                    <div className="space-y-1">
+                      {(r.items || []).map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center p-2 rounded-lg bg-white/5 border border-white/5">
+                          <span className="text-[12px] text-muted-foreground">{item.description}</span>
+                          <span className={cn("text-[12px] font-bold", item.type === 'CREDIT' ? 'text-emerald-400' : 'text-rose-400')}>
+                            {item.type === 'DEDUCTION' ? '-' : '+'}{fmt(item.value)}
+                          </span>
+                        </div>
+                      ))}
+                      {!r.items && (
+                        <p className="text-[11px] text-muted-foreground italic">Detalhamento não disponível para registros antigos.</p>
+                      )}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Resumo Financeiro */}
+                  <div className="space-y-4">
+                    <p className="text-[11px] font-black text-white uppercase tracking-widest mb-3">Resumo Financeiro</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Último Salário', val: r.last_salary || 0 },
+                        { label: 'Total Bruto', val: r.gross_value || r.rescission_value },
+                        { label: 'Total Descontos', val: -(r.inss_deduction || 0) - (r.irrf_deduction || 0) - (r.other_deductions || 0) },
+                        { label: 'Líquido Final', val: r.rescission_value, highlight: true },
+                      ].map(item => (
+                        <div key={item.label} className={cn("p-3 rounded-xl border", item.highlight ? "bg-rose-500/10 border-rose-500/20" : "bg-white/5 border-white/5")}>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</p>
+                          <p className={cn('text-[14px] font-black', item.val != null && item.val < 0 ? 'text-rose-400' : 'text-white')}>
+                            {fmt(Math.abs(item.val || 0))}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="text-[11px] font-bold text-amber-500 uppercase">FGTS + Multa 40%</p>
+                        <p className="text-[14px] font-black text-amber-500">{fmt(r.fgts_value)}</p>
+                      </div>
+                      <p className="text-[10px] text-amber-500/60 leading-tight">Este valor é disponibilizado via chave de saque e não compõe o líquido depositado em conta.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
