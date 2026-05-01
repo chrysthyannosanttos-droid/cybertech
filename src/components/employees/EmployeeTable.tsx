@@ -24,7 +24,21 @@ interface EmployeeTableProps {
   sortOrder?: 'asc' | 'desc';
   onSortChange?: (field: string, order: 'asc' | 'desc') => void;
 }
-
+export function EmployeeTable({
+  paginatedEmployees,
+  selectedIds,
+  onToggleSelectAll,
+  onToggleSelect,
+  onEdit,
+  onDelete,
+  onRegisterPhoto,
+  isAdmin,
+  currentUser,
+  calcEmployeeCost,
+  page,
+  totalPages,
+  perPage,
+  totalFiltered,
   onPageChange,
   sortBy,
   sortOrder,
