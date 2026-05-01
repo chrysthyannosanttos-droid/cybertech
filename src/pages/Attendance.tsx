@@ -46,7 +46,7 @@ export default function Attendance() {
 
   const { user } = useAuth();
   const { toast } = useToast();
-  const isAdmin = user?.role === 'superadmin';
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'tenant';
   const tenantId = (user as any)?.tenantId || (user as any)?.tenant_id;
 
   const fetchData = useCallback(async () => {

@@ -131,7 +131,7 @@ export default function Payroll() {
     };
   }, []);
 
-  const isAdmin = currentUser?.role === 'superadmin';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'tenant';
 
   const payroll: PayrollEntry[] = useMemo(() => {
     return dbEmployees

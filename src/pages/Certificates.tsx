@@ -23,7 +23,7 @@ export default function Certificates() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tenantId, setTenantId] = useState<string | null>(null);
   
-  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'tenant';
 
   useEffect(() => {
     const fetchData = async () => {

@@ -297,7 +297,7 @@ export default function Tenants() {
       monthlyFee: Number(form.monthlyFee) || 0,
       additionalCosts: [],
     };
-
+    const branding = {
       system_name: form.systemName,
       primary_color: form.primaryColor,
       logo_url: form.logoUrl,
@@ -960,13 +960,53 @@ export default function Tenants() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest text-emerald-400">Fundo da Tela de Login</Label>
-                      <Input 
-                        value={form.backgroundUrl} 
-                        onChange={e => setForm(f => ({ ...f, backgroundUrl: e.target.value }))}
-                        className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
-                        placeholder="URL da Imagem (4K/FullHD)"
-                      />
+                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest text-emerald-400">Fundo de Tela (Login e Sistema)</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          value={form.backgroundUrl} 
+                          onChange={e => setForm(f => ({ ...f, backgroundUrl: e.target.value }))}
+                          className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
+                          placeholder="URL da Imagem (4K/FullHD)"
+                        />
+                        <Button 
+                          variant="outline" 
+                          className="h-11 border-white/10 hover:bg-white/5 relative shrink-0 px-3"
+                          onClick={() => document.getElementById('bg-upload')?.click()}
+                        >
+                          <Plus className="w-4 h-4" />
+                          <input 
+                            id="bg-upload"
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              
+                              try {
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `bg_${selectedTenant.id}_${Date.now()}.${fileExt}`;
+                                const filePath = `backgrounds/${fileName}`;
+                                
+                                const { error: uploadError } = await supabase.storage
+                                  .from('system-assets')
+                                  .upload(filePath, file);
+                                  
+                                if (uploadError) throw uploadError;
+                                
+                                const { data: { publicUrl } } = supabase.storage
+                                  .from('system-assets')
+                                  .getPublicUrl(filePath);
+                                  
+                                setForm(f => ({ ...f, backgroundUrl: publicUrl }));
+                                toast({ title: 'Upload de Fundo concluído!' });
+                              } catch (err: any) {
+                                toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                              }
+                            }}
+                          />
+                        </Button>
+                      </div>
                       <p className="text-[10px] text-muted-foreground italic">Deixe em branco para usar o fundo padrão.</p>
                     </div>
                   </div>

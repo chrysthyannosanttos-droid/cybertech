@@ -74,6 +74,13 @@ export function BrandingStyles() {
       }
       link.href = branding.logo_url;
     }
+
+    // Dynamic Background for the system
+    if (branding?.background_url) {
+      document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+    } else {
+      document.documentElement.style.removeProperty('--tenant-bg');
+    }
   }, [branding]);
 
   return null;

@@ -39,7 +39,7 @@ const TYPE_NAMES: Record<string, string> = {
 export default function Rescissions() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const isAdmin = currentUser?.role === 'superadmin';
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'tenant';
 
   const [rescissions, setRescissions] = useState<Rescission[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);

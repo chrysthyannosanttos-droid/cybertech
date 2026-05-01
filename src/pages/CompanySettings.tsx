@@ -21,7 +21,8 @@ export default function CompanySettings() {
     cnpj: '',
     systemName: '',
     primaryColor: '',
-    logoUrl: ''
+    logoUrl: '',
+    backgroundUrl: ''
   });
 
   useEffect(() => {
@@ -50,7 +51,8 @@ export default function CompanySettings() {
           cnpj: data.cnpj || '',
           systemName: data.branding?.system_name || '',
           primaryColor: data.branding?.primary_color || '',
-          logoUrl: data.branding?.logo_url || ''
+          logoUrl: data.branding?.logo_url || '',
+          backgroundUrl: data.branding?.background_url || ''
         });
       }
       setIsLoading(false);
@@ -63,15 +65,20 @@ export default function CompanySettings() {
     if (!tenant || !form.name || !form.cnpj) return;
     setIsSaving(true);
 
+    const { data: currentTenant } = await supabase.from('tenants').select('branding').eq('id', tenant.id).single();
+    const existingBranding = currentTenant?.branding || {};
+
     const { error } = await supabase
       .from('tenants')
       .update({
         name: form.name,
         cnpj: form.cnpj,
         branding: {
+          ...existingBranding,
           system_name: form.systemName,
           primary_color: form.primaryColor,
-          logo_url: form.logoUrl
+          logo_url: form.logoUrl,
+          background_url: form.backgroundUrl
         }
       })
       .eq('id', tenant.id);
@@ -330,6 +337,61 @@ export default function CompanySettings() {
                   </div>
                 </div>
 
+                <div className="space-y-4">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Fundo de Tela (Login e Sistema)</Label>
+                  <div className="flex flex-col md:flex-row gap-4 items-start">
+                    <div className="flex-1 w-full space-y-2">
+                      <Input 
+                        value={form.backgroundUrl} 
+                        onChange={e => setForm(f => ({ ...f, backgroundUrl: e.target.value }))}
+                        className="h-11 bg-white/[0.03] border-white/10"
+                        placeholder="URL da Imagem ou faça upload ao lado"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="h-9 text-[10px] font-bold border-white/10 hover:bg-white/5 relative"
+                          onClick={() => document.getElementById('bg-upload-settings')?.click()}
+                        >
+                          <Palette className="w-3.5 h-3.5 mr-2" /> Upload de Arquivo
+                          <input 
+                            id="bg-upload-settings"
+                            type="file" 
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !tenant) return;
+                              
+                              try {
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `bg_${tenant.id}_${Date.now()}.${fileExt}`;
+                                const filePath = `backgrounds/${fileName}`;
+                                
+                                const { error: uploadError } = await supabase.storage
+                                  .from('system-assets')
+                                  .upload(filePath, file);
+                                  
+                                if (uploadError) throw uploadError;
+                                
+                                const { data: { publicUrl } } = supabase.storage
+                                  .from('system-assets')
+                                  .getPublicUrl(filePath);
+                                  
+                                setForm(f => ({ ...f, backgroundUrl: publicUrl }));
+                                toast({ title: 'Upload concluído!' });
+                              } catch (err: any) {
+                                toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                              }
+                            }}
+                          />
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground italic">Recomendado: 4K ou FullHD</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-6 border-t border-white/10">
                   <Label className="text-[11px] font-black text-primary uppercase tracking-widest mb-4 block">Prévia da Interface</Label>
                   <div className="bg-white/[0.02] rounded-2xl p-6 border border-white/5 flex gap-6 items-center">
@@ -365,7 +427,7 @@ export default function CompanySettings() {
                   <Button 
                     onClick={async () => {
                       if (!window.confirm('Deseja resetar a identidade visual para o padrão CyberTech?')) return;
-                      setForm(f => ({ ...f, systemName: '', primaryColor: '', logoUrl: '' }));
+                      setForm(f => ({ ...f, systemName: '', primaryColor: '', logoUrl: '', backgroundUrl: '' }));
                       setIsSaving(true);
                       const { error } = await supabase.from('tenants').update({ branding: null }).eq('id', tenant.id);
                       if (error) toast({ title: 'Erro ao resetar', variant: 'destructive' });
