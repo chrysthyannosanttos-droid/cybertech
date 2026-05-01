@@ -113,7 +113,7 @@ export function EmployeeFormModal({
       mobilidade: Number(form.mobilidade || 0),
       vale_flexivel: Number(form.valeFlexivel || 0),
       // adicional_noturno: Number(form.adicionalNoturno || 0), // Comentado até a coluna ser criada no Supabase
-      flexivel_selo: !!form.flexivelSelo,
+      // flexivel_selo: !!form.flexivelSelo,
       jornada_entrada: form.jornadaEntrada || '08:00',
       jornada_saida_almoco: form.jornadaSaidaAlmoco || '12:00',
       jornada_retorno_almoco: form.jornadaRetornoAlmoco || '13:00',
