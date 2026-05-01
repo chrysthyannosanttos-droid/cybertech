@@ -935,12 +935,7 @@ export default function Tenants() {
                                 if (!file) return;
                                 
                                 try {
-                                  // Garantir que o bucket 'system-assets' existe
-                                  const { data: buckets } = await supabase.storage.listBuckets();
-                                  if (!buckets?.some(b => b.name === 'system-assets')) {
-                                    await supabase.storage.createBucket('system-assets', { public: true });
-                                  }
-                                  
+                                  // Tentativa direta de upload para o bucket 'system-assets'
                                   const fileExt = file.name.split('.').pop();
                                   const fileName = `${selectedTenant.id}_${Date.now()}.${fileExt}`;
                                   const filePath = `logos/${fileName}`;
@@ -949,7 +944,12 @@ export default function Tenants() {
                                     .from('system-assets')
                                     .upload(filePath, file);
                                     
-                                  if (uploadError) throw uploadError;
+                                  if (uploadError) {
+                                    if (uploadError.message.includes('not found')) {
+                                      throw new Error('O bucket "system-assets" não foi encontrado no Supabase. Por favor, crie-o no painel do Supabase > Storage e defina como Público.');
+                                    }
+                                    throw uploadError;
+                                  }
                                   
                                   const { data: { publicUrl } } = supabase.storage
                                     .from('system-assets')
@@ -958,7 +958,11 @@ export default function Tenants() {
                                   setForm(f => ({ ...f, logoUrl: publicUrl }));
                                   toast({ title: 'Upload concluído!' });
                                 } catch (err: any) {
-                                  toast({ title: 'Erro no upload', description: err.message, variant: 'destructive' });
+                                  toast({ 
+                                    title: 'Erro no upload', 
+                                    description: err.message, 
+                                    variant: 'destructive' 
+                                  });
                                 }
                               }}
                             />
