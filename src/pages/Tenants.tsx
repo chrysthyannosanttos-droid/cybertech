@@ -129,6 +129,14 @@ export default function Tenants() {
     };
   }, [getAllUsers]);
 
+  // Security check: Only Cristiano can access this page
+  useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      toast({ title: 'Acesso negado', description: 'Você não tem permissão para acessar o gerenciamento global.', variant: 'destructive' });
+      navigate('/dashboard');
+    }
+  }, [isLoading, isAdmin, navigate]);
+
   // Sync form state with selected tenant for White Label
   useEffect(() => {
     if (selectedTenant) {
