@@ -691,6 +691,13 @@ export default function Dashboard() {
                 R$ {costs.adicionalNoturno.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
+
+            <div className="relative pl-5 border-l-2 border-emerald-500/30 group hover:border-emerald-500 transition-colors bg-emerald-500/5 rounded-r-xl py-1">
+              <p className="text-[10px] font-black text-emerald-500 uppercase mb-2 tracking-widest">Valor Líquido Folha</p>
+              <p className="text-xl font-black tabular-nums text-emerald-400 tracking-tight">
+                R$ {processedPayrollTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
             
             <div className="xl:col-span-1 glass bg-primary/10 p-6 rounded-2xl border border-primary/20 flex flex-col justify-center shadow-[0_0_20px_rgba(14,165,233,0.1)]">
               <p className="text-[10px] font-bold text-primary uppercase mb-1 tracking-widest">Custo Total Consolidado</p>
