@@ -66,6 +66,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showRescissionsList, setShowRescissionsList] = useState(false);
   const [showPayrollList, setShowPayrollList] = useState(false);
+  const [showCertificatesDetail, setShowCertificatesDetail] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -302,6 +303,27 @@ export default function Dashboard() {
 
   const absenteeism = totalEmployees > 0 ? ((totalCertDays / (totalEmployees * 22)) * 100).toFixed(1) : '0.0';
 
+  const certRanking = useMemo(() => {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const data: Record<string, { name: string; count: number; days: number }> = {};
+    certificates.forEach(c => {
+      const certDate = parseISO(c.date);
+      if (certDate >= sixMonthsAgo) {
+        if (!data[c.employeeId]) {
+          data[c.employeeId] = { name: c.employeeName || 'Desconhecido', count: 0, days: 0 };
+        }
+        data[c.employeeId].count += 1;
+        data[c.employeeId].days += (c.days || 0);
+      }
+    });
+
+    return Object.values(data)
+      .sort((a, b) => b.days - a.days)
+      .slice(0, 10);
+  }, [certificates]);
+
   const processedPayrollTotal = useMemo(() => {
     return payrolls
       .filter(p => {
@@ -449,7 +471,14 @@ export default function Dashboard() {
           sub={newAdmissions > 0 ? `${newAdmissions} novas admissões` : 'Nenhuma admissão'} 
           delay={isSuperAdmin ? 3 : 1} 
         />
-        <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
+        <KpiCard 
+          icon={FileHeart} 
+          label="Atestados" 
+          value={String(totalCertificates)} 
+          sub={`Absenteísmo: ${absenteeism}%`} 
+          delay={isSuperAdmin ? 4 : 2} 
+          onClick={() => setShowCertificatesDetail(true)}
+        />
         
         <KpiCard 
           icon={DollarSign} 
@@ -777,6 +806,60 @@ export default function Dashboard() {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Certificates Ranking Dialog */}
+      <Dialog open={showCertificatesDetail} onOpenChange={setShowCertificatesDetail}>
+        <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e]">
+          <DialogHeader>
+            <DialogTitle className="text-white font-black flex items-center gap-2">
+              <FileHeart className="w-5 h-5 text-rose-500" /> Ranking de Absenteísmo (Últimos 6 Meses)
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar mt-4">
+            {certRanking.length === 0 ? (
+              <p className="text-center py-10 text-muted-foreground">Nenhum atestado registrado nos últimos 6 meses.</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-4 py-2 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-white/5">
+                  <span>Colaborador</span>
+                  <div className="flex gap-12">
+                    <span className="w-20 text-center">Atestados</span>
+                    <span className="w-20 text-right">Total Dias</span>
+                  </div>
+                </div>
+                {certRanking.map((item, idx) => (
+                  <div key={idx} className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/[0.08] transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center font-black text-[12px]",
+                        idx < 3 ? "bg-rose-500/20 text-rose-400" : "bg-white/5 text-muted-foreground"
+                      )}>
+                        {idx + 1}º
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-bold text-white">{item.name}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Top {idx + 1} Absenteísmo</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-12 items-center">
+                      <div className="w-20 text-center">
+                        <span className="text-[14px] font-bold text-white">{item.count}</span>
+                      </div>
+                      <div className="w-20 text-right">
+                        <span className="text-[14px] font-black text-rose-400">{item.days}d</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-6 text-center italic border-t border-white/5 pt-4">
+              O ranking considera a soma total de dias de afastamento nos últimos 180 dias.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
