@@ -66,6 +66,7 @@ export default function Rescissions() {
     extraHoursPercent: 0.5,
     additionalDeductions: 0,
     nightShiftPay: 0,
+    manualDeductions: [] as { id: string; description: string; value: number }[],
   });
 
   const selectedEmp = employees.find(e => e.id === form.employeeId);
@@ -88,7 +89,7 @@ export default function Rescissions() {
             dependents: form.dependents,
             extraHours: form.extraHours,
             extraHoursPercent: form.extraHoursPercent,
-            additionalDeductions: form.additionalDeductions,
+            additionalDeductions: (form.additionalDeductions || 0) + form.manualDeductions.reduce((sum, d) => sum + (d.value || 0), 0),
             nightShiftPay: form.nightShiftPay,
           });
         } catch { return null; }
@@ -160,7 +161,7 @@ export default function Rescissions() {
       gross_value: preview.totalCreditos,
       inss_deduction: preview.inss,
       irrf_deduction: preview.irrf,
-      other_deductions: form.additionalDeductions,
+      other_deductions: (form.additionalDeductions || 0) + form.manualDeductions.reduce((sum, d) => sum + (d.value || 0), 0),
       items: preview.items,
     }]);
 
@@ -191,7 +192,7 @@ export default function Rescissions() {
 
     toast({ title: '✅ Rescisão calculada e registrada!', description: `${emp.name} — Líquido: ${fmt(preview.valorLiquido)}` });
     setIsOpen(false);
-    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5, additionalDeductions: 0 });
+    setForm({ employeeId: '', type: 'SEM_JUSTA_CAUSA', terminationDate: new Date().toISOString().split('T')[0], admissionDate: '', lastSalary: 0, hazardPay: 0, unhealthyPay: 0, fgtsBalance: 0, hasVestedVacation: false, noticePeriodWorked: false, dependents: 0, extraHours: 0, extraHoursPercent: 0.5, additionalDeductions: 0, manualDeductions: [], nightShiftPay: 0 });
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -399,18 +400,68 @@ export default function Rescissions() {
                 </div>
               </div>
 
-              {/* Outros Descontos */}
-              <div className="space-y-1.5">
-                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-rose-400">Outros Descontos (Manual)</Label>
-                <div className="relative">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] font-bold text-rose-500/50">R$</div>
-                  <Input 
-                    type="number" 
-                    value={form.additionalDeductions || ''} 
-                    onChange={e => setForm(f => ({ ...f, additionalDeductions: Number(e.target.value) }))} 
-                    className="bg-rose-500/5 border-rose-500/20 h-10 pl-9 font-black text-rose-400 placeholder:text-rose-500/20" 
-                    placeholder="0,00" 
-                  />
+              {/* Lista de Descontos Manuais */}
+              <div className="space-y-3 p-4 rounded-xl bg-rose-500/5 border border-rose-500/10">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] font-black text-rose-400 uppercase tracking-widest">Descontos Manuais / Ajustes</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-[10px] font-bold text-rose-400 hover:bg-rose-500/10 gap-1"
+                    onClick={() => setForm(f => ({ 
+                      ...f, 
+                      manualDeductions: [...f.manualDeductions, { id: crypto.randomUUID(), description: '', value: 0 }] 
+                    }))}
+                  >
+                    <Plus className="w-3 h-3" /> Adicionar Desconto
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {form.manualDeductions.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic text-center py-2">Nenhum desconto manual adicionado.</p>
+                  )}
+                  {form.manualDeductions.map((ded, idx) => (
+                    <div key={ded.id} className="flex gap-2 items-center animate-in fade-in slide-in-from-top-1">
+                      <Input 
+                        placeholder="Ex: Quebra de Caixa" 
+                        value={ded.description}
+                        onChange={e => {
+                          const newList = [...form.manualDeductions];
+                          newList[idx].description = e.target.value;
+                          setForm(f => ({ ...f, manualDeductions: newList }));
+                        }}
+                        className="bg-white/5 border-white/10 h-9 text-[12px]"
+                      />
+                      <div className="relative w-[150px] shrink-0">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-rose-500/50">R$</span>
+                        <Input 
+                          type="number" 
+                          placeholder="0,00" 
+                          value={ded.value || ''}
+                          onChange={e => {
+                            const newList = [...form.manualDeductions];
+                            newList[idx].value = Number(e.target.value);
+                            setForm(f => ({ ...f, manualDeductions: newList }));
+                          }}
+                          className="bg-white/5 border-white/10 h-9 pl-7 text-[12px] font-bold text-rose-400"
+                        />
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 text-muted-foreground hover:text-rose-500"
+                        onClick={() => {
+                          setForm(f => ({ 
+                            ...f, 
+                            manualDeductions: f.manualDeductions.filter(d => d.id !== ded.id) 
+                          }));
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
 
