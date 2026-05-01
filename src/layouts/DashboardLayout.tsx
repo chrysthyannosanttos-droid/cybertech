@@ -2,12 +2,12 @@ import { Outlet } from 'react-router-dom';
 import AppSidebar from '@/components/AppSidebar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { LogOut, ShieldAlert } from 'lucide-react';
 
 export default function DashboardLayout() {
-  const { user } = useAuth();
+  const { user, isImpersonating, stopImpersonating } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -40,6 +40,24 @@ export default function DashboardLayout() {
       </div>
 
       <main className="flex-1 overflow-y-auto h-full pt-16 md:pt-0 custom-scrollbar">
+        {isImpersonating && (
+          <div className="bg-emerald-600/90 backdrop-blur-md text-white py-2 px-4 flex items-center justify-between sticky top-0 z-[60] shadow-xl border-b border-white/10 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 animate-pulse" />
+              <p className="text-[12px] font-bold tracking-tight">
+                VISUALIZAÇÃO DE EMPRESA ATIVA: <span className="uppercase text-white/90">{user?.tenantBranding?.system_name || "CLIENTE"}</span>
+              </p>
+            </div>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={stopImpersonating}
+              className="h-7 text-[11px] font-black uppercase tracking-tighter bg-white/10 hover:bg-white/20 border border-white/20 gap-1.5"
+            >
+              <LogOut className="w-3 h-3" /> Sair da Visualização
+            </Button>
+          </div>
+        )}
         <div className="p-4 md:p-8 max-w-[1400px] mx-auto min-h-full">
           <Outlet />
         </div>

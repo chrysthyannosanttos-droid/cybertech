@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Palette, Globe } from 'lucide-react';
+import { Palette, Globe, LogIn, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
   const map = {
@@ -30,11 +31,11 @@ function StatusBadge({ status }: { status: Tenant['subscription']['status'] }) {
 }
 
 export default function Tenants() {
-  console.log("!!! AGENT VERSION 2.0 LOADED !!!");
+  const { user: currentUser, getAllUsers, saveUser, deleteUser, isImpersonating, impersonateTenant, stopImpersonating } = useAuth();
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [stores, setStores] = useState<StoreType[]>([]);
   
-  const { user: currentUser, getAllUsers, saveUser, deleteUser } = useAuth();
   const { toast } = useToast();
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [search, setSearch] = useState('');
@@ -1190,6 +1191,20 @@ export default function Tenants() {
                     >
                       Gerenciar
                     </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 font-bold text-[11px]"
+                        onClick={() => {
+                          impersonateTenant(t.id, t.branding);
+                          toast({ title: `Acessando como ${t.name}`, description: 'Você agora está visualizando os dados desta empresa.' });
+                          navigate('/dashboard');
+                        }}
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Acessar
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="icon" 

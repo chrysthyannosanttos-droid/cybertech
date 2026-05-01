@@ -27,6 +27,9 @@ interface AuthContextType {
   currentPermissions: AppModule[] | undefined; // undefined = all access
   isEmployeeView: boolean;
   setIsEmployeeView: (v: boolean) => void;
+  impersonateTenant: (tenantId: string, branding?: any) => void;
+  stopImpersonating: () => void;
+  isImpersonating: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -64,6 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [isEmployeeView, setIsEmployeeView] = useState<boolean>(() => {
     return sessionStorage.getItem('is_employee_view') === 'true';
+  });
+  const [isImpersonating, setIsImpersonating] = useState<boolean>(() => {
+    return sessionStorage.getItem('is_impersonating') === 'true';
   });
 
   const toggleEmployeeView = useCallback((v: boolean) => {
@@ -208,7 +214,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('must_change_password');
     sessionStorage.removeItem('user_permissions');
     sessionStorage.removeItem('app_permissions');
+    sessionStorage.removeItem('is_impersonating');
   }, []);
+
+  const impersonateTenant = useCallback((tenantId: string, branding?: any) => {
+    if (user?.role !== 'superadmin' && !user?.email?.toLowerCase().includes('cristiano')) return;
+    
+    const updatedUser = { ...user, tenantId, tenantBranding: branding };
+    setUser(updatedUser as User);
+    setIsImpersonating(true);
+    sessionStorage.setItem('is_impersonating', 'true');
+    sessionStorage.setItem('nexus_user', JSON.stringify(updatedUser));
+  }, [user]);
+
+  const stopImpersonating = useCallback(async () => {
+    if (!user) return;
+    // Recarregar dados originais do banco
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    if (profile) {
+      const userData: User = {
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        role: profile.role,
+        tenantId: profile.tenant_id,
+        canEditEmployees: profile.can_edit_employees,
+        canDeleteEmployees: profile.can_delete_employees,
+        permissions: profile.permissions,
+        appPermissions: profile.app_permissions,
+        tenantBranding: undefined,
+        plan: 'BASIC'
+      };
+      setUser(userData);
+      setIsImpersonating(false);
+      sessionStorage.setItem('is_impersonating', 'false');
+      sessionStorage.setItem('nexus_user', JSON.stringify(userData));
+    }
+  }, [user]);
 
   // Persistência definitiva de dados garantida
 
@@ -329,6 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       getAllUsers, saveUser, deleteUser,
       getUserPermissions, currentPermissions,
       isEmployeeView, setIsEmployeeView: toggleEmployeeView,
+      impersonateTenant, stopImpersonating, isImpersonating
     }}>
       {children}
     </AuthContext.Provider>
