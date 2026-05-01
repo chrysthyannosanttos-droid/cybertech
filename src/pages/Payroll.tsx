@@ -41,7 +41,7 @@ export default function Payroll() {
   const [exportEndDate, setExportEndDate] = useState<Date>();
   const [includeCpf, setIncludeCpf] = useState(false);
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isImpersonating } = useAuth();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dbEmployees, setDbEmployees] = useState<Employee[]>([]);
   const [dbCertificates, setDbCertificates] = useState<Certificate[]>([]);
@@ -67,17 +67,30 @@ export default function Payroll() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      let qEmployees = supabase.from('employees').select('*').eq('status', 'ACTIVE');
+      let qCertificates = supabase.from('certificates').select('*');
+      let qStores = supabase.from('stores').select('*');
+      let qSheets = supabase.from('time_sheets').select('employee_id, date, status').eq('status', 'ABSENT');
+
+      const isSuperAdmin = currentUser?.role === 'superadmin' && !isImpersonating;
+
+      if (!isSuperAdmin && currentUser?.tenantId) {
+        qEmployees = qEmployees.eq('tenant_id', currentUser.tenantId);
+        qCertificates = qCertificates.eq('tenant_id', currentUser.tenantId);
+        qStores = qStores.eq('tenant_id', currentUser.tenantId);
+        qSheets = qSheets.eq('tenant_id', currentUser.tenantId);
+      }
+
       const [
         { data: empData },
         { data: certData },
         { data: storesData },
         { data: sheetsData }
       ] = await Promise.all([
-        supabase.from('employees').select('*').eq('status', 'ACTIVE'),
-        supabase.from('certificates').select('*'),
-        supabase.from('stores').select('*'),
-        // Busca folhas de ponto para calcular faltas reais
-        supabase.from('time_sheets').select('employee_id, date, status').eq('status', 'ABSENT')
+        qEmployees,
+        qCertificates,
+        qStores,
+        qSheets
       ]);
 
       if (sheetsData) setDbTimeSheets(sheetsData);
