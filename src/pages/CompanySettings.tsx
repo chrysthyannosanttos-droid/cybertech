@@ -430,7 +430,6 @@ export default function CompanySettings() {
                     Resetar Padrão
                   </Button>
                 </div>
-              </div>
             </CardContent>
           </Card>
         </div>
