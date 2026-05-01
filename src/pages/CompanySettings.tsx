@@ -227,18 +227,6 @@ export default function CompanySettings() {
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              {!currentUser?.email?.toLowerCase().includes('cristiano') ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
-                  <Layout className="w-12 h-12 text-muted-foreground/20" />
-                  <p className="text-[13px] text-muted-foreground max-w-[280px]">
-                    As configurações de identidade visual (White-Label) são restritas e podem ser gerenciadas apenas pelo administrador <strong>Cristiano</strong>.
-                  </p>
-                  <Button variant="outline" size="sm" className="h-8 text-[11px] font-bold uppercase tracking-widest" disabled>
-                    Solicitar Alteração
-                  </Button>
-                </div>
-              ) : (
-                <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nome do Sistema Personalizado</Label>
@@ -442,8 +430,7 @@ export default function CompanySettings() {
                     Resetar Padrão
                   </Button>
                 </div>
-              </>
-            )}
+              </div>
             </CardContent>
           </Card>
         </div>
