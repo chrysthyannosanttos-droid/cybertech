@@ -87,7 +87,7 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
     // Se cristiano ou superadmin: acesso total a todos os módulos
     if (isCristiano || currentPermissions === undefined) return true;
     // Para outros: verificar permissões
-    return currentPermissions.includes(link.module);
+    return Array.isArray(currentPermissions) && currentPermissions.includes(link.module);
   });
 
   return (
