@@ -7,6 +7,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Button } from '@/components/ui/button';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EmployeeFiltersProps {
   search: string;
@@ -51,32 +56,95 @@ export function EmployeeFilters({
         />
       </div>
       <div className="w-px h-8 bg-white/10 mx-1" />
-      <Select value={storeFilter} onValueChange={onStoreFilterChange}>
-        <SelectTrigger className="w-[180px] h-10 bg-white/5 border-white/10 rounded-xl">
-          <SelectValue placeholder="Lojas" />
-        </SelectTrigger>
-        <SelectContent className="glass-card border-white/10 text-white">
-          <SelectItem value="all">Todas as Lojas</SelectItem>
-          {dbStores.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name.replace('SUPER ', '')}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={departmentFilter} onValueChange={onDepartmentFilterChange}>
-        <SelectTrigger className="w-[160px] h-10 bg-white/5 border-white/10 rounded-xl">
-          <SelectValue placeholder="Setores" />
-        </SelectTrigger>
-        <SelectContent className="glass-card border-white/10 text-white">
-          <SelectItem value="all">Todos Setores</SelectItem>
-          {departments.map((d, i) => (
-            <SelectItem key={i} value={d}>
-              {d}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      
+      {/* Searchable Stores */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            className="w-[200px] h-10 justify-between bg-white/5 border-white/10 rounded-xl text-white hover:bg-white/10"
+          >
+            {storeFilter === "all" 
+              ? "Todas as Lojas" 
+              : dbStores.find((s) => s.id === storeFilter)?.name.replace('SUPER ', '') || "Selecionar Loja..."}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[200px] p-0 glass-card border-white/10">
+          <Command className="bg-transparent">
+            <CommandInput placeholder="Buscar loja..." className="h-9" />
+            <CommandList>
+              <CommandEmpty>Nenhuma loja encontrada.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="all"
+                  onSelect={() => onStoreFilterChange("all")}
+                  className="text-white hover:bg-primary/20"
+                >
+                  <Check className={cn("mr-2 h-4 w-4", storeFilter === "all" ? "opacity-100" : "opacity-0")} />
+                  Todas as Lojas
+                </CommandItem>
+                {dbStores.map((s) => (
+                  <CommandItem
+                    key={s.id}
+                    value={s.name}
+                    onSelect={() => onStoreFilterChange(s.id)}
+                    className="text-white hover:bg-primary/20"
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", storeFilter === s.id ? "opacity-100" : "opacity-0")} />
+                    {s.name.replace('SUPER ', '')}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Searchable Departments */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            className="w-[180px] h-10 justify-between bg-white/5 border-white/10 rounded-xl text-white hover:bg-white/10"
+          >
+            {departmentFilter === "all" ? "Todos Setores" : departmentFilter}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[180px] p-0 glass-card border-white/10">
+          <Command className="bg-transparent">
+            <CommandInput placeholder="Buscar setor..." className="h-9" />
+            <CommandList>
+              <CommandEmpty>Nenhum setor encontrado.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="all"
+                  onSelect={() => onDepartmentFilterChange("all")}
+                  className="text-white hover:bg-primary/20"
+                >
+                  <Check className={cn("mr-2 h-4 w-4", departmentFilter === "all" ? "opacity-100" : "opacity-0")} />
+                  Todos Setores
+                </CommandItem>
+                {departments.map((d, i) => (
+                  <CommandItem
+                    key={i}
+                    value={d}
+                    onSelect={() => onDepartmentFilterChange(d)}
+                    className="text-white hover:bg-primary/20"
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", departmentFilter === d ? "opacity-100" : "opacity-0")} />
+                    {d}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
       <Select value={statusFilter} onValueChange={onStatusFilterChange}>
         <SelectTrigger className="w-[140px] h-10 bg-white/5 border-white/10 rounded-xl">
           <SelectValue placeholder="Status" />

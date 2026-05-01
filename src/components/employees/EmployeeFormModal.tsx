@@ -23,6 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EmployeeFormModalProps {
   open: boolean;
@@ -284,23 +288,42 @@ export function EmployeeFormModal({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 flex flex-col">
                 <Label className="text-[12px] text-muted-foreground">Loja de Alocação *</Label>
-                <Select
-                  value={form.storeId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, storeId: v }))}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dbStores.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full h-9 justify-between bg-background border-input font-normal"
+                    >
+                      {form.storeId 
+                        ? dbStores.find((s) => s.id === form.storeId)?.name 
+                        : "Selecione a loja..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar loja..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>Nenhuma loja encontrada.</CommandEmpty>
+                        <CommandGroup>
+                          {dbStores.map((s) => (
+                            <CommandItem
+                              key={s.id}
+                              value={s.name}
+                              onSelect={() => setForm((f) => ({ ...f, storeId: s.id }))}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", form.storeId === s.id ? "opacity-100" : "opacity-0")} />
+                              {s.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[12px] text-muted-foreground">Setor / Departamento</Label>
@@ -315,23 +338,40 @@ export function EmployeeFormModal({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 flex flex-col">
                 <Label className="text-[12px] text-muted-foreground">Cargo Oficial</Label>
-                <Select
-                  value={form.role}
-                  onValueChange={(v) => setForm((f) => ({ ...f, role: v }))}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Selecione o cargo..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[250px]">
-                    {ROLES.map((r, i) => (
-                      <SelectItem key={i} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full h-9 justify-between bg-background border-input font-normal"
+                    >
+                      {form.role || "Selecione o cargo..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cargo..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cargo encontrado.</CommandEmpty>
+                        <CommandGroup className="max-h-[250px] overflow-y-auto">
+                          {ROLES.map((r, i) => (
+                            <CommandItem
+                              key={i}
+                              value={r}
+                              onSelect={() => setForm((f) => ({ ...f, role: r }))}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", form.role === r ? "opacity-100" : "opacity-0")} />
+                              {r}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[12px] text-muted-foreground">CBO</Label>
