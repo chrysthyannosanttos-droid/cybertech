@@ -60,6 +60,26 @@ export function EmployeeFormModal({
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
+  const guessGender = (name: string): 'M' | 'F' | 'OTHER' => {
+    if (!name) return 'M';
+    const firstName = name.trim().split(' ')[0].toLowerCase();
+    
+    // Nomes femininos comuns terminados em A, IA, ANA, INE, ELE
+    if (
+      firstName.endsWith('a') || 
+      firstName.endsWith('ia') || 
+      firstName.endsWith('ana') || 
+      firstName.endsWith('ine') || 
+      firstName.endsWith('ele') ||
+      ['beatriz', 'iris', 'alice'].includes(firstName)
+    ) {
+      return 'F';
+    }
+    
+    // Nomes masculinos comuns terminados em O, ER, EL, OS, AM
+    return 'M';
+  };
+
   useEffect(() => {
     if (open) {
       setStep(1);
@@ -193,7 +213,15 @@ export function EmployeeFormModal({
                 <Label className="text-[12px] text-muted-foreground">Nome Completo *</Label>
                 <Input
                   value={form.name || ''}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value.toUpperCase() }))}
+                  onChange={(e) => {
+                    const newName = e.target.value.toUpperCase();
+                    const suggestedGender = guessGender(newName);
+                    setForm((f) => ({ 
+                      ...f, 
+                      name: newName,
+                      gender: f.name ? f.gender : suggestedGender // Só sugere se o nome estava vazio antes ou for a primeira vez
+                    }));
+                  }}
                   className="h-9"
                 />
               </div>
