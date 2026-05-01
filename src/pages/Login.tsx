@@ -54,6 +54,25 @@ export default function Login() {
     }
   }, [tenantParam]);
 
+  // Apply branding to page title, favicon, and background immediately
+  useEffect(() => {
+    if (branding?.system_name) {
+      document.title = branding.system_name;
+    }
+    if (branding?.logo_url) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = branding.logo_url;
+    }
+    if (branding?.background_url) {
+      document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+    }
+  }, [branding]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const success = await login(email, password);
@@ -81,8 +100,8 @@ export default function Login() {
 
   if (isBrandingLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1d]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50"></div>
+      <div className="fixed inset-0 flex items-center justify-center bg-[#0a0f1d]" style={{ zIndex: 9999 }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/30"></div>
       </div>
     );
   }
