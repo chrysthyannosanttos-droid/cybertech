@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [rescissions, setRescissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showRescissionsList, setShowRescissionsList] = useState(false);
+  const [showPayrollList, setShowPayrollList] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -449,19 +450,23 @@ export default function Dashboard() {
           delay={isSuperAdmin ? 3 : 1} 
         />
         <KpiCard icon={FileHeart} label="Atestados" value={String(totalCertificates)} sub={`Absenteísmo: ${absenteeism}%`} delay={isSuperAdmin ? 4 : 2} />
-        {!isSuperAdmin && (
-          <>
-            <KpiCard icon={DollarSign} label="Salário Líquido" value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} sub="Lote do mês" delay={3} />
-            <KpiCard 
-              icon={UserMinus} 
-              label="Rescisões Pagas" 
-              value={`R$ ${totalRescissionsValue.toLocaleString('pt-BR')}`} 
-              sub={`${rescissions.length} registros`} 
-              delay={4} 
-              onClick={() => setShowRescissionsList(true)}
-            />
-          </>
-        )}
+        
+        <KpiCard 
+          icon={DollarSign} 
+          label="Salário Líquido" 
+          value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} 
+          sub="Competência Atual" 
+          delay={5} 
+          onClick={() => setShowPayrollList(true)}
+        />
+        <KpiCard 
+          icon={UserMinus} 
+          label="Rescisões Pagas" 
+          value={`R$ ${totalRescissionsValue.toLocaleString('pt-BR')}`} 
+          sub={`${rescissions.length} processos`} 
+          delay={6} 
+          onClick={() => setShowRescissionsList(true)}
+        />
       </div>
 
       {/* Charts Grid */}
@@ -702,26 +707,65 @@ export default function Dashboard() {
         <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e]">
           <DialogHeader>
             <DialogTitle className="text-white font-black flex items-center gap-2">
-              <UserMinus className="w-5 h-5 text-rose-400" /> Histórico de Rescisões Pagas
+              <UserMinus className="w-5 h-5 text-rose-400" /> Detalhamento de Rescisões
             </DialogTitle>
           </DialogHeader>
           
           <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-3 mt-4">
             {rescissions.length === 0 ? (
-              <p className="text-center py-10 text-muted-foreground">Nenhuma rescisão registrada.</p>
+              <p className="text-center py-10 text-muted-foreground">Nenhuma rescisão registrada no período.</p>
             ) : (
               rescissions.map(r => (
-                <div key={r.id} className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
-                  <div>
-                    <p className="text-[13px] font-bold text-white">{r.employee_name}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {format(parseISO(r.termination_date), 'dd/MM/yyyy')} · {r.type}
-                    </p>
-                    {r.store_name && <p className="text-[10px] text-primary/70 font-bold uppercase">{r.store_name}</p>}
+                <div key={r.id} className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/[0.08] transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-110 transition-transform">
+                      <UserMinus className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-white">{r.employee_name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {format(parseISO(r.termination_date), 'dd/MM/yyyy')} · {r.type}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-[14px] font-black text-white">R$ {Number(r.rescission_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                    {r.fgts_value > 0 && <p className="text-[10px] text-amber-500">FGTS: R$ {Number(r.fgts_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>}
+                    <p className="text-[14px] font-black text-rose-400">R$ {Number(r.rescission_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    {r.fgts_value > 0 && <p className="text-[10px] text-amber-500">FGTS+Multa: R$ {Number(r.fgts_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payroll List Dialog */}
+      <Dialog open={showPayrollList} onOpenChange={setShowPayrollList}>
+        <DialogContent className="max-w-3xl border-white/10 bg-[#0a0f1e]">
+          <DialogHeader>
+            <DialogTitle className="text-white font-black flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-400" /> Detalhamento de Folha Mensal
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar space-y-3 mt-4">
+            {payrolls.length === 0 ? (
+              <p className="text-center py-10 text-muted-foreground">Nenhum holerite processado nesta competência.</p>
+            ) : (
+              payrolls.map(p => (
+                <div key={p.id} className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/[0.08] transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                      <Calculator className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-white">{p.employee_name}</p>
+                      <p className="text-[11px] text-muted-foreground">Competência: {p.reference_month}/{p.reference_year}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[14px] font-black text-emerald-400">R$ {Number(p.net_salary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-muted-foreground">Bruto: R$ {Number(p.gross_salary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               ))
