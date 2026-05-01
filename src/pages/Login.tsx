@@ -21,27 +21,33 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const tenantParam = searchParams.get('t');
   const [branding, setBranding] = useState<any>(null);
+  const [isBrandingLoading, setIsBrandingLoading] = useState(!!tenantParam);
 
   useEffect(() => {
     if (tenantParam) {
       const fetchBranding = async () => {
-        // Try to fetch by slug first
-        const { data: bySlug } = await supabase
-          .from('tenants')
-          .select('branding')
-          .filter('branding->>slug', 'eq', tenantParam)
-          .single();
-
-        if (bySlug?.branding) {
-          setBranding(bySlug.branding);
-        } else {
-          // Then try by ID
-          const { data: byId } = await supabase
+        setIsBrandingLoading(true);
+        try {
+          // Try to fetch by slug first
+          const { data: bySlug } = await supabase
             .from('tenants')
             .select('branding')
-            .eq('id', tenantParam)
+            .filter('branding->>slug', 'eq', tenantParam)
             .single();
-          if (byId?.branding) setBranding(byId.branding);
+
+          if (bySlug?.branding) {
+            setBranding(bySlug.branding);
+          } else {
+            // Then try by ID
+            const { data: byId } = await supabase
+              .from('tenants')
+              .select('branding')
+              .eq('id', tenantParam)
+              .single();
+            if (byId?.branding) setBranding(byId.branding);
+          }
+        } finally {
+          setIsBrandingLoading(false);
         }
       };
       fetchBranding();
@@ -72,6 +78,14 @@ export default function Login() {
     toast({ title: 'Senha criada com sucesso!', description: 'Bem-vindo ao sistema.' });
     navigate('/dashboard');
   };
+
+  if (isBrandingLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0f1d]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/50"></div>
+      </div>
+    );
+  }
 
   return (
     <div 
