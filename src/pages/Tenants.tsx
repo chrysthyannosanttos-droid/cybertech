@@ -66,7 +66,9 @@ export default function Tenants() {
         subscription: t.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
         employeeCount: t.employee_count || 0,
         plan: t.plan || 'BASIC',
-        branding: t.branding || {}
+        branding: t.branding || {},
+        slug: t.branding?.slug || '',
+        background_url: t.branding?.background_url || ''
       })));
     }
 
@@ -92,7 +94,9 @@ export default function Tenants() {
           subscription: updated.subscription || { status: 'active', startDate: '', expiryDate: '', monthlyFee: 0, additionalCosts: [] },
           employeeCount: updated.employee_count || 0,
           plan: updated.plan || 'BASIC',
-          branding: updated.branding || {}
+          branding: updated.branding || {},
+          slug: updated.branding?.slug || '',
+          background_url: updated.branding?.background_url || ''
         });
       }
     }
@@ -137,7 +141,9 @@ export default function Tenants() {
         plan: selectedTenant.plan || 'BASIC',
         systemName: selectedTenant.branding?.system_name || '',
         primaryColor: selectedTenant.branding?.primary_color || '',
-        logoUrl: selectedTenant.branding?.logo_url || ''
+        logoUrl: selectedTenant.branding?.logo_url || '',
+        slug: selectedTenant.branding?.slug || '',
+        backgroundUrl: selectedTenant.branding?.background_url || ''
       });
     }
   }, [selectedTenant]);
@@ -151,7 +157,9 @@ export default function Tenants() {
     plan: 'BASIC' as 'BASIC' | 'PRO' | 'ENTERPRISE',
     systemName: '',
     primaryColor: '',
-    logoUrl: ''
+    logoUrl: '',
+    slug: '',
+    backgroundUrl: ''
   });
   
   // Forms for the Details View
@@ -246,7 +254,9 @@ export default function Tenants() {
       plan: 'BASIC',
       systemName: '',
       primaryColor: '',
-      logoUrl: ''
+      logoUrl: '',
+      slug: '',
+      backgroundUrl: ''
     });
     setOpen(true);
   };
@@ -262,7 +272,9 @@ export default function Tenants() {
       plan: t.plan || 'BASIC',
       systemName: t.branding?.system_name || '',
       primaryColor: t.branding?.primary_color || '',
-      logoUrl: t.branding?.logo_url || ''
+      logoUrl: t.branding?.logo_url || '',
+      slug: t.branding?.slug || '',
+      backgroundUrl: t.branding?.background_url || ''
     });
     setOpen(true);
   };
@@ -278,10 +290,11 @@ export default function Tenants() {
       additionalCosts: [],
     };
 
-    const branding = {
       system_name: form.systemName,
       primary_color: form.primaryColor,
-      logo_url: form.logoUrl
+      logo_url: form.logoUrl,
+      slug: form.slug,
+      background_url: form.backgroundUrl
     };
 
     const targetId = editTenantId || selectedTenant?.id;
@@ -908,6 +921,47 @@ export default function Tenants() {
                       </div>
                     </div>
                   </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest">Link de Acesso (Slug)</Label>
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground font-mono">/</span>
+                          <Input 
+                            value={form.slug} 
+                            onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                            className="bg-white/5 border-white/10 h-11 text-[13px] font-mono font-bold pl-6"
+                            placeholder="ex: rh-marechal"
+                          />
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          type="button"
+                          className="h-11 border-white/10 hover:bg-white/5"
+                          onClick={() => {
+                            const url = `${window.location.origin}/login?t=${form.slug || selectedTenant.id}`;
+                            navigator.clipboard.writeText(url);
+                            toast({ title: 'Link copiado!', description: 'O link exclusivo deste cliente foi copiado.' });
+                          }}
+                        >
+                          <Globe className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground italic">Esse será o endereço único do seu cliente (ex: cybertech.rh/login?t=rh-marechal)</p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[12px] font-black text-primary uppercase tracking-widest text-emerald-400">Fundo da Tela de Login</Label>
+                      <Input 
+                        value={form.backgroundUrl} 
+                        onChange={e => setForm(f => ({ ...f, backgroundUrl: e.target.value }))}
+                        className="bg-white/5 border-white/10 h-11 text-[13px] font-bold"
+                        placeholder="URL da Imagem (4K/FullHD)"
+                      />
+                      <p className="text-[10px] text-muted-foreground italic">Deixe em branco para usar o fundo padrão.</p>
+                    </div>
+                  </div>
 
                   <div className="space-y-4">
                     <Label className="text-[12px] font-black text-primary uppercase tracking-widest">Logotipo do Sistema (Beta Upload)</Label>
@@ -1190,6 +1244,19 @@ export default function Tenants() {
                       onClick={() => setSelectedTenant(t)}
                     >
                       Gerenciar
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/10"
+                      title="Copiar Link de Acesso"
+                      onClick={() => {
+                        const url = `${window.location.origin}/login?t=${t.branding?.slug || t.id}`;
+                        navigator.clipboard.writeText(url);
+                        toast({ title: 'Link copiado!', description: `Link exclusivo para ${t.name} pronto para envio.` });
+                      }}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
                     </Button>
                     {isAdmin && (
                       <Button

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +18,35 @@ export default function Login() {
   const { login, mustChangePassword, changePassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const tenantParam = searchParams.get('t');
+  const [branding, setBranding] = useState<any>(null);
+
+  useEffect(() => {
+    if (tenantParam) {
+      const fetchBranding = async () => {
+        // Try to fetch by slug first
+        const { data: bySlug } = await supabase
+          .from('tenants')
+          .select('branding')
+          .filter('branding->>slug', 'eq', tenantParam)
+          .single();
+
+        if (bySlug?.branding) {
+          setBranding(bySlug.branding);
+        } else {
+          // Then try by ID
+          const { data: byId } = await supabase
+            .from('tenants')
+            .select('branding')
+            .eq('id', tenantParam)
+            .single();
+          if (byId?.branding) setBranding(byId.branding);
+        }
+      };
+      fetchBranding();
+    }
+  }, [tenantParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,11 +76,15 @@ export default function Login() {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-[#0a0f1d] overflow-hidden"
+      style={{ 
+        '--primary': branding?.primary_color || '#1fb4f3',
+        '--primary-foreground': '#ffffff'
+      } as any}
     >
       {/* Background Image with Overlay */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/bg-login.png')" }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
+        style={{ backgroundImage: `url('${branding?.background_url || '/bg-login.png'}')` }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1d]/80 via-[#0a0f1d]/90 to-[#0a0f1d]" />
       
@@ -69,14 +103,20 @@ export default function Login() {
 
       <div className="w-full max-w-[360px] relative z-10">
         <div className="flex flex-col items-center justify-center gap-6 mb-12">
-          <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(31,180,243,0.3)] border border-white/10 transform -rotate-3 hover:rotate-0 transition-all duration-500 hover:scale-105 bg-black/40 p-2">
-            <img src="/logo-cybertech.png" alt="CyberTech Logo" className="w-full h-full object-contain" />
+          <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(31,180,243,0.3)] border border-white/10 transform -rotate-3 hover:rotate-0 transition-all duration-500 hover:scale-105 bg-black/40 p-2 flex items-center justify-center">
+            <img src={branding?.logo_url || "/logo-cybertech.png"} alt="Logo" className="max-w-full max-h-full object-contain" />
           </div>
           <div className="text-center">
             <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic drop-shadow-2xl">
-              CyberTech <span className="text-primary">RH</span>
+              {branding?.system_name ? (
+                branding.system_name
+              ) : (
+                <>CyberTech <span className="text-primary">RH</span></>
+              )}
             </h1>
-            <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">Inteligência para Recursos Humanos</p>
+            <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">
+              {branding?.system_name ? 'Portal de Gestão Exclusivo' : 'Inteligência para Recursos Humanos'}
+            </p>
           </div>
         </div>
 

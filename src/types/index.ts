@@ -16,6 +16,8 @@ export interface Tenant {
     primary_color?: string;
     secondary_color?: string;
     system_name?: string;
+    background_url?: string;
+    slug?: string;
   };
 }
 
