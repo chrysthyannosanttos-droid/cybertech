@@ -592,26 +592,56 @@ export function EmployeeFormModal({
                 <h3 className="text-[13px] font-medium">Benefícios Atribuídos</h3>
               </div>
               <div className="divide-y divide-border">
-                {MOCK_BENEFITS.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between p-4 bg-background">
-                    <div>
-                      <p className="text-[13px] font-medium">{b.name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {b.type === 'FIXED_VALUE'
-                          ? `Valor: R$ ${b.defaultValue.toLocaleString('pt-BR', {
-                              minimumFractionDigits: 2,
-                            })}`
-                          : `Porcentagem: ${(b.defaultValue * 100).toFixed(0)}% do Salário Base`}
-                      </p>
+                {MOCK_BENEFITS.map((b) => {
+                  // Mapear o benefício do Mock para o campo real do formulário
+                  const fieldMap: Record<string, keyof Employee> = {
+                    'vt': 'valeTransporte',
+                    'vr': 'valeRefeicao',
+                    'ins': 'insalubridade',
+                    'per': 'periculosidade',
+                    'flex': 'flexivel',
+                    'mob': 'mobilidade',
+                    'grat': 'gratificacao'
+                  };
+                  const field = fieldMap[b.id];
+                  const isActive = !!selectedBenefits[b.id];
+                  const currentValue = field ? (form[field] as number) || 0 : b.defaultValue;
+
+                  return (
+                    <div key={b.id} className="flex items-center justify-between p-4 bg-background">
+                      <div className="flex-1">
+                        <p className="text-[13px] font-medium">{b.name}</p>
+                        {isActive ? (
+                          <div className="flex items-center gap-2 mt-1 animate-in fade-in zoom-in-95 duration-200">
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">Valor: R$</span>
+                            <Input
+                              type="number"
+                              value={currentValue}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (field) setForm(f => ({ ...f, [field]: val }));
+                              }}
+                              className="h-7 w-24 text-[11px] px-2 bg-white/5 border-white/10"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {b.type === 'FIXED_VALUE'
+                              ? `Valor padrão: R$ ${b.defaultValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                              : `Porcentagem: ${(b.defaultValue * 100).toFixed(0)}% do Salário Base`}
+                          </p>
+                        )}
+                      </div>
+                      <Switch
+                        checked={isActive}
+                        onCheckedChange={(c) => {
+                          setSelectedBenefits((prev) => ({ ...prev, [b.id]: c }));
+                          // Se desligar, podemos opcionalmente zerar o valor ou manter. Vamos manter para facilitar a reativação.
+                        }}
+                      />
                     </div>
-                    <Switch
-                      checked={!!selectedBenefits[b.id]}
-                      onCheckedChange={(c) =>
-                        setSelectedBenefits((prev) => ({ ...prev, [b.id]: c }))
-                      }
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -626,12 +656,17 @@ export function EmployeeFormModal({
                 R${' '}
                 {(() => {
                   let est = form.salary || 0;
-                  MOCK_BENEFITS.forEach((b) => {
-                    if (selectedBenefits[b.id]) {
-                      if (b.type === 'FIXED_VALUE') est += b.defaultValue;
-                      if (b.type === 'PERCENTAGE') est += (form.salary || 0) * b.defaultValue;
-                    }
-                  });
+                  // Usar os valores reais do formulário para o cálculo
+                  est += Number(form.valeTransporte || 0);
+                  est += Number(form.valeRefeicao || 0);
+                  est += Number(form.insalubridade || 0);
+                  est += Number(form.periculosidade || 0);
+                  est += Number(form.flexivel || 0);
+                  est += Number(form.mobilidade || 0);
+                  est += Number(form.gratificacao || 0);
+                  est += Number(form.valeFlexivel || 0);
+                  est += Number(form.adicionalNoturno || 0);
+                  
                   return est.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                 })()}
               </p>
