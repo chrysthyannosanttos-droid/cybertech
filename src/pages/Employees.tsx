@@ -72,9 +72,23 @@ export default function Employees() {
     });
 
     result.sort((a, b) => {
+      let valA: any = a[sortBy as keyof Employee];
+      let valB: any = b[sortBy as keyof Employee];
+
+      // Caso especial para custo calculado
+      if (sortBy === 'totalCost') {
+        valA = calcEmployeeCost(a);
+        valB = calcEmployeeCost(b);
+      }
+      
       if (sortBy === 'name') {
         return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       }
+
+      if (sortBy === 'salary' || sortBy === 'totalCost') {
+        return sortOrder === 'asc' ? (Number(valA) || 0) - (Number(valB) || 0) : (Number(valB) || 0) - (Number(valA) || 0);
+      }
+
       if (sortBy === 'admission_date') {
         const dateA = new Date(a.admissionDate || 0).getTime();
         const dateB = new Date(b.admissionDate || 0).getTime();
@@ -328,6 +342,9 @@ export default function Employees() {
         totalPages={totalPages}
         perPage={perPage}
         totalFiltered={filtered.length}
+        onSortChange={(field, order) => { setSortBy(field); setSortOrder(order); }}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
         onPageChange={setPage}
       />
 

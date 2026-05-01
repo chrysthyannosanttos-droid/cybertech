@@ -1,4 +1,4 @@
-import { UserX, Camera, Edit2, Trash2, Trophy } from 'lucide-react';
+import { UserX, Camera, Edit2, Trash2, Trophy, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Employee } from '@/types';
@@ -20,25 +20,30 @@ interface EmployeeTableProps {
   perPage: number;
   totalFiltered: number;
   onPageChange: (page: number | ((p: number) => number)) => void;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSortChange?: (field: string, order: 'asc' | 'desc') => void;
 }
 
-export function EmployeeTable({
-  paginatedEmployees,
-  selectedIds,
-  onToggleSelectAll,
-  onToggleSelect,
-  onEdit,
-  onDelete,
-  onRegisterPhoto,
-  isAdmin,
-  currentUser,
-  calcEmployeeCost,
-  page,
-  totalPages,
-  perPage,
-  totalFiltered,
   onPageChange,
+  sortBy,
+  sortOrder,
+  onSortChange,
 }: EmployeeTableProps) {
+  const handleSort = (field: string) => {
+    if (!onSortChange) return;
+    if (sortBy === field) {
+      onSortChange(field, sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      onSortChange(field, 'asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortBy !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-20" />;
+    return sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 text-primary" /> : <ArrowDown className="w-3 h-3 ml-1 text-primary" />;
+  };
+
   return (
     <div className="glass-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden relative">
       <div className="overflow-x-auto min-h-[400px]">
@@ -55,12 +60,18 @@ export function EmployeeTable({
                   className="border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </th>
-              <th className="px-2 py-3">Colaborador</th>
+              <th className="px-2 py-3 cursor-pointer group/h" onClick={() => handleSort('name')}>
+                <div className="flex items-center">Colaborador <SortIcon field="name" /></div>
+              </th>
               <th className="px-2 py-3 text-center">Status</th>
               <th className="px-2 py-3">Unid/Setor</th>
               <th className="px-2 py-3 text-left">Cargo</th>
-              <th className="px-2 py-3 text-right">Base</th>
-              <th className="px-2 py-3 text-right">Total</th>
+              <th className="px-2 py-3 text-right cursor-pointer group/h" onClick={() => handleSort('salary')}>
+                <div className="flex items-center justify-end">Base <SortIcon field="salary" /></div>
+              </th>
+              <th className="px-2 py-3 text-right cursor-pointer group/h" onClick={() => handleSort('totalCost')}>
+                <div className="flex items-center justify-end">Total <SortIcon field="totalCost" /></div>
+              </th>
               <th className="px-2 py-3 text-center">Ações</th>
             </tr>
           </thead>
