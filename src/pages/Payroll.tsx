@@ -20,6 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 import { Loader2, PlayCircle, Mail, Send, MessageSquare, ExternalLink } from 'lucide-react';
 import { BulkPostModal } from '@/components/payroll/BulkPostModal';
+import { calculatePayroll, round } from '@/lib/cltEngine';
+import { processBatch } from '@/lib/payrollModule';
 
 // Mock payroll verbas (códigos de verba)
 const VERBAS = [
