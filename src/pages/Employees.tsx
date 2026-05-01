@@ -42,6 +42,7 @@ export default function Employees() {
   const [storeFilter, setStoreFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [genderFilter, setGenderFilter] = useState('all');
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -59,7 +60,7 @@ export default function Employees() {
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setPage(1);
-  }, [search, storeFilter, statusFilter, departmentFilter]);
+  }, [search, storeFilter, statusFilter, departmentFilter, genderFilter]);
 
   const departments = useMemo(() => Array.from(new Set(employees.map((e) => e.department).filter(Boolean))), [employees]);
 
@@ -69,7 +70,8 @@ export default function Employees() {
       const matchStore = storeFilter === 'all' || e.storeId === storeFilter;
       const matchStatus = statusFilter === 'all' || (e.status || 'INACTIVE') === statusFilter;
       const matchDept = departmentFilter === 'all' || e.department === departmentFilter;
-      return matchSearch && matchStore && matchStatus && matchDept;
+      const matchGender = genderFilter === 'all' || e.gender === genderFilter;
+      return matchSearch && matchStore && matchStatus && matchDept && matchGender;
     });
 
     result.sort((a, b) => {
@@ -99,7 +101,7 @@ export default function Employees() {
     });
 
     return result;
-  }, [employees, search, storeFilter, statusFilter, departmentFilter, sortBy, sortOrder]);
+  }, [employees, search, storeFilter, statusFilter, departmentFilter, genderFilter, sortBy, sortOrder]);
 
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
   const totalPages = Math.ceil(filtered.length / perPage);
@@ -321,6 +323,8 @@ export default function Employees() {
         onDepartmentFilterChange={setDepartmentFilter}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        genderFilter={genderFilter}
+        onGenderFilterChange={setGenderFilter}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={(field, order) => { setSortBy(field); setSortOrder(order); }}

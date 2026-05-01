@@ -22,6 +22,8 @@ interface EmployeeFiltersProps {
   onDepartmentFilterChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  genderFilter: string;
+  onGenderFilterChange: (value: string) => void;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
   onSortChange: (field: string, order: 'asc' | 'desc') => void;
@@ -38,6 +40,8 @@ export function EmployeeFilters({
   onDepartmentFilterChange,
   statusFilter,
   onStatusFilterChange,
+  genderFilter,
+  onGenderFilterChange,
   sortBy,
   sortOrder,
   onSortChange,
@@ -153,6 +157,18 @@ export function EmployeeFilters({
           <SelectItem value="all">Todos Status</SelectItem>
           <SelectItem value="ACTIVE">Ativos</SelectItem>
           <SelectItem value="INACTIVE">Inativos</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select value={genderFilter} onValueChange={onGenderFilterChange}>
+        <SelectTrigger className="w-[130px] h-10 bg-white/5 border-white/10 rounded-xl">
+          <SelectValue placeholder="Sexo" />
+        </SelectTrigger>
+        <SelectContent className="glass-card border-white/10 text-white">
+          <SelectItem value="all">Todos Sexos</SelectItem>
+          <SelectItem value="M">Masculino</SelectItem>
+          <SelectItem value="F">Feminino</SelectItem>
+          <SelectItem value="OTHER">Outro</SelectItem>
         </SelectContent>
       </Select>
 
