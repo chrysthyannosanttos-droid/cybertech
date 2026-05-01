@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateRescission, RescissionType, monthsBetween } from '@/lib/cltEngine';
 import { addAuditLog } from '@/data/mockData';
-import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator, Sparkles } from 'lucide-react';
+import { UserMinus, Plus, Search, Trash2, Printer, ChevronDown, ChevronUp, Calculator, Sparkles, DollarSign, Wallet } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -246,6 +246,10 @@ export default function Rescissions() {
   };
 
   const filtered = rescissions.filter(r => r.employee_name?.toLowerCase().includes(search.toLowerCase()));
+  
+  const totalNetValue = rescissions.reduce((acc, r) => acc + (r.rescission_value || 0), 0);
+  const totalFgtsValue = rescissions.reduce((acc, r) => acc + (r.fgts_value || 0), 0);
+  const totalGrossValue = rescissions.reduce((acc, r) => acc + (r.gross_value || 0), 0);
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -551,6 +555,29 @@ export default function Rescissions() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Total Líquido Pago', value: fmt(totalNetValue), sub: 'Depósitos em conta', icon: DollarSign, color: 'text-rose-400' },
+          { label: 'Total FGTS + Multa', value: fmt(totalFgtsValue), sub: 'Disponível para saque', icon: Sparkles, color: 'text-amber-400' },
+          { label: 'Total Bruto (Proventos)', value: fmt(totalGrossValue), sub: 'Sem descontos', icon: Wallet, color: 'text-blue-400' },
+          { label: 'Total de Rescisões', value: rescissions.length, sub: 'Registros no sistema', icon: UserMinus, color: 'text-white' },
+        ].map((stat, i) => (
+          <div key={i} className="glass-card rounded-2xl border border-white/5 p-5 relative overflow-hidden group hover:border-rose-500/30 transition-all duration-300">
+            <div className="flex items-start justify-between relative">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
+                <p className={`text-xl font-black ${stat.color} tracking-tighter`}>{stat.value}</p>
+                <p className="text-[10px] text-muted-foreground font-medium">{stat.sub}</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Busca */}
