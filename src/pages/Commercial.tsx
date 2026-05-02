@@ -491,12 +491,19 @@ export default function Commercial() {
                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
               {AVAILABLE_MODULES.map((mod) => {
                 const isSelected = selectedModules.includes(mod.id);
                 const Icon = mod.icon;
                 return (
-                  <div key={mod.id} onClick={() => toggleModule(mod.id)} className={cn("group p-6 rounded-[1.5rem] border cursor-pointer transition-all", isSelected ? 'bg-primary/10 border-primary/40' : 'bg-white/[0.02] border-white/5')}>
+                  <button 
+                    key={mod.id} 
+                    onClick={() => toggleModule(mod.id)} 
+                    className={cn(
+                      "group p-6 rounded-[1.5rem] border cursor-pointer transition-all text-left relative overflow-hidden outline-none", 
+                      isSelected ? 'bg-primary/10 border-primary/40' : 'bg-white/[0.02] border-white/5'
+                    )}
+                  >
                     <div className="flex items-start gap-5">
                       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border transition-all", isSelected ? 'bg-primary text-white' : 'bg-white/5 text-muted-foreground')}>
                         <Icon className="w-7 h-7" />
@@ -506,7 +513,7 @@ export default function Commercial() {
                         <p className="text-[11px] text-muted-foreground line-clamp-2">{mod.description}</p>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
