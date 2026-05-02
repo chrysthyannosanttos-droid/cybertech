@@ -32,7 +32,8 @@ import {
   HardDrive,
   Scale,
   FileSignature,
-  Building
+  Building,
+  Info
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,6 +149,8 @@ const AVAILABLE_MODULES: ModuleOption[] = [
   },
 ];
 
+const MIN_EMPLOYEES_BILLING = 50;
+
 export default function Commercial() {
   const { user: currentUser } = useAuth();
   const isCristiano = currentUser?.email?.toLowerCase().includes('cristiano') || currentUser?.name?.toLowerCase().includes('cristiano');
@@ -176,13 +179,13 @@ export default function Commercial() {
 
   const calculateMonthlyTotal = (type: 'cloud' | 'local') => {
     const current = pricing[type];
-    const perUserTotal = (Number(current.perUser) || 0) * (Number(employeeCount) || 0);
+    const effectiveEmployeeCount = Math.max(MIN_EMPLOYEES_BILLING, Number(employeeCount) || 0);
+    const perUserTotal = (Number(current.perUser) || 0) * effectiveEmployeeCount;
     const maintenanceTotal = Number(current.maintenance) || 0;
     
     const modulesBaseTotal = AVAILABLE_MODULES
       .filter(m => selectedModules.includes(m.id))
       .reduce((acc, curr) => {
-        // Se for o módulo whitelabel, usar o preço customizado
         if (curr.id === 'whitelabel') {
           return acc + (Number(whiteLabelPrice) || 0);
         }
@@ -212,6 +215,7 @@ export default function Commercial() {
     try {
       const doc = new jsPDF();
       const primaryColor = [0, 163, 255]; 
+      const effectiveCount = Math.max(MIN_EMPLOYEES_BILLING, Number(employeeCount) || 0);
 
       // Cabeçalho Oficial
       doc.setFillColor(10, 15, 29);
@@ -254,7 +258,7 @@ export default function Commercial() {
       y += 8;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      const greeting = "Abaixo detalhamos o comparativo de investimento para as modalidades de Servidor Nuvem e Servidor Local/Físico.";
+      const greeting = "Abaixo detalhamos o comparativo de investimento. Nota: Para fins de licenciamento, aplicamos um faturamento mínimo de 50 colaboradores.";
       const greetingLines = doc.splitTextToSize(greeting, 180);
       doc.text(greetingLines, 15, y);
       y += (greetingLines.length * 5) + 15;
@@ -270,7 +274,7 @@ export default function Commercial() {
         ['Taxa de Implantação (Setup)', 'R$ ' + pricing.cloud.setup, 'R$ ' + pricing.local.setup],
         ['Manutenção Mensal', 'R$ ' + pricing.cloud.maintenance, 'R$ ' + pricing.local.maintenance],
         ['Licença Mensal p/ Usuário', 'R$ ' + pricing.cloud.perUser, 'R$ ' + pricing.local.perUser],
-        ['Adicional White Label', 'R$ ' + (selectedModules.includes('whitelabel') ? whiteLabelPrice : 'N/A'), 'R$ ' + (selectedModules.includes('whitelabel') ? whiteLabelPrice : 'N/A')],
+        ['Base de Faturamento', effectiveCount + ' Colab. (Mínimo)', effectiveCount + ' Colab. (Mínimo)'],
         ['INVESTIMENTO MENSAL TOTAL', 'R$ ' + calculateMonthlyTotal('cloud').toLocaleString('pt-BR'), 'R$ ' + calculateMonthlyTotal('local').toLocaleString('pt-BR')]
       ];
 
@@ -288,34 +292,7 @@ export default function Commercial() {
         }
       });
 
-      y = (doc as any).lastAutoTable.finalY + 15;
-      
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Módulos Inclusos na Solução', 15, y);
-      y += 5;
-
-      const moduleData = AVAILABLE_MODULES
-        .filter(m => selectedModules.includes(m.id))
-        .map(m => [m.label, m.longDescription]);
-
-      (doc as any).autoTable({
-        startY: y,
-        head: [['Módulo', 'Descrição Técnica']],
-        body: moduleData,
-        theme: 'striped',
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [100, 100, 100] }
-      });
-
-      // Marca d'água de fundo
-      if (logoBase64) {
-        doc.setGState(new (doc as any).GState({ opacity: 0.03 }));
-        doc.addImage(logoBase64, 'PNG', 40, 80, 130, 130);
-        doc.setGState(new (doc as any).GState({ opacity: 1 }));
-      }
-
-      doc.save(`Comparativo_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
+      doc.save(`Proposta_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
       toast({ title: "PDF Gerado!" });
     } catch (error) {
       toast({ title: "Erro ao gerar PDF", variant: "destructive" });
@@ -330,6 +307,7 @@ export default function Commercial() {
       const doc = new jsPDF();
       const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
       const current = pricing[type];
+      const effectiveCount = Math.max(MIN_EMPLOYEES_BILLING, Number(employeeCount) || 0);
       
       doc.setFillColor(245, 245, 245);
       doc.rect(0, 0, 210, 40, 'F');
@@ -347,7 +325,7 @@ export default function Commercial() {
         { title: 'CONTRATADA', content: 'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, CNPJ: 00.000.000/0001-00.' },
         { title: 'CONTRATANTE', content: `${clientName.toUpperCase()}, CNPJ: ${clientCnpj || '___________________'}.` },
         { title: 'OBJETO', content: `O sistema será implantado em regime de SERVIDOR ${type === 'cloud' ? 'EM NUVEM (SaaS)' : 'FÍSICO/LOCAL (On-Premise)'}.` },
-        { title: 'INVESTIMENTO', content: `Setup de R$ ${current.setup} e Mensalidade de R$ ${calculateMonthlyTotal(type).toLocaleString('pt-BR')}.` }
+        { title: 'INVESTIMENTO', content: `Setup de R$ ${current.setup}. Mensalidade calculada sobre base mínima de ${MIN_EMPLOYEES_BILLING} colaboradores, totalizando R$ ${calculateMonthlyTotal(type).toLocaleString('pt-BR')} mensais.` }
       ];
 
       contractText.forEach(item => {
@@ -379,7 +357,7 @@ export default function Commercial() {
           <div>
             <h1 className="text-2xl font-black text-white tracking-tight uppercase italic">CyberTech Dual-Server Proposal</h1>
             <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" /> Comparativo de Infraestrutura (Nuvem vs Local)
+              <Sparkles className="w-3.5 h-3.5 text-primary" /> Faturamento Mínimo Ativado (50 Colaboradores)
             </p>
           </div>
         </div>
@@ -428,12 +406,18 @@ export default function Commercial() {
                   />
                </div>
                <div className="space-y-2">
-                  <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest ml-1">Colaboradores</Label>
+                  <div className="flex justify-between items-center pr-1">
+                    <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest ml-1">Colaboradores</Label>
+                    <span className="text-[9px] font-black text-rose-400 uppercase">Min 50</span>
+                  </div>
                   <Input 
                     type="number"
                     value={employeeCount} 
                     onChange={e => setEmployeeCount(e.target.value)}
-                    className="bg-white/5 border-white/10 h-12 rounded-xl font-bold"
+                    className={cn(
+                      "bg-white/5 border-white/10 h-12 rounded-xl font-bold",
+                      Number(employeeCount) < 50 && "text-rose-400 border-rose-500/30"
+                    )}
                   />
                </div>
                <div className="space-y-2">
@@ -469,7 +453,10 @@ export default function Commercial() {
                     </div>
                   </div>
                   <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest">Total Mensal Estimado</span>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-black uppercase text-primary tracking-widest">Total Mensal</span>
+                       <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-black uppercase">Mín. 50</span>
+                    </div>
                     <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</span>
                   </div>
                </div>
@@ -495,7 +482,10 @@ export default function Commercial() {
                     </div>
                   </div>
                   <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Mensal Estimado</span>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Mensal</span>
+                       <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-muted-foreground font-black uppercase">Mín. 50</span>
+                    </div>
                     <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR')}</span>
                   </div>
                </div>
@@ -514,9 +504,6 @@ export default function Commercial() {
                       <div className="space-y-1">
                         <h4 className={cn("text-[15px] font-black uppercase", isSelected ? 'text-white' : 'text-zinc-400')}>{mod.label}</h4>
                         <p className="text-[11px] text-muted-foreground line-clamp-2">{mod.description}</p>
-                        {mod.id === 'whitelabel' && isSelected && (
-                          <span className="inline-block mt-2 px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-black rounded-md">VALOR CUSTOM: R$ {whiteLabelPrice}</span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -555,10 +542,13 @@ export default function Commercial() {
                   <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
                     Prezado(a) responsável pela <span className="text-primary">{clientName}</span>,
                   </h3>
-                  <p className="text-slate-600 text-md leading-relaxed font-medium">
-                    Apresentamos abaixo o detalhamento comparativo entre nossas duas principais modalidades de implantação. 
-                    Escolha a que melhor se adapta à cultura e política de segurança de dados da sua empresa.
-                  </p>
+                  <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                    <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <p className="text-slate-600 text-sm leading-relaxed font-medium">
+                      Nota: O licenciamento da plataforma CyberTech RH contempla um <strong>faturamento mínimo de 50 colaboradores</strong>. 
+                      Empresas com volume inferior serão faturadas sobre esta base mínima contratual.
+                    </p>
+                  </div>
                </div>
 
                {/* Comparison Table View */}
@@ -599,15 +589,13 @@ export default function Commercial() {
                         <td className="p-6 text-center text-primary font-black border-l border-slate-100">R$ {pricing.cloud.perUser} /mês</td>
                         <td className="p-6 text-center font-black border-l border-slate-100">R$ {pricing.local.perUser} /mês</td>
                       </tr>
-                      {selectedModules.includes('whitelabel') && (
-                        <tr className="border-b border-slate-100">
-                          <td className="p-6 font-black bg-slate-50">Módulo White Label (Personalização)</td>
-                          <td className="p-6 text-center text-primary font-black border-l border-slate-100">R$ {whiteLabelPrice} /mês</td>
-                          <td className="p-6 text-center font-black border-l border-slate-100">R$ {whiteLabelPrice} /mês</td>
-                        </tr>
-                      )}
+                      <tr className="border-b border-slate-100">
+                        <td className="p-6 font-black bg-slate-50">Base de Faturamento (Mínima)</td>
+                        <td className="p-6 text-center text-primary font-black border-l border-slate-100">{Math.max(50, Number(employeeCount))} Colaboradores</td>
+                        <td className="p-6 text-center font-black border-l border-slate-100">{Math.max(50, Number(employeeCount))} Colaboradores</td>
+                      </tr>
                       <tr className="bg-slate-900 text-white">
-                        <td className="p-8 font-black uppercase tracking-widest text-[11px]">Total Recorrente ({employeeCount} Colab.)</td>
+                        <td className="p-8 font-black uppercase tracking-widest text-[11px]">Total Recorrente Estimado</td>
                         <td className="p-8 text-center text-2xl font-black text-primary border-l border-white/10">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</td>
                         <td className="p-8 text-center text-2xl font-black text-white border-l border-white/10">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR')}</td>
                       </tr>
