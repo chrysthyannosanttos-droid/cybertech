@@ -165,6 +165,9 @@ export default function Commercial() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isGeneratingContract, setIsGeneratingContract] = useState(false);
 
+  // Custom Price for White Label
+  const [whiteLabelPrice, setWhiteLabelPrice] = useState('500.00');
+
   // Dual Pricing State
   const [pricing, setPricing] = useState({
     cloud: { setup: '1490.00', maintenance: '290.00', perUser: '12.90' },
@@ -175,9 +178,17 @@ export default function Commercial() {
     const current = pricing[type];
     const perUserTotal = (Number(current.perUser) || 0) * (Number(employeeCount) || 0);
     const maintenanceTotal = Number(current.maintenance) || 0;
+    
     const modulesBaseTotal = AVAILABLE_MODULES
       .filter(m => selectedModules.includes(m.id))
-      .reduce((acc, curr) => acc + curr.suggestedPrice, 0);
+      .reduce((acc, curr) => {
+        // Se for o módulo whitelabel, usar o preço customizado
+        if (curr.id === 'whitelabel') {
+          return acc + (Number(whiteLabelPrice) || 0);
+        }
+        return acc + curr.suggestedPrice;
+      }, 0);
+
     return perUserTotal + modulesBaseTotal + maintenanceTotal;
   };
 
@@ -259,7 +270,7 @@ export default function Commercial() {
         ['Taxa de Implantação (Setup)', 'R$ ' + pricing.cloud.setup, 'R$ ' + pricing.local.setup],
         ['Manutenção Mensal', 'R$ ' + pricing.cloud.maintenance, 'R$ ' + pricing.local.maintenance],
         ['Licença Mensal p/ Usuário', 'R$ ' + pricing.cloud.perUser, 'R$ ' + pricing.local.perUser],
-        ['Base de Colaboradores', employeeCount, employeeCount],
+        ['Adicional White Label', 'R$ ' + (selectedModules.includes('whitelabel') ? whiteLabelPrice : 'N/A'), 'R$ ' + (selectedModules.includes('whitelabel') ? whiteLabelPrice : 'N/A')],
         ['INVESTIMENTO MENSAL TOTAL', 'R$ ' + calculateMonthlyTotal('cloud').toLocaleString('pt-BR'), 'R$ ' + calculateMonthlyTotal('local').toLocaleString('pt-BR')]
       ];
 
@@ -305,7 +316,7 @@ export default function Commercial() {
       }
 
       doc.save(`Comparativo_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
-      toast({ title: "PDF Gerado!", description: "Comparativo de preços baixado com sucesso." });
+      toast({ title: "PDF Gerado!" });
     } catch (error) {
       toast({ title: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
@@ -335,7 +346,7 @@ export default function Commercial() {
       const contractText = [
         { title: 'CONTRATADA', content: 'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, CNPJ: 00.000.000/0001-00.' },
         { title: 'CONTRATANTE', content: `${clientName.toUpperCase()}, CNPJ: ${clientCnpj || '___________________'}.` },
-        { title: 'MODALIDADE', content: `O sistema será implantado em regime de SERVIDOR ${type === 'cloud' ? 'EM NUVEM (SaaS)' : 'FÍSICO/LOCAL (On-Premise)'}.` },
+        { title: 'OBJETO', content: `O sistema será implantado em regime de SERVIDOR ${type === 'cloud' ? 'EM NUVEM (SaaS)' : 'FÍSICO/LOCAL (On-Premise)'}.` },
         { title: 'INVESTIMENTO', content: `Setup de R$ ${current.setup} e Mensalidade de R$ ${calculateMonthlyTotal(type).toLocaleString('pt-BR')}.` }
       ];
 
@@ -397,7 +408,7 @@ export default function Commercial() {
       {!showPreview ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-12 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                <div className="space-y-2">
                   <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest ml-1">Cliente / Empresa</Label>
                   <Input 
@@ -417,12 +428,21 @@ export default function Commercial() {
                   />
                </div>
                <div className="space-y-2">
-                  <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest ml-1">Nº de Colaboradores</Label>
+                  <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest ml-1">Colaboradores</Label>
                   <Input 
                     type="number"
                     value={employeeCount} 
                     onChange={e => setEmployeeCount(e.target.value)}
                     className="bg-white/5 border-white/10 h-12 rounded-xl font-bold"
+                  />
+               </div>
+               <div className="space-y-2">
+                  <Label className="text-[11px] font-black uppercase text-primary tracking-widest ml-1">Valor White Label (R$)</Label>
+                  <Input 
+                    type="number"
+                    value={whiteLabelPrice} 
+                    onChange={e => setWhiteLabelPrice(e.target.value)}
+                    className="bg-primary/10 border-primary/20 h-12 rounded-xl font-black text-white"
                   />
                </div>
             </div>
@@ -494,6 +514,9 @@ export default function Commercial() {
                       <div className="space-y-1">
                         <h4 className={cn("text-[15px] font-black uppercase", isSelected ? 'text-white' : 'text-zinc-400')}>{mod.label}</h4>
                         <p className="text-[11px] text-muted-foreground line-clamp-2">{mod.description}</p>
+                        {mod.id === 'whitelabel' && isSelected && (
+                          <span className="inline-block mt-2 px-2 py-0.5 bg-primary/20 text-primary text-[10px] font-black rounded-md">VALOR CUSTOM: R$ {whiteLabelPrice}</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -576,6 +599,13 @@ export default function Commercial() {
                         <td className="p-6 text-center text-primary font-black border-l border-slate-100">R$ {pricing.cloud.perUser} /mês</td>
                         <td className="p-6 text-center font-black border-l border-slate-100">R$ {pricing.local.perUser} /mês</td>
                       </tr>
+                      {selectedModules.includes('whitelabel') && (
+                        <tr className="border-b border-slate-100">
+                          <td className="p-6 font-black bg-slate-50">Módulo White Label (Personalização)</td>
+                          <td className="p-6 text-center text-primary font-black border-l border-slate-100">R$ {whiteLabelPrice} /mês</td>
+                          <td className="p-6 text-center font-black border-l border-slate-100">R$ {whiteLabelPrice} /mês</td>
+                        </tr>
+                      )}
                       <tr className="bg-slate-900 text-white">
                         <td className="p-8 font-black uppercase tracking-widest text-[11px]">Total Recorrente ({employeeCount} Colab.)</td>
                         <td className="p-8 text-center text-2xl font-black text-primary border-l border-white/10">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</td>
