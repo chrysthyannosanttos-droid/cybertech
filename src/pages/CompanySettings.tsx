@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Tenant } from '@/types';
-import { Building2, Save, X, ShieldCheck, CreditCard, Calendar, AlertCircle, Palette, Layout } from 'lucide-react';
+import { Building2, Save, X, ShieldCheck, CreditCard, Calendar, AlertCircle, Palette, Layout, Monitor, Download, Smartphone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { addAuditLog } from '@/data/mockData';
 
 export default function CompanySettings() {
@@ -152,8 +153,18 @@ export default function CompanySettings() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
+      <Tabs defaultValue="company" className="w-full">
+        <TabsList className="glass p-1 border border-white/5 rounded-2xl mb-8">
+          <TabsTrigger value="company" className="gap-2">
+            <Building2 className="w-4 h-4" /> Dados Gerais
+          </TabsTrigger>
+          <TabsTrigger value="downloads" className="gap-2">
+            <Download className="w-4 h-4" /> Central de Apps
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="company" className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="md:col-span-2 space-y-6">
           <Card className="glass border-white/5 shadow-2xl overflow-hidden relative">
             <CardHeader className="border-b border-white/5 bg-white/5">
               <div className="flex items-center gap-3">
@@ -528,8 +539,72 @@ export default function CompanySettings() {
               </p>
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="downloads" className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="glass p-8 rounded-3xl border border-white/10 space-y-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-primary/20 transition-colors" />
+              
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary border border-primary/20 shadow-lg">
+                  <Monitor className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-black text-white uppercase tracking-tighter">Versão Desktop (Windows)</h3>
+                  <p className="text-[12px] text-muted-foreground font-medium">Software oficial instalado para PC</p>
+                </div>
+              </div>
+              
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5 space-y-4">
+                <p className="text-[13px] text-white/80 leading-relaxed">
+                  A versão desktop oferece maior estabilidade para o **Ponto Eletrônico**, permite inicialização automática com o Windows e atalhos rápidos na barra de tarefas.
+                </p>
+                
+                <div className="space-y-3">
+                  <Button 
+                    className="w-full gap-3 font-bold h-12 shadow-[0_0_20px_rgba(31,180,243,0.3)] hover:scale-[1.02] transition-transform" 
+                    onClick={() => window.open('https://cybertech-rh.vercel.app/downloads/CyberTech_RH_Setup.exe', '_blank')}
+                  >
+                    <Download className="w-5 h-5" /> Baixar Instalador Windows (.exe)
+                  </Button>
+                  <p className="text-[10px] text-center text-muted-foreground italic">Versão 1.0.0 - Compatível com Windows 10 e 11</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass p-8 rounded-3xl border border-white/10 space-y-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-amber-500/20 transition-colors" />
+              
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-500 border border-amber-500/20 shadow-lg">
+                  <Smartphone className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-black text-white uppercase tracking-tighter">Versão Mobile (PWA)</h3>
+                  <p className="text-[12px] text-muted-foreground font-medium">Acesso rápido pelo celular</p>
+                </div>
+              </div>
+              
+              <div className="bg-black/40 p-5 rounded-2xl border border-white/5 space-y-4">
+                <p className="text-[13px] text-white/80 leading-relaxed">
+                  Otimizado para smartphones. Você pode adicionar um ícone do sistema diretamente na sua tela de aplicativos sem precisar baixar na App Store.
+                </p>
+                
+                <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                  <div className="w-16 h-16 bg-white rounded-lg p-1 shrink-0">
+                    <div className="w-full h-full bg-zinc-200 rounded-sm flex items-center justify-center text-[8px] text-zinc-500 font-bold text-center p-1 uppercase">QR Link do Sistema</div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-white uppercase tracking-tighter">Como instalar:</p>
+                    <p className="text-[10px] text-muted-foreground">1. Abra o sistema no Chrome/Safari<br/>2. Menu > Adicionar à tela inicial</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
