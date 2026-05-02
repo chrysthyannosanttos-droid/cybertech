@@ -23,6 +23,34 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@CyberTech" />
     <meta name="twitter:image" content="/logo-cybertech.png" />
+
+    <script>
+      (function() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const tenant = urlParams.get('t') || localStorage.getItem('last_tenant_slug');
+          
+          if (tenant) {
+            // Oculta o background padrão imediatamente se houver um tenant detectado
+            document.documentElement.style.setProperty('--tenant-bg', 'none');
+            
+            // Tenta carregar do cache para exibição instantânea
+            const cached = localStorage.getItem('branding_' + tenant);
+            if (cached) {
+              const branding = JSON.parse(cached);
+              if (branding.background_url) {
+                document.documentElement.style.setProperty('--tenant-bg', 'url("' + branding.background_url + '")');
+              }
+              if (branding.primary_color) {
+                document.documentElement.style.setProperty('--primary-color', branding.primary_color);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Branding pre-loader error:', e);
+        }
+      })();
+    </script>
   </head>
 
   <body>
