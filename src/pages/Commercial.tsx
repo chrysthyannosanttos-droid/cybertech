@@ -31,7 +31,8 @@ import {
   Cloud,
   HardDrive,
   Scale,
-  FileSignature
+  FileSignature,
+  Building
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -207,98 +208,125 @@ export default function Commercial() {
     setIsGeneratingPdf(true);
     try {
       const doc = new jsPDF();
-      const primaryColor = [0, 102, 255]; 
+      const primaryColor = [0, 163, 255]; 
 
-      doc.setFillColor(15, 23, 42); 
-      doc.rect(0, 0, 210, 60, 'F');
+      // Cabeçalho Oficial
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 50, 'F');
 
       const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
       if (logoBase64) {
-        doc.setGState(new (doc as any).GState({ opacity: 0.05 }));
-        doc.addImage(logoBase64, 'PNG', 45, 100, 120, 120, undefined, 'FAST');
-        doc.setGState(new (doc as any).GState({ opacity: 1 }));
+        doc.addImage(logoBase64, 'PNG', 15, 10, 30, 30);
       }
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
-      doc.text('PROPOSTA COMERCIAL', 20, 30);
+      doc.text('CYBERTECH RH', 50, 25);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('TECNOLOGIA PARA GESTÃO DE PESSOAL', 20, 38);
-      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setLineWidth(1.5);
-      doc.line(20, 45, 50, 45);
+      doc.text('INTELIGÊNCIA DIGITAL EM GESTÃO DE PESSOAL', 50, 32);
 
-      doc.setTextColor(255, 255, 255);
+      // Linha Divisória
+      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setLineWidth(1);
+      doc.line(50, 36, 120, 36);
+
+      // Info Proposta
+      doc.setFontSize(8);
+      doc.text('PROPOSTA COMERCIAL Nº: ' + Math.floor(Math.random() * 10000), 150, 20);
+      doc.text('DATA: ' + new Date().toLocaleDateString('pt-BR'), 150, 25);
+
+      // Cliente Section
+      doc.setFillColor(245, 247, 250);
+      doc.rect(15, 60, 180, 25, 'F');
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PREPARADO PARA:', 25, 70);
+      doc.setFontSize(14);
+      doc.text(clientName.toUpperCase(), 25, 78);
+      doc.setFontSize(9);
+      doc.text('CNPJ: ' + (clientCnpj || 'NÃO INFORMADO'), 140, 78);
+
+      // Mensagem de Saudação
+      let y = 100;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Prezado(a) responsável pela ${clientName},`, 15, y);
+      y += 8;
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
-      doc.text('PREPARADO PARA:', 140, 25);
+      const greeting = "É um prazer apresentar nossa proposta de modernização para o seu RH. O ecossistema CyberTech foi projetado para eliminar burocracias, garantir segurança jurídica e oferecer uma experiência digital superior para seus colaboradores.";
+      const greetingLines = doc.splitTextToSize(greeting, 180);
+      doc.text(greetingLines, 15, y);
+      y += (greetingLines.length * 5) + 15;
+
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text(clientName.toUpperCase(), 140, 32);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(clientCnpj || 'CNPJ NÃO INFORMADO', 140, 38);
-
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Escopo da Solução - ' + (serverType === 'CLOUD' ? 'Servidor Nuvem' : 'Servidor Local'), 20, 80);
+      doc.text('Escopo da Solução - Servidor ' + (serverType === 'CLOUD' ? 'Nuvem' : 'Local'), 15, y);
+      y += 5;
 
       const moduleData = AVAILABLE_MODULES
         .filter(m => selectedModules.includes(m.id))
         .map(m => [m.label, m.longDescription]);
 
       (doc as any).autoTable({
-        startY: 85,
+        startY: y,
         head: [['Módulo', 'Descrição do Serviço']],
         body: moduleData,
         theme: 'striped',
-        headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold' },
         styles: { fontSize: 9, cellPadding: 5 },
         columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } }
       });
 
-      const finalY = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(16);
+      y = (doc as any).lastAutoTable.finalY + 15;
+      
+      // Nova Página se necessário
+      if (y > 220) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Investimento Sugerido (' + (serverType === 'CLOUD' ? 'Cloud' : 'Local') + ')', 20, finalY);
+      doc.text('Resumo do Investimento', 15, y);
+      y += 5;
 
       const priceData = [
-        ['Taxa de Implementação (Setup)', 'R$ ' + currentPricing.setup, 'Pagamento único inicial'],
-        ['Manutenção Mensal do Servidor', 'R$ ' + currentPricing.maintenance, 'Infraestrutura e Suporte'],
-        ['Licenciamento p/ Colaborador', 'R$ ' + currentPricing.perUser, 'Valor unitário mensal'],
-        ['Base de Usuários Estimada', employeeCount, 'Total de colaboradores'],
-        ['Investimento Mensal Total', 'R$ ' + calculateMonthlyTotal().toLocaleString('pt-BR'), 'Recorrência mensal total']
+        ['Implementação (Setup)', 'R$ ' + currentPricing.setup, 'Configuração e Treinamento'],
+        ['Manutenção Mensal', 'R$ ' + currentPricing.maintenance, 'Hospedagem e Atualizações'],
+        ['Licenciamento/Usuário', 'R$ ' + currentPricing.perUser, 'Por colaborador ativo'],
+        ['Colaboradores Estimados', employeeCount, 'Volume de licenças'],
+        ['INVESTIMENTO TOTAL MENSAL', 'R$ ' + calculateMonthlyTotal().toLocaleString('pt-BR'), 'Recorrência estimada']
       ];
 
       (doc as any).autoTable({
-        startY: finalY + 5,
+        startY: y,
         body: priceData,
         theme: 'grid',
         styles: { fontSize: 10, cellPadding: 6 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 70 }, 1: { textColor: primaryColor, fontStyle: 'bold' } }
+        columnStyles: { 
+          0: { fontStyle: 'bold', cellWidth: 60 }, 
+          1: { textColor: primaryColor, fontStyle: 'bold', halign: 'right' },
+          2: { textColor: [100, 100, 100], fontSize: 8 }
+        }
       });
 
-      const nextY = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Garantias & Segurança', 20, nextY);
-      doc.setFontSize(9);
-      const safety = [
-        '• Disponibilidade (SLA) de 99.9% garantida em contrato.',
-        '• Backup diário automático e redundância segura.',
-        '• Conformidade total com a LGPD (Lei Geral de Proteção de Dados).',
-        '• Suporte técnico especializado via WhatsApp e Ticket.'
-      ];
-      safety.forEach((line, i) => doc.text(line, 20, nextY + 10 + (i * 6)));
+      // Marca d'água de fundo (mais suave)
+      if (logoBase64) {
+        doc.setGState(new (doc as any).GState({ opacity: 0.03 }));
+        doc.addImage(logoBase64, 'PNG', 40, 80, 130, 130);
+        doc.setGState(new (doc as any).GState({ opacity: 1 }));
+      }
 
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text('CyberTech RH © 2026 - Inteligência Digital em RH', 105, 290, { align: 'center' });
+      doc.text('CyberTech RH © 2026 - Tecnologia Brasileira para o Mundo', 105, 285, { align: 'center' });
 
-      doc.save(`Proposta_${clientName.replace(/\s/g, '_')}.pdf`);
-      toast({ title: "PDF Gerado!", description: "A proposta comercial foi baixada com sucesso." });
+      doc.save(`Proposta_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: "Proposta Gerada!", description: "O documento oficial da CyberTech foi baixado." });
     } catch (error) {
       toast({ title: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
@@ -312,52 +340,41 @@ export default function Commercial() {
       const doc = new jsPDF();
       const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
       
-      // Contrato Header
       doc.setFillColor(245, 245, 245);
       doc.rect(0, 0, 210, 40, 'F');
       if (logoBase64) {
-        doc.addImage(logoBase64, 'PNG', 10, 10, 20, 20);
+        doc.addImage(logoBase64, 'PNG', 15, 5, 25, 25);
       }
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('INSTRUMENTO PARTICULAR DE CONTRATO DE', 40, 20);
-      doc.text('LICENCIAMENTO E PRESTAÇÃO DE SERVIÇOS', 40, 28);
-
-      let y = 50;
+      doc.text('CONTRATO DE LICENCIAMENTO DE SOFTWARE', 50, 20);
       doc.setFontSize(10);
+      doc.text('CYBERTECH RH - HR-HUB PLUS', 50, 28);
+
+      let y = 55;
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       
-      // Qualificacao
       const contractText = [
-        { title: 'CONTRATADA', content: 'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 00.000.000/0001-00, sediada na Cidade de [Sua Cidade/UF].' },
-        { title: 'CONTRATANTE', content: `${clientName.toUpperCase()}, inscrita no CNPJ sob o nº ${clientCnpj || '___________________'}, com sede em endereço comercial informado no ato do cadastro.` },
-        { title: 'CLÁUSULA 1ª - OBJETO', content: `O presente contrato tem como objeto o licenciamento de uso do software de gestão de RH (HR-HUB PLUS), em modalidade de SERVIDOR ${serverType === 'CLOUD' ? 'EM NUVEM (SAAS)' : 'LOCAL'}, incluindo os módulos: ${AVAILABLE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => m.label).join(', ')}.` },
-        { title: 'CLÁUSULA 2ª - DA IMPLANTAÇÃO', content: `A CONTRATADA compromete-se a realizar a implantação e configuração inicial do sistema no prazo de 15 dias úteis, mediante o pagamento da taxa de Setup de R$ ${currentPricing.setup}.` },
-        { title: 'CLÁUSULA 3ª - VALORES E REAJUSTES', content: `A CONTRATANTE pagará mensalmente à CONTRATADA o valor fixo de R$ ${currentPricing.maintenance} referente à manutenção e suporte, somado ao valor de R$ ${currentPricing.perUser} por colaborador ativo (Estimativa: ${employeeCount} colaboradores), totalizando uma recorrência inicial de R$ ${calculateMonthlyTotal().toLocaleString('pt-BR')}.` },
-        { title: 'CLÁUSULA 4ª - DISPONIBILIDADE E SUPORTE', content: 'A CONTRATADA garante um SLA (Service Level Agreement) de 99.9% de disponibilidade mensal do sistema. O suporte técnico será prestado via canais digitais em horário comercial (segunda a sexta, das 08h às 18h).' },
-        { title: 'CLÁUSULA 5ª - LGPD E SIGILO', content: 'As partes comprometem-se a cumprir integralmente a Lei Geral de Proteção de Dados (Lei 13.709/2018), garantindo o sigilo absoluto das informações inseridas no sistema.' },
-        { title: 'CLÁUSULA 6ª - VIGÊNCIA E RESCISÃO', content: 'O presente contrato tem vigência de 12 meses, renováveis automaticamente. A rescisão imotivada poderá ocorrer mediante aviso prévio de 30 dias.' }
+        { title: 'CONTRATADA', content: 'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, inscrita no CNPJ sob o nº 00.000.000/0001-00.' },
+        { title: 'CONTRATANTE', content: `${clientName.toUpperCase()}, CNPJ: ${clientCnpj || '___________________'}.` },
+        { title: 'OBJETO', content: `Licenciamento de uso da plataforma CyberTech RH em servidor ${serverType}, contemplando os módulos de BI, Ecossistema, Ponto e Folha.` },
+        { title: 'INVESTIMENTO', content: `Taxa de Setup de R$ ${currentPricing.setup} e Mensalidade de R$ ${calculateMonthlyTotal().toLocaleString('pt-BR')}.` },
+        { title: 'SUPORTE', content: 'Incluso suporte técnico ilimitado via WhatsApp corporativo e Tickets de atendimento.' }
       ];
 
       contractText.forEach(item => {
         doc.setFont('helvetica', 'bold');
-        doc.text(item.title, 20, y);
-        y += 6;
+        doc.text(item.title + ':', 20, y);
+        y += 5;
         doc.setFont('helvetica', 'normal');
         const lines = doc.splitTextToSize(item.content, 170);
         doc.text(lines, 20, y);
         y += (lines.length * 5) + 8;
       });
 
-      // Assinaturas
-      y = 250;
-      doc.line(20, y, 90, y);
-      doc.line(120, y, 190, y);
-      doc.text('CYBERTECH RH (CONTRATADA)', 25, y + 5);
-      doc.text('CLIENTE (CONTRATANTE)', 135, y + 5);
-
-      doc.save(`Contrato_${clientName.replace(/\s/g, '_')}.pdf`);
-      toast({ title: "Contrato Gerado!", description: "O contrato jurídico foi gerado com os dados da proposta." });
+      doc.save(`Contrato_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: "Contrato Gerado!" });
     } catch (error) {
       toast({ title: "Erro ao gerar Contrato", variant: "destructive" });
     } finally {
@@ -370,12 +387,12 @@ export default function Commercial() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-            <Briefcase className="w-6 h-6 text-primary" />
+            <Building className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-white tracking-tight uppercase italic italic">Gestão Comercial</h1>
+            <h1 className="text-2xl font-black text-white tracking-tight uppercase italic">CyberTech Proposal</h1>
             <p className="text-[13px] text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary" /> Engenharia de Propostas Inteligentes
+              <Sparkles className="w-3.5 h-3.5 text-primary" /> Gerador de Documentos Oficiais
             </p>
           </div>
         </div>
@@ -403,7 +420,6 @@ export default function Commercial() {
 
       {!showPreview ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Configurações da Proposta */}
           <div className="lg:col-span-4 space-y-6 sticky top-24">
             <div className="glass-card rounded-[2rem] border border-white/10 p-8 space-y-8 relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-primary/10 transition-all duration-500" />
@@ -436,7 +452,6 @@ export default function Commercial() {
                 </div>
               </div>
 
-              {/* Server Choice */}
               <div className="space-y-6 pt-8 border-t border-white/5">
                 <h3 className="text-[14px] font-black text-primary uppercase tracking-[0.2em] flex items-center gap-3">
                   <span className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[14px]">02</span>
@@ -534,7 +549,6 @@ export default function Commercial() {
             </div>
           </div>
 
-          {/* Seleção de Módulos */}
           <div className="lg:col-span-8 space-y-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div className="space-y-1">
@@ -611,90 +625,88 @@ export default function Commercial() {
       ) : (
         /* Preview da Proposta - Design Ultra Executive */
         <div className="max-w-5xl mx-auto space-y-10 animate-in slide-in-from-bottom-12 duration-700 pb-20">
-          <div className="glass-card rounded-[3rem] border border-white/10 overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.7)] bg-[#05070a] relative">
+          <div className="glass-card rounded-[3rem] border border-white/10 overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.7)] bg-white relative">
             
             {/* BACKGROUND WATERMARK (LOGO) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] overflow-hidden z-0">
                <img src="/logo-cybertech.png" alt="Watermark" className="w-[80%] max-w-2xl transform -rotate-12 scale-150" />
             </div>
 
-            {/* Cover Section */}
-            <div className="relative h-[450px] flex items-center p-20 overflow-hidden border-b border-white/10 z-10">
-               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent" />
-               <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_20%,rgba(var(--primary),0.15),transparent_40%)]" />
-               
-               <div className="relative z-10 space-y-8 max-w-2xl">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
-                    <Award className="w-4 h-4 text-primary" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Corporate Proposal 2026</span>
+            {/* Header CyberTech */}
+            <div className="relative bg-[#0a0f1d] p-16 flex flex-col md:flex-row items-center justify-between gap-8 z-10 border-b border-primary/20">
+               <div className="flex items-center gap-8">
+                  <div className="w-24 h-24 bg-white rounded-[2rem] p-4 flex items-center justify-center shadow-2xl">
+                    <img src="/logo-cybertech.png" alt="CyberTech Logo" className="w-full h-full object-contain" />
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-6xl font-black text-white tracking-tighter leading-[0.9]">
-                      TECNOLOGIA <br />
-                      <span className="text-primary italic">TRANSFORMADORA.</span>
-                    </h2>
-                    <p className="text-lg text-muted-foreground font-medium max-w-md mt-4">
-                      Elevando a gestão de capital humano a um novo patamar de inteligência e segurança jurídica via <span className="text-white font-bold">{serverType === 'CLOUD' ? 'Cloud Server' : 'Local Server'}</span>.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-8 pt-8">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Preparado Para</p>
-                      <p className="text-2xl font-bold text-white tracking-tight">{clientName}</p>
-                    </div>
-                    <div className="w-px h-12 bg-white/10" />
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Modelo de Entrega</p>
-                      <p className="text-2xl font-bold text-white tracking-tight">{serverType === 'CLOUD' ? 'Servidor Nuvem' : 'Servidor Local'}</p>
-                    </div>
+                    <h2 className="text-4xl font-black text-white tracking-tighter leading-none">CYBERTECH <span className="text-primary italic">RH</span></h2>
+                    <p className="text-primary/80 font-black text-[12px] uppercase tracking-[0.3em]">Inteligência Digital em Gestão</p>
                   </div>
                </div>
-               
-               {/* Abstract Elements */}
-               <div className="absolute right-20 top-20 w-32 h-32 border-4 border-primary/20 rounded-full animate-pulse" />
-               <div className="absolute right-40 bottom-20 w-16 h-16 border border-white/10 rounded-full" />
+               <div className="text-right space-y-2">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                    <Award className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">PROPOSTA COMERCIAL 2026</span>
+                  </div>
+                  <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Ref: CT-{Math.floor(Math.random() * 10000)}</p>
+               </div>
             </div>
 
-            {/* Value Pillars */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border-b border-white/10 z-10 relative">
-               {[
-                 { title: 'Segurança Máxima', desc: 'Conformidade total com LGPD e criptografia de dados.', icon: Shield },
-                 { title: 'SLA de 99.9%', desc: 'Infraestrutura robusta com alta disponibilidade garantida.', icon: Globe },
-                 { title: 'Suporte VIP', desc: 'Atendimento prioritário e consultoria de implantação.', icon: Headphones }
-               ].map((p, i) => (
-                 <div key={i} className="p-12 border-r last:border-0 border-white/10 flex flex-col items-center text-center space-y-4 hover:bg-white/[0.02] transition-colors">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                      <p.icon className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-[14px] font-black text-white uppercase tracking-widest">{p.title}</h4>
-                      <p className="text-[12px] text-muted-foreground leading-relaxed font-medium">{p.desc}</p>
-                    </div>
-                 </div>
-               ))}
+            {/* Greeting & Introduction */}
+            <div className="p-20 space-y-12 z-10 relative bg-white">
+               <div className="space-y-6 max-w-3xl">
+                  <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                    Prezado(a) responsável pela <span className="text-primary">{clientName}</span>,
+                  </h3>
+                  <div className="space-y-4 text-slate-600 text-lg leading-relaxed font-medium">
+                    <p>
+                      É com grande entusiasmo que a <strong>CyberTech RH</strong> apresenta este projeto de transformação digital para sua empresa. 
+                      Nosso objetivo é elevar o patamar da sua gestão de capital humano através de uma plataforma robusta, segura e centrada na experiência do colaborador.
+                    </p>
+                    <p>
+                      O ecossistema <strong>HR-HUB PLUS</strong> foi desenvolvido para automatizar processos complexos, garantir total segurança jurídica (LGPD) e oferecer insights estratégicos 
+                      em tempo real para a tomada de decisão da alta diretoria.
+                    </p>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8">
+                  <div className="space-y-4">
+                     <p className="text-[11px] font-black text-primary uppercase tracking-[0.2em]">Preparado Especialmente Para</p>
+                     <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                        <p className="text-2xl font-black text-slate-900">{clientName}</p>
+                        <p className="text-[13px] text-slate-500 font-bold uppercase">CNPJ: {clientCnpj || 'Consumidor Final'}</p>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <p className="text-[11px] font-black text-primary uppercase tracking-[0.2em]">Modelo de Entrega</p>
+                     <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                        <p className="text-2xl font-black text-slate-900">{serverType === 'CLOUD' ? 'Servidor Cloud' : 'Servidor Local'}</p>
+                        <p className="text-[13px] text-slate-500 font-bold uppercase">Infraestrutura Dedicada</p>
+                     </div>
+                  </div>
+               </div>
             </div>
 
             {/* Technical Scope */}
-            <div className="p-20 space-y-16 z-10 relative">
+            <div className="p-20 space-y-16 z-10 relative bg-slate-50">
               <div className="text-center space-y-4 max-w-xl mx-auto">
-                <h3 className="text-3xl font-black text-white tracking-tight uppercase">Escopo Modular de Soluções</h3>
-                <p className="text-muted-foreground text-[14px]">
-                  Componentes de software selecionados especificamente para atender aos desafios operacionais da sua empresa.
-                </p>
+                <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Módulos Selecionados</h3>
+                <div className="h-1 w-20 bg-primary mx-auto" />
               </div>
 
               <div className="grid grid-cols-1 gap-6">
                 {AVAILABLE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => (
-                  <div key={m.id} className="group flex items-start gap-8 p-10 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:border-primary/30 transition-all backdrop-blur-sm">
-                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500 shrink-0 border border-white/10">
+                  <div key={m.id} className="group flex items-start gap-8 p-10 rounded-[2rem] bg-white border border-slate-200 hover:border-primary/30 transition-all shadow-sm">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-500 shrink-0 border border-primary/10">
                       <m.icon className="w-8 h-8" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
-                        <h4 className="text-xl font-black text-white tracking-tight uppercase">{m.label}</h4>
-                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[9px] font-black uppercase">{m.category}</span>
+                        <h4 className="text-xl font-black text-slate-900 tracking-tight uppercase">{m.label}</h4>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black uppercase">{m.category}</span>
                       </div>
-                      <p className="text-[14px] text-muted-foreground leading-relaxed max-w-2xl font-medium">
+                      <p className="text-[14px] text-slate-600 leading-relaxed max-w-2xl font-medium">
                         {m.longDescription}
                       </p>
                     </div>
@@ -704,42 +716,42 @@ export default function Commercial() {
             </div>
 
             {/* Financial Summary */}
-            <div className="p-20 bg-gradient-to-b from-transparent to-primary/[0.03] border-t border-white/10 z-10 relative">
-              <div className="glass-card rounded-[2.5rem] border border-primary/20 p-16 space-y-16 bg-black relative overflow-hidden shadow-2xl">
+            <div className="p-20 bg-white border-t border-slate-100 z-10 relative">
+              <div className="rounded-[2.5rem] border border-primary/20 p-16 space-y-16 bg-[#0a0f1d] relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 blur-[120px] rounded-full -mr-48 -mt-48" />
                 
                 <div className="text-center space-y-4">
-                  <h3 className="text-2xl font-black text-white tracking-widest uppercase">Investimento Estratégico ({serverType})</h3>
+                  <h3 className="text-2xl font-black text-white tracking-widest uppercase">Investimento Estratégico</h3>
                   <div className="h-1 w-20 bg-primary mx-auto" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                    <div className="space-y-2 text-center">
-                      <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em]">Setup Inicial</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Setup Único</p>
                       <div className="flex flex-col">
                         <span className="text-3xl font-black text-white tracking-tighter">R$ {currentPricing.setup}</span>
-                        <span className="text-[10px] text-primary font-black uppercase mt-1">Implementação única</span>
+                        <span className="text-[10px] text-primary font-black uppercase mt-1">Implementação</span>
                       </div>
                    </div>
                    <div className="space-y-2 text-center">
-                      <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em]">Manutenção Mensal</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Manutenção</p>
                       <div className="flex flex-col">
                         <span className="text-3xl font-black text-white tracking-tighter">R$ {currentPricing.maintenance}</span>
-                        <span className="text-[10px] text-primary font-black uppercase mt-1">Infraestrutura de Servidor</span>
+                        <span className="text-[10px] text-primary font-black uppercase mt-1">Hospedagem & Suporte</span>
                       </div>
                    </div>
                    <div className="space-y-2 text-center">
-                      <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em]">Licenciamento</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Licenciamento</p>
                       <div className="flex flex-col">
                         <span className="text-3xl font-black text-white tracking-tighter">R$ {currentPricing.perUser}</span>
-                        <span className="text-[10px] text-primary font-black uppercase mt-1">por colaborador / mês</span>
+                        <span className="text-[10px] text-primary font-black uppercase mt-1">Por Colaborador</span>
                       </div>
                    </div>
                    <div className="space-y-2 text-center">
-                      <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em]">Total Mensal</p>
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Mensal</p>
                       <div className="flex flex-col">
                         <span className="text-3xl font-black text-primary tracking-tighter">R$ {calculateMonthlyTotal().toLocaleString('pt-BR')}</span>
-                        <span className="text-[10px] text-white font-black uppercase mt-1">Recorrência Estimada</span>
+                        <span className="text-[10px] text-white font-black uppercase mt-1">Faturamento Recorrente</span>
                       </div>
                    </div>
                 </div>
@@ -772,14 +784,17 @@ export default function Commercial() {
             </div>
 
             {/* Footer */}
-            <div className="bg-black/60 p-12 text-center border-t border-white/5 z-10 relative">
-              <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="bg-slate-900 p-12 text-center border-t border-white/5 z-10 relative">
+              <div className="flex items-center justify-center gap-4 mb-6">
                 <ShieldCheck className="w-5 h-5 text-primary" />
                 <Lock className="w-5 h-5 text-primary" />
                 <Globe className="w-5 h-5 text-primary" />
               </div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-[0.4em] font-black">
+              <p className="text-[11px] text-slate-400 uppercase tracking-[0.4em] font-black">
                 CyberTech RH &copy; 2026 – Inteligência Digital em Gestão de Pessoas
+              </p>
+              <p className="text-[9px] text-slate-600 mt-4 uppercase tracking-widest">
+                tecnologia brasileira • segurança de dados • conformidade lgpd
               </p>
             </div>
           </div>
