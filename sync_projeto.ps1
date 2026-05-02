@@ -17,10 +17,10 @@ Write-Host "`n[2/3] Enviando para o GitHub (origin main)..." -ForegroundColor Ye
 git push origin main
 Write-Host "[OK] Sincronizado com GitHub." -ForegroundColor Green
 
-# 3. Vercel Deploy
-Write-Host "`n[3/3] Iniciando Deploy na Vercel..." -ForegroundColor Yellow
-npx vercel --prod --confirm
-Write-Host "[CONCLUIDO] O sistema esta sendo atualizado na nuvem!" -ForegroundColor Green
+# 3. Vercel Deploy (DESATIVADO - O Git Sync ja dispara o deploy automatico na Vercel)
+Write-Host "`n[3/3] Sincronizacao Git concluida. O deploy sera iniciado automaticamente pela Vercel via GitHub." -ForegroundColor Yellow
+# npx vercel --prod --confirm
+Write-Host "[CONCLUIDO] O sistema esta sendo atualizado na nuvem via Git Push!" -ForegroundColor Green
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "  PROCESSO FINALIZADO COM SUCESSO!" -ForegroundColor Cyan

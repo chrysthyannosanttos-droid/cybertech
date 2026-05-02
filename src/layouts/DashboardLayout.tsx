@@ -11,7 +11,7 @@ export default function DashboardLayout() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-background text-white overflow-hidden">
+    <div className="flex h-screen w-full bg-transparent text-white overflow-hidden relative">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex h-full border-r border-white/5">
         <AppSidebar />

@@ -77,7 +77,12 @@ export function BrandingStyles() {
 
     // Dynamic Background for the system
     if (branding?.background_url) {
-      document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+      // Pre-load to avoid flash
+      const img = new Image();
+      img.src = branding.background_url;
+      img.onload = () => {
+        document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+      };
     } else {
       document.documentElement.style.removeProperty('--tenant-bg');
     }

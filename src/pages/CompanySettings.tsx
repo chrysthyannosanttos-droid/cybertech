@@ -215,18 +215,56 @@ export default function CompanySettings() {
                   </div>
                   <div>
                     <CardTitle className="text-[14px] font-black uppercase tracking-widest text-white">White Label & Branding <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded ml-2">V2.1</span></CardTitle>
-                    <CardDescription className="text-[11px] font-medium text-muted-foreground">Personalize a identidade visual do seu sistema</CardDescription>
+                    <CardDescription className="text-[11px] font-medium text-muted-foreground">Identidade visual do sistema (Gestão CyberTech)</CardDescription>
                   </div>
                 </div>
                 {!currentUser?.email?.toLowerCase().includes('cristiano') && (
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
                     <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">Somente Cristiano</span>
+                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tight">Bloqueado p/ Cliente</span>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
+              {/* Link de Acesso Exclusivo (Sempre visível para o cliente) */}
+              <div className="space-y-2">
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Seu Link de Acesso Exclusivo</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">/</span>
+                    <Input 
+                      value={tenant.branding?.slug || tenant.id} 
+                      disabled
+                      className="h-11 bg-white/[0.05] border-white/10 font-mono pl-6 opacity-70"
+                    />
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="h-11 w-11 border-white/10 hover:bg-white/5"
+                    onClick={() => {
+                      const url = `${window.location.origin}/login?t=${tenant.branding?.slug || tenant.id}`;
+                      navigator.clipboard.writeText(url);
+                      toast({ title: 'Link copiado!', description: 'O link de acesso da sua empresa foi copiado.' });
+                    }}
+                  >
+                    <Layout className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-[9px] text-muted-foreground italic">Este é o link que deve ser utilizado para acessar o portal da sua empresa.</p>
+              </div>
+
+              <div className="divider my-4 opacity-10" />
+
+              {!currentUser?.email?.toLowerCase().includes('cristiano') ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
+                   <Palette className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
+                   <h3 className="text-[14px] font-bold text-white mb-1">Identidade Visual</h3>
+                   <p className="text-[11px] text-muted-foreground max-w-[280px] mb-4">A personalização de marca e logos é gerenciada exclusivamente pela equipe da <strong>CyberTech</strong>.</p>
+                </div>
+              ) : (
+                <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nome do Sistema Personalizado</Label>
@@ -430,8 +468,10 @@ export default function CompanySettings() {
                     Resetar Padrão
                   </Button>
                 </div>
-            </CardContent>
-          </Card>
+              </>
+            )}
+          </CardContent>
+        </Card>
         </div>
 
         <div className="space-y-6">

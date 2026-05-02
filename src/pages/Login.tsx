@@ -20,13 +20,26 @@ export default function Login() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const tenantParam = searchParams.get('t');
-  const [branding, setBranding] = useState<any>(null);
-  const [isBrandingLoading, setIsBrandingLoading] = useState(!!tenantParam);
+  const [branding, setBranding] = useState<any>(() => {
+    if (tenantParam) {
+      const cached = localStorage.getItem(`branding_${tenantParam}`);
+      return cached ? JSON.parse(cached) : null;
+    }
+    return null;
+  });
+  const [isBrandingLoading, setIsBrandingLoading] = useState(() => {
+    if (!tenantParam) return false;
+    const cached = localStorage.getItem(`branding_${tenantParam}`);
+    return !cached; // Only load if not cached
+  });
 
   useEffect(() => {
     if (tenantParam) {
       const fetchBranding = async () => {
-        setIsBrandingLoading(true);
+        // If we don't have cached branding, show loading
+        const cached = localStorage.getItem(`branding_${tenantParam}`);
+        if (!cached) setIsBrandingLoading(true);
+
         try {
           // Try to fetch by slug first
           const { data: bySlug } = await supabase
@@ -35,17 +48,24 @@ export default function Login() {
             .filter('branding->>slug', 'eq', tenantParam)
             .single();
 
-          if (bySlug?.branding) {
-            setBranding(bySlug.branding);
-          } else {
+          let fetchedBranding = bySlug?.branding;
+
+          if (!fetchedBranding) {
             // Then try by ID
             const { data: byId } = await supabase
               .from('tenants')
               .select('branding')
               .eq('id', tenantParam)
               .single();
-            if (byId?.branding) setBranding(byId.branding);
+            fetchedBranding = byId?.branding;
           }
+
+          if (fetchedBranding) {
+            setBranding(fetchedBranding);
+            localStorage.setItem(`branding_${tenantParam}`, JSON.stringify(fetchedBranding));
+          }
+        } catch (err) {
+          console.error('Error fetching branding:', err);
         } finally {
           setIsBrandingLoading(false);
         }
@@ -69,7 +89,18 @@ export default function Login() {
       link.href = branding.logo_url;
     }
     if (branding?.background_url) {
-      document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+      // Pre-load the image to avoid flash
+      const img = new Image();
+      img.src = branding.background_url;
+      img.onload = () => {
+        document.documentElement.style.setProperty('--tenant-bg', `url('${branding.background_url}')`);
+      };
+    } else {
+      document.documentElement.style.removeProperty('--tenant-bg');
+    }
+
+    if (branding?.primary_color) {
+      document.documentElement.style.setProperty('--primary', branding.primary_color);
     }
   }, [branding]);
 
@@ -108,18 +139,13 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 relative bg-[#0a0f1d] overflow-hidden"
+      className="min-h-screen flex items-center justify-center p-4 relative bg-transparent overflow-hidden"
       style={{ 
         '--primary': branding?.primary_color || '#1fb4f3',
         '--primary-foreground': '#ffffff'
       } as any}
     >
-      {/* Background Image with Overlay */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
-        style={{ backgroundImage: `url('${branding?.background_url || '/bg-login.png'}')` }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0a0f1d]/80 via-[#0a0f1d]/90 to-[#0a0f1d]" />
+      {/* Background elements are handled globally by index.css and BrandingStyles */}
       
       {/* Animated Background Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full animate-pulse z-10" />
