@@ -207,6 +207,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const lastTenant = localStorage.getItem('last_tenant_slug');
+    
     setUser(null);
     setMustChangePassword(false);
     setCurrentPermissions(undefined);
@@ -215,6 +217,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('user_permissions');
     sessionStorage.removeItem('app_permissions');
     sessionStorage.removeItem('is_impersonating');
+
+    // Redirect to tenant-specific login if applicable
+    if (lastTenant) {
+      window.location.href = `/login?t=${lastTenant}`;
+    } else {
+      window.location.href = '/login';
+    }
   }, []);
 
   const impersonateTenant = useCallback((tenantId: string, branding?: any) => {

@@ -103,10 +103,16 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
         onClick={onNavigate}
         className="flex items-center gap-3 px-5 h-16 border-b border-white/5 hover:bg-white/5 transition-colors"
       >
-        <div className="w-12 h-12 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(31,180,243,0.2)] bg-black/40 p-1 border border-white/5">
-          <img src={user?.tenantBranding?.logo_url || "/logo-cybertech.png"} alt="Logo" className="w-full h-full object-contain" />
+        <div className="w-12 h-12 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(31,180,243,0.2)] bg-black/40 p-1 border border-white/5 flex items-center justify-center">
+          {user?.tenantBranding?.logo_url ? (
+            <img src={user.tenantBranding.logo_url} alt="Logo" className="w-full h-full object-contain" />
+          ) : (user?.role === 'superadmin' && !isImpersonating) ? (
+            <img src="/logo-cybertech.png" alt="Logo" className="w-full h-full object-contain" />
+          ) : null}
         </div>
-        <span className="font-bold text-[16px] tracking-tighter text-white drop-shadow-sm">{user?.tenantBranding?.system_name || "CyberTech RH"}</span>
+        <span className="font-bold text-[16px] tracking-tighter text-white drop-shadow-sm min-h-[1em]">
+          {user?.tenantBranding?.system_name || ((user?.role === 'superadmin' && !isImpersonating) ? "CyberTech RH" : "")}
+        </span>
       </NavLink>
 
       {/* Role badge */}
