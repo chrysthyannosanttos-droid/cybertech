@@ -176,16 +176,156 @@ export default function Commercial() {
     setIsGeneratingContract(true);
     try {
       const doc = new jsPDF();
-      doc.setFontSize(16);
+      const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
+      const current = pricing[type];
+      const effectiveCount = Math.max(MIN_EMPLOYEES_BILLING, Number(employeeCount) || 0);
+      const totalMensal = calculateMonthlyTotal(type).toLocaleString('pt-BR');
+      const modality = type === 'cloud' ? 'SERVIDOR EM NUVEM (SaaS)' : 'SERVIDOR FÍSICO LOCAL (On-Premise)';
+      const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      // ─── CABEÇALHO ──────────────────────────────────────────────────────
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 45, 'F');
+      if (logoBase64) doc.addImage(logoBase64, 'PNG', 12, 8, 28, 28);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text(`CONTRATO DE LICENCIAMENTO - SERVIDOR ${type.toUpperCase()}`, 20, 20);
-      doc.setFontSize(10);
+      doc.text('CYBERTECH RH', 45, 20);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Contratante: ${clientName}`, 20, 35);
-      doc.text(`Investimento: R$ ${calculateMonthlyTotal(type).toLocaleString('pt-BR')} mensais.`, 20, 45);
-      doc.save(`Contrato_${type.toUpperCase()}_CyberTech.pdf`);
-      toast({ title: "Contrato Gerado!" });
+      doc.text('Inteligência Digital em Gestão de Pessoal', 45, 28);
+      doc.setTextColor(0, 163, 255);
+      doc.setFontSize(8);
+      doc.text('www.cybertech-psi.vercel.app', 45, 36);
+
+      // ─── TÍTULO DO CONTRATO ─────────────────────────────────────────────
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`INSTRUMENTO PARTICULAR DE CONTRATO`, 105, 58, { align: 'center' });
+      doc.setFontSize(11);
+      doc.text(`LICENCIAMENTO DE SOFTWARE – ${type === 'cloud' ? 'NUVEM' : 'LOCAL'}`, 105, 66, { align: 'center' });
+      doc.setDrawColor(0, 163, 255);
+      doc.setLineWidth(0.8);
+      doc.line(20, 70, 190, 70);
+
+      // ─── QUALIFICAÇÃO DAS PARTES ────────────────────────────────────────
+      let y = 80;
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+
+      const drawSection = (title: string, content: string) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(0, 100, 200);
+        doc.text(title, 20, y);
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(9);
+        const lines = doc.splitTextToSize(content, 170);
+        doc.text(lines, 20, y);
+        y += (lines.length * 5) + 4;
+      };
+
+      drawSection('CONTRATADA:', 
+        'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob nº 00.000.000/0001-00, com sede no endereço registrado em cartório, doravante denominada simplesmente CONTRATADA.');
+
+      drawSection('CONTRATANTE:', 
+        `${clientName.toUpperCase()}, ${clientCnpj ? 'pessoa jurídica inscrita no CNPJ sob nº ' + clientCnpj + ',' : 'conforme dados cadastrais informados,'} doravante denominada simplesmente CONTRATANTE.`);
+
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.line(20, y, 190, y);
+      y += 6;
+
+      // ─── CLÁUSULAS ──────────────────────────────────────────────────────
+      drawSection('CLÁUSULA 1ª – OBJETO:',
+        `O presente contrato tem por objeto o licenciamento de uso da plataforma de gestão de pessoal CyberTech RH (HR-HUB PLUS), em modalidade ${modality}, com os seguintes módulos contratados: ${AVAILABLE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => m.label).join(', ')}.`);
+
+      drawSection('CLÁUSULA 2ª – IMPLANTAÇÃO E PRAZO:',
+        `A CONTRATADA realizará a implantação e configuração inicial do sistema no prazo de até 15 (quinze) dias úteis contados do pagamento da Taxa de Setup no valor de R$ ${current.setup} (pagamento único). O prazo contratual é de 12 (doze) meses, renovável automaticamente por igual período.`);
+
+      drawSection('CLÁUSULA 3ª – VALORES E FATURAMENTO:',
+        `A CONTRATANTE pagará mensalmente: (a) Taxa de Manutenção de Infraestrutura: R$ ${current.maintenance}; (b) Licenciamento por Colaborador: R$ ${current.perUser} por usuário ativo, calculado sobre base mínima de ${effectiveCount} colaboradores. Investimento mensal total estimado: R$ ${totalMensal}. O faturamento considera a base mínima contratual de ${MIN_EMPLOYEES_BILLING} colaboradores.`);
+
+      drawSection('CLÁUSULA 4ª – DISPONIBILIDADE E SUPORTE (SLA):',
+        'A CONTRATADA garante disponibilidade mínima de 99,9% ao mês (SLA). O suporte técnico especializado será prestado via canais digitais (WhatsApp corporativo e sistema de tickets) em horário comercial, segunda a sexta-feira das 08h às 18h.');
+
+      drawSection('CLÁUSULA 5ª – PROTEÇÃO DE DADOS (LGPD):',
+        'As partes comprometem-se a cumprir integralmente a Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018 – LGPD). A CONTRATADA atuará como Operadora de dados, processando apenas as informações estritamente necessárias à execução do contrato, com sigilo absoluto.');
+
+      drawSection('CLÁUSULA 6ª – RESCISÃO:',
+        'O contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias. A rescisão motivada por descumprimento contratual poderá ocorrer de forma imediata, sem ônus para a parte inocente.');
+
+      // ─── TABELA FINANCEIRA ───────────────────────────────────────────────
+      if (y < 230) {
+        y += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(0, 100, 200);
+        doc.text('RESUMO FINANCEIRO:', 20, y);
+        y += 4;
+
+        (doc as any).autoTable({
+          startY: y,
+          head: [['Item', 'Valor']],
+          body: [
+            ['Setup Inicial (pagamento único)', 'R$ ' + current.setup],
+            ['Manutenção Mensal de Infraestrutura', 'R$ ' + current.maintenance],
+            ['Licenciamento por Colaborador/mês', 'R$ ' + current.perUser],
+            ['Base de Faturamento (mínima contratual)', effectiveCount + ' colaboradores'],
+            ['TOTAL RECORRENTE MENSAL ESTIMADO', 'R$ ' + totalMensal],
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+          styles: { fontSize: 8, cellPadding: 4 },
+          columnStyles: { 0: { fontStyle: 'bold', cellWidth: 120 }, 1: { textColor: [0, 100, 200], fontStyle: 'bold', halign: 'right' } },
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // ─── ASSINATURAS ─────────────────────────────────────────────────────
+      // Se não cabe na página atual, adiciona nova página
+      if (y > 255) {
+        doc.addPage();
+        y = 25;
+      }
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(60, 60, 60);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Por estarem assim justas e contratadas, firmam o presente instrumento em 2 (duas) vias,`, 20, y);
+      y += 5;
+      doc.text(`na cidade de ______________________, aos ${today}.`, 20, y);
+      y += 14;
+
+      doc.setDrawColor(100, 100, 100);
+      doc.setLineWidth(0.5);
+      doc.line(20, y, 90, y);
+      doc.line(120, y, 190, y);
+      y += 5;
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CYBERTECH RH (CONTRATADA)', 55, y, { align: 'center' });
+      doc.text(clientName.toUpperCase(), 155, y, { align: 'center' });
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120, 120, 120);
+      doc.text('Representante Legal / Assinatura', 55, y, { align: 'center' });
+      doc.text('Representante Legal / Assinatura', 155, y, { align: 'center' });
+
+      // ─── RODAPÉ ─────────────────────────────────────────────────────────
+      doc.setFontSize(7);
+      doc.setTextColor(180, 180, 180);
+      doc.text('CyberTech RH © 2026 – Documento gerado automaticamente pela plataforma HR-HUB PLUS', 105, 290, { align: 'center' });
+
+      doc.save(`Contrato_${type === 'cloud' ? 'Nuvem' : 'Fisico'}_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: "✅ Contrato Gerado!", description: "Documento jurídico completo exportado com sucesso." });
     } catch (error) {
+      console.error(error);
       toast({ title: "Erro ao gerar Contrato", variant: "destructive" });
     } finally { setIsGeneratingContract(false); }
   };
