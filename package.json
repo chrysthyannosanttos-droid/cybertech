@@ -82,6 +82,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^41.5.0",
     "electron-builder": "^26.8.1",
     "eslint": "^9.32.0",
@@ -96,5 +97,28 @@
     "vite": "^6.0.0",
     "vitest": "^4.1.0",
     "wait-on": "^9.0.5"
+  },
+  "build": {
+    "appId": "com.cybertech.rh",
+    "productName": "CyberTech RH",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/logo-cybertech.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CyberTech RH"
+    }
   }
 }
