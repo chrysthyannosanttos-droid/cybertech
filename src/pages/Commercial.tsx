@@ -139,34 +139,127 @@ export default function Commercial() {
       const doc = new jsPDF();
       const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
       const effectiveCount = Math.max(MIN_EMPLOYEES_BILLING, Number(employeeCount) || 0);
+      const propNum = Math.floor(Math.random() * 9000) + 1000;
 
+      const addWatermark = () => {
+        if (logoBase64) {
+          doc.setGState(new (doc as any).GState({ opacity: 0.04 }));
+          doc.addImage(logoBase64, 'PNG', 35, 80, 140, 140);
+          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+        }
+      };
+
+      // ── Página 1: Marca d'água ──────────────────────────────────────────
+      addWatermark();
+
+      // ── Cabeçalho dark ─────────────────────────────────────────────────
       doc.setFillColor(10, 15, 29);
-      doc.rect(0, 0, 210, 50, 'F');
-      if (logoBase64) doc.addImage(logoBase64, 'PNG', 15, 10, 30, 30);
+      doc.rect(0, 0, 210, 45, 'F');
+      if (logoBase64) doc.addImage(logoBase64, 'PNG', 12, 8, 28, 28);
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      doc.text('CYBERTECH RH', 50, 25);
-      
-      const priceData = [
-        ['ITEM', 'NUVEM', 'LOCAL'],
-        ['Setup', 'R$ ' + pricing.cloud.setup, 'R$ ' + pricing.local.setup],
-        ['Mensalidade', 'R$ ' + pricing.cloud.maintenance, 'R$ ' + pricing.local.maintenance],
-        ['Por Usuário', 'R$ ' + pricing.cloud.perUser, 'R$ ' + pricing.local.perUser],
-        ['Faturamento Mín.', effectiveCount + ' Colab.', effectiveCount + ' Colab.'],
-        ['TOTAL MENSAL', 'R$ ' + calculateMonthlyTotal('cloud').toLocaleString('pt-BR'), 'R$ ' + calculateMonthlyTotal('local').toLocaleString('pt-BR')]
-      ];
+      doc.text('CYBERTECH RH', 45, 20);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('INTELIGÊNCIA DIGITAL EM GESTÃO DE PESSOAL', 45, 28);
+      doc.setDrawColor(0, 163, 255);
+      doc.setLineWidth(1);
+      doc.line(45, 32, 115, 32);
+      doc.setTextColor(180, 180, 180);
+      doc.setFontSize(7.5);
+      doc.text(`PROPOSTA COMERCIAL Nº ${propNum}`, 145, 22);
+      doc.text(`DATA: ${new Date().toLocaleDateString('pt-BR')}`, 145, 28);
+
+      // ── Bloco do cliente ───────────────────────────────────────────────
+      doc.setFillColor(245, 247, 250);
+      doc.roundedRect(15, 52, 180, 20, 3, 3, 'F');
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PREPARADO PARA:', 22, 59);
+      doc.setTextColor(10, 15, 29);
+      doc.setFontSize(13);
+      doc.text(clientName.toUpperCase(), 22, 67);
+      if (clientCnpj) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text('CNPJ: ' + clientCnpj, 150, 67);
+      }
+
+      // ── Carta de apresentação ──────────────────────────────────────────
+      let y = 82;
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Prezado(a) responsável pela ${clientName},`, 15, y);
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const intro = `É um prazer apresentar nossa proposta de modernização para o seu RH. O ecossistema CyberTech foi projetado para eliminar burocracias, garantir segurança jurídica e oferecer uma experiência digital superior para seus colaboradores.`;
+      const introLines = doc.splitTextToSize(intro, 180);
+      doc.text(introLines, 15, y);
+      y += (introLines.length * 5) + 8;
+
+      // ── Tabela de módulos ──────────────────────────────────────────────
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Escopo da Solução – Servidor Nuvem & Físico', 15, y);
+      y += 4;
+
+      const moduleData = AVAILABLE_MODULES
+        .filter(m => selectedModules.includes(m.id))
+        .map(m => [m.label, m.longDescription]);
 
       (doc as any).autoTable({
-        startY: 120,
-        head: [priceData[0]],
-        body: priceData.slice(1),
-        theme: 'grid',
-        headStyles: { fillColor: [10, 15, 29] }
+        startY: y,
+        head: [['Módulo', 'Descrição do Serviço']],
+        body: moduleData,
+        theme: 'striped',
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 4 },
+        columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' } },
+        didDrawPage: () => addWatermark(),
       });
 
+      y = (doc as any).lastAutoTable.finalY + 10;
+
+      // ── Tabela comparativa de preços ───────────────────────────────────
+      if (y > 220) { doc.addPage(); addWatermark(); y = 20; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(10, 15, 29);
+      doc.text('Resumo do Investimento', 15, y);
+      y += 4;
+
+      (doc as any).autoTable({
+        startY: y,
+        head: [['Modelo de Custo', 'Servidor Nuvem', 'Servidor Físico']],
+        body: [
+          ['Implementação (Setup)', 'R$ ' + pricing.cloud.setup, 'R$ ' + pricing.local.setup],
+          ['Manutenção Mensal', 'R$ ' + pricing.cloud.maintenance, 'R$ ' + pricing.local.maintenance],
+          ['Licenciamento/Usuário', 'R$ ' + pricing.cloud.perUser, 'R$ ' + pricing.local.perUser],
+          ['Colaboradores Estimados', effectiveCount + ' (mín.)', effectiveCount + ' (mín.)'],
+          ['INVESTIMENTO TOTAL MENSAL', 'R$ ' + calculateMonthlyTotal('cloud').toLocaleString('pt-BR'), 'R$ ' + calculateMonthlyTotal('local').toLocaleString('pt-BR')],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 9, cellPadding: 5 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          1: { textColor: [0, 120, 220], fontStyle: 'bold', halign: 'right' },
+          2: { fontStyle: 'bold', halign: 'right' },
+        },
+        didDrawPage: () => addWatermark(),
+      });
+
+      // ── Rodapé ─────────────────────────────────────────────────────────
+      doc.setFontSize(7);
+      doc.setTextColor(180, 180, 180);
+      doc.text('CyberTech RH © 2026 – Tecnologia Brasileira para o Mundo', 105, 290, { align: 'center' });
+
       doc.save(`Proposta_CyberTech_${clientName.replace(/\s/g, '_')}.pdf`);
-      toast({ title: "PDF Gerado!" });
+      toast({ title: "✅ Proposta Gerada!", description: "PDF com marca d'água exportado." });
     } catch (error) {
       toast({ title: "Erro ao gerar PDF", variant: "destructive" });
     } finally { setIsGeneratingPdf(false); }
