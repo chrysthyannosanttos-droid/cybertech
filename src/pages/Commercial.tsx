@@ -29,7 +29,9 @@ import {
   Award,
   Server,
   Cloud,
-  HardDrive
+  HardDrive,
+  Scale,
+  FileSignature
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,6 +162,7 @@ export default function Commercial() {
   const [selectedModules, setSelectedModules] = useState<string[]>(['dashboard', 'employees', 'attendance', 'payroll']);
   const [showPreview, setShowPreview] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingContract, setIsGeneratingContract] = useState(false);
 
   // Server Choice State
   const [serverType, setServerType] = useState<'CLOUD' | 'LOCAL'>('CLOUD');
@@ -186,52 +189,47 @@ export default function Commercial() {
   };
 
   const getBase64ImageFromUrl = async (url: string): Promise<string> => {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.addEventListener("load", () => resolve(reader.result as string), false);
-      reader.addEventListener("error", () => reject());
-      reader.readAsDataURL(blob);
-    });
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => resolve(reader.result as string), false);
+        reader.addEventListener("error", () => reject());
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      return '';
+    }
   };
 
   const handleGeneratePdf = async () => {
     setIsGeneratingPdf(true);
     try {
       const doc = new jsPDF();
-      const primaryColor = [0, 102, 255]; // Blue
+      const primaryColor = [0, 102, 255]; 
 
-      // Header Background
-      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.setFillColor(15, 23, 42); 
       doc.rect(0, 0, 210, 60, 'F');
 
-      // Add Watermark to PDF
-      try {
-        const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
-        // jsPDF context for transparency
+      const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
+      if (logoBase64) {
         doc.setGState(new (doc as any).GState({ opacity: 0.05 }));
         doc.addImage(logoBase64, 'PNG', 45, 100, 120, 120, undefined, 'FAST');
         doc.setGState(new (doc as any).GState({ opacity: 1 }));
-      } catch (e) {
-        console.warn('Could not add watermark to PDF', e);
       }
 
-      // Title
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
       doc.text('PROPOSTA COMERCIAL', 20, 30);
-      
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('TECNOLOGIA PARA GESTÃO DE PESSOAL', 20, 38);
-
       doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setLineWidth(1.5);
       doc.line(20, 45, 50, 45);
 
-      // Client Info
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
       doc.text('PREPARADO PARA:', 140, 25);
@@ -242,7 +240,6 @@ export default function Commercial() {
       doc.setFont('helvetica', 'normal');
       doc.text(clientCnpj || 'CNPJ NÃO INFORMADO', 140, 38);
 
-      // Content
       doc.setTextColor(30, 41, 59);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
@@ -262,7 +259,6 @@ export default function Commercial() {
         columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' } }
       });
 
-      // Pricing
       const finalY = (doc as any).lastAutoTable.finalY + 20;
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
@@ -281,20 +277,14 @@ export default function Commercial() {
         body: priceData,
         theme: 'grid',
         styles: { fontSize: 10, cellPadding: 6 },
-        columnStyles: { 
-          0: { fontStyle: 'bold', cellWidth: 70 },
-          1: { textColor: primaryColor, fontStyle: 'bold' }
-        }
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 70 }, 1: { textColor: primaryColor, fontStyle: 'bold' } }
       });
 
-      // Security & Support
       const nextY = (doc as any).lastAutoTable.finalY + 20;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('Garantias & Segurança', 20, nextY);
-      
       doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
       const safety = [
         '• Disponibilidade (SLA) de 99.9% garantida em contrato.',
         '• Backup diário automático e redundância segura.',
@@ -303,19 +293,75 @@ export default function Commercial() {
       ];
       safety.forEach((line, i) => doc.text(line, 20, nextY + 10 + (i * 6)));
 
-      // Footer
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text('Esta proposta tem validade de 15 dias a partir desta data.', 105, 285, { align: 'center' });
       doc.text('CyberTech RH © 2026 - Inteligência Digital em RH', 105, 290, { align: 'center' });
 
-      doc.save(`Proposta_${clientName.replace(/\s/g, '_')}_${serverType}.pdf`);
+      doc.save(`Proposta_${clientName.replace(/\s/g, '_')}.pdf`);
       toast({ title: "PDF Gerado!", description: "A proposta comercial foi baixada com sucesso." });
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast({ title: "Erro ao gerar PDF", description: "Ocorreu um problema técnico.", variant: "destructive" });
+      toast({ title: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
       setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleGenerateContract = async () => {
+    setIsGeneratingContract(true);
+    try {
+      const doc = new jsPDF();
+      const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
+      
+      // Contrato Header
+      doc.setFillColor(245, 245, 245);
+      doc.rect(0, 0, 210, 40, 'F');
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'PNG', 10, 10, 20, 20);
+      }
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INSTRUMENTO PARTICULAR DE CONTRATO DE', 40, 20);
+      doc.text('LICENCIAMENTO E PRESTAÇÃO DE SERVIÇOS', 40, 28);
+
+      let y = 50;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Qualificacao
+      const contractText = [
+        { title: 'CONTRATADA', content: 'CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 00.000.000/0001-00, sediada na Cidade de [Sua Cidade/UF].' },
+        { title: 'CONTRATANTE', content: `${clientName.toUpperCase()}, inscrita no CNPJ sob o nº ${clientCnpj || '___________________'}, com sede em endereço comercial informado no ato do cadastro.` },
+        { title: 'CLÁUSULA 1ª - OBJETO', content: `O presente contrato tem como objeto o licenciamento de uso do software de gestão de RH (HR-HUB PLUS), em modalidade de SERVIDOR ${serverType === 'CLOUD' ? 'EM NUVEM (SAAS)' : 'LOCAL'}, incluindo os módulos: ${AVAILABLE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => m.label).join(', ')}.` },
+        { title: 'CLÁUSULA 2ª - DA IMPLANTAÇÃO', content: `A CONTRATADA compromete-se a realizar a implantação e configuração inicial do sistema no prazo de 15 dias úteis, mediante o pagamento da taxa de Setup de R$ ${currentPricing.setup}.` },
+        { title: 'CLÁUSULA 3ª - VALORES E REAJUSTES', content: `A CONTRATANTE pagará mensalmente à CONTRATADA o valor fixo de R$ ${currentPricing.maintenance} referente à manutenção e suporte, somado ao valor de R$ ${currentPricing.perUser} por colaborador ativo (Estimativa: ${employeeCount} colaboradores), totalizando uma recorrência inicial de R$ ${calculateMonthlyTotal().toLocaleString('pt-BR')}.` },
+        { title: 'CLÁUSULA 4ª - DISPONIBILIDADE E SUPORTE', content: 'A CONTRATADA garante um SLA (Service Level Agreement) de 99.9% de disponibilidade mensal do sistema. O suporte técnico será prestado via canais digitais em horário comercial (segunda a sexta, das 08h às 18h).' },
+        { title: 'CLÁUSULA 5ª - LGPD E SIGILO', content: 'As partes comprometem-se a cumprir integralmente a Lei Geral de Proteção de Dados (Lei 13.709/2018), garantindo o sigilo absoluto das informações inseridas no sistema.' },
+        { title: 'CLÁUSULA 6ª - VIGÊNCIA E RESCISÃO', content: 'O presente contrato tem vigência de 12 meses, renováveis automaticamente. A rescisão imotivada poderá ocorrer mediante aviso prévio de 30 dias.' }
+      ];
+
+      contractText.forEach(item => {
+        doc.setFont('helvetica', 'bold');
+        doc.text(item.title, 20, y);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        const lines = doc.splitTextToSize(item.content, 170);
+        doc.text(lines, 20, y);
+        y += (lines.length * 5) + 8;
+      });
+
+      // Assinaturas
+      y = 250;
+      doc.line(20, y, 90, y);
+      doc.line(120, y, 190, y);
+      doc.text('CYBERTECH RH (CONTRATADA)', 25, y + 5);
+      doc.text('CLIENTE (CONTRATANTE)', 135, y + 5);
+
+      doc.save(`Contrato_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: "Contrato Gerado!", description: "O contrato jurídico foi gerado com os dados da proposta." });
+    } catch (error) {
+      toast({ title: "Erro ao gerar Contrato", variant: "destructive" });
+    } finally {
+      setIsGeneratingContract(false);
     }
   };
 
@@ -704,15 +750,22 @@ export default function Commercial() {
                     className="h-14 px-10 rounded-2xl border-white/10 hover:bg-white/5 font-black uppercase text-[12px] tracking-widest gap-3"
                     onClick={() => window.print()}
                    >
-                     <Printer className="w-5 h-5" /> Imprimir Documento
+                     <Printer className="w-5 h-5" /> Imprimir
                    </Button>
                    <Button 
-                    className="h-14 px-10 rounded-2xl bg-primary text-white font-black uppercase text-[12px] tracking-widest gap-3 shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:-translate-y-1 transition-all"
+                    className="h-14 px-10 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[12px] tracking-widest gap-3 hover:bg-white/10 transition-all"
                     disabled={isGeneratingPdf}
                     onClick={handleGeneratePdf}
                    >
-                     {isGeneratingPdf ? <CheckCircle2 className="w-5 h-5 animate-pulse" /> : <Download className="w-5 h-5" />}
-                     {isGeneratingPdf ? 'Gerando Arquivo...' : 'Exportar PDF Premium'}
+                     <Download className="w-5 h-5" /> Exportar Proposta
+                   </Button>
+                   <Button 
+                    className="h-14 px-10 rounded-2xl bg-primary text-white font-black uppercase text-[12px] tracking-widest gap-3 shadow-[0_20px_40px_rgba(var(--primary),0.3)] hover:-translate-y-1 transition-all"
+                    disabled={isGeneratingContract}
+                    onClick={handleGenerateContract}
+                   >
+                     {isGeneratingContract ? <CheckCircle2 className="w-5 h-5 animate-pulse" /> : <FileSignature className="w-5 h-5" />}
+                     {isGeneratingContract ? 'Gerando Contrato...' : 'Gerar Contrato Jurídico'}
                    </Button>
                 </div>
               </div>
