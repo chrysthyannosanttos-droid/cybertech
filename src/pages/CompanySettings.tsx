@@ -539,7 +539,8 @@ export default function CompanySettings() {
               </p>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      </TabsContent>
 
         <TabsContent value="downloads" className="animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="grid gap-6 md:grid-cols-2">
@@ -597,7 +598,7 @@ export default function CompanySettings() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-[11px] font-bold text-white uppercase tracking-tighter">Como instalar:</p>
-                    <p className="text-[10px] text-muted-foreground">1. Abra o sistema no Chrome/Safari<br/>2. Menu > Adicionar à tela inicial</p>
+                    <p className="text-[10px] text-muted-foreground">1. Abra o sistema no Chrome/Safari<br/>2. Menu &gt; Adicionar à tela inicial</p>
                   </div>
                 </div>
               </div>
