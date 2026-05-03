@@ -18,7 +18,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Recebendo os dados (Corrigido: padronizando para pdf_url)
     const { tenant_id, employee_email, employee_name, pdf_url, month, year } = await req.json()
+
+    if (!tenant_id || !employee_email || !pdf_url) {
+      throw new Error('Dados insuficientes para o envio (tenant_id, email ou pdf ausentes).')
+    }
 
     // 1. Buscar configurações SMTP do Tenant
     const { data: settings, error: sError } = await supabase
@@ -28,7 +33,7 @@ serve(async (req) => {
       .single()
 
     if (sError || !settings) {
-      throw new Error('Configurações SMTP não encontradas para esta unidade.')
+      throw new Error(`Configurações SMTP não encontradas para o tenant: ${tenant_id}`)
     }
 
     // 2. Configurar o Cliente SMTP
@@ -52,7 +57,7 @@ serve(async (req) => {
         Seu holerite referente ao mês ${month}/${year} já está disponível para consulta.
         
         Você pode visualizá-lo e baixá-lo através do link abaixo:
-        ${pdfUrl}
+        ${pdf_url}
         
         Atenciosamente,
         Departamento de RH - ${settings.from_name}
@@ -63,7 +68,7 @@ serve(async (req) => {
           <p>Olá <strong>${employee_name}</strong>,</p>
           <p>Seu holerite referente ao mês <strong>${month}/${year}</strong> já está disponível para consulta.</p>
           <div style="margin: 30px 0; text-align: center;">
-            <a href="${pdfUrl}" style="background-color: #0066cc; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Visualizar Holerite (PDF)</a>
+            <a href="${pdf_url}" style="background-color: #0066cc; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Visualizar Holerite (PDF)</a>
           </div>
           <hr style="border: 0; border-top: 1px solid #eee;" />
           <p style="font-size: 12px; color: #666;">Este é um e-mail automático enviado pelo sistema CyberTech RH.</p>
@@ -79,6 +84,7 @@ serve(async (req) => {
     })
 
   } catch (error) {
+    console.error('Email Error:', error.message)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
