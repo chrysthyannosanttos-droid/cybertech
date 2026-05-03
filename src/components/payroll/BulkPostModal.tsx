@@ -115,26 +115,37 @@ export function BulkPostModal({
         } else if (!result?.pdfUrl) {
             setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
         } else {
-            // Chamada para WhatsApp (Modo Gratuito)
-            if (emp.phone) {
-                let cleanPhone = emp.phone.replace(/\D/g, '');
-                if (cleanPhone.length === 11) cleanPhone = '55' + cleanPhone;
-                const message = encodeURIComponent(`Olá ${emp.name}, seu holerite de ${referenceMonth.toString().padStart(2, '0')}/${referenceYear} está disponível: ${result.pdfUrl}`);
-                const waLink = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${message}`;
-                
-                // No modo em massa, abrimos as abas com um pequeno intervalo para não travar o navegador
-                setTimeout(() => {
-                    window.open(waLink, '_blank');
-                }, i * 1500); 
+            // Chamada Real para a Edge Function de E-mail
+            try {
+              let tenantId = (emp as any).tenant_id || (emp as any).tenantId;
+              if (!tenantId) {
+                const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+                tenantId = tData?.id;
+              }
 
-                setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'WhatsApp Web aberto' }]);
-                
-                await supabase.from('payrolls').update({ 
-                    status: 'SENT',
-                    sent_whatsapp_at: new Date().toISOString() 
-                }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
-            } else {
-                setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Telefone ausente' }]);
+              const { data: fData, error: fError } = await supabase.functions.invoke('send-payroll-email', {
+                  body: {
+                    tenant_id: tenantId,
+                    employee_email: emp.email,
+                    employee_name: emp.name,
+                    pdf_url: result.pdfUrl,
+                    month: referenceMonth.toString().padStart(2, '0'),
+                    year: referenceYear.toString()
+                  }
+              });
+
+              if (!fError && fData?.success) {
+                  setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail enviado' }]);
+                  await supabase.from('payrolls').update({ 
+                      status: 'SENT',
+                      sent_email_at: new Date().toISOString() 
+                  }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
+              } else {
+                  const errorMsg = fError?.message || fData?.error || 'Erro no servidor';
+                  setLog(prev => [...prev, { name: emp.name, status: 'error', message: `Falha: ${errorMsg}` }]);
+              }
+            } catch (err: any) {
+              setLog(prev => [...prev, { name: emp.name, status: 'error', message: err.message }]);
             }
         }
         setProgress(((i + 1) / total) * 100);
