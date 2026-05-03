@@ -187,6 +187,34 @@ export default function EmailSettings() {
                 </div>
               ) : (
                 <>
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-4 mb-2">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Send className="w-4 h-4" />
+                      <span className="text-[11px] font-black uppercase tracking-widest">Identidade do Remetente</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-bold uppercase text-muted-foreground">Nome da Empresa / RH</Label>
+                        <Input 
+                          value={settings.from_name} 
+                          onChange={e => setSettings(s => ({ ...s, from_name: e.target.value }))}
+                          placeholder="Ex: RH CyberTech" 
+                          className="h-11 bg-white/5 border-white/10 rounded-xl font-bold" 
+                        />
+                        <p className="text-[9px] text-muted-foreground">Este é o nome que aparecerá no campo "De:" do e-mail.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-bold uppercase text-muted-foreground">E-mail de Envio</Label>
+                        <Input 
+                          value={settings.from_email} 
+                          onChange={e => setSettings(s => ({ ...s, from_email: e.target.value }))}
+                          placeholder="nao-responda@empresa.com" 
+                          className="h-11 bg-white/5 border-white/10 rounded-xl" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-[11px] font-bold uppercase text-muted-foreground">Host SMTP</Label>
@@ -206,7 +234,7 @@ export default function EmailSettings() {
                         type="number" 
                         value={settings.smtp_port} 
                         onChange={e => setSettings(s => ({ ...s, smtp_port: parseInt(e.target.value) }))}
-                        placeholder="587" 
+                        placeholder="465" 
                         className="h-11 bg-white/5 border-white/10 rounded-xl" 
                       />
                     </div>
@@ -214,7 +242,7 @@ export default function EmailSettings() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Usuário / Login</Label>
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Usuário SMTP</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input 
@@ -237,29 +265,6 @@ export default function EmailSettings() {
                           className="h-11 pl-10 bg-white/5 border-white/10 rounded-xl" 
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="h-px bg-white/5 my-2" />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Nome de Exibição</Label>
-                      <Input 
-                        value={settings.from_name} 
-                        onChange={e => setSettings(s => ({ ...s, from_name: e.target.value }))}
-                        placeholder="Ex: RH CyberTech" 
-                        className="h-11 bg-white/5 border-white/10 rounded-xl" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">E-mail de Remetente</Label>
-                      <Input 
-                        value={settings.from_email} 
-                        onChange={e => setSettings(s => ({ ...s, from_email: e.target.value }))}
-                        placeholder="nao-responda@empresa.com" 
-                        className="h-11 bg-white/5 border-white/10 rounded-xl" 
-                      />
                     </div>
                   </div>
 
