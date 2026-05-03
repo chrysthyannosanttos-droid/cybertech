@@ -33,7 +33,7 @@ async function ensureBucket() {
 }
 
 // =======================
-// GERAÇÃO DE HOLERITE (PDF FRONTEND)
+// GERAÇÃO DE HOLERITE (PDF FRONTEND - REDESIGN)
 // =======================
 export async function generatePayslipBlob(
   employee: Employee,
@@ -42,60 +42,85 @@ export async function generatePayslipBlob(
   year: number
 ): Promise<Blob> {
   const doc = new jsPDF();
-  const primaryColor = [22, 22, 22];
-  const accentColor = [0, 102, 204];
-  const lightGrey = [245, 245, 245];
+  
+  // Cores da Marca
+  const primaryColor = [30, 41, 59]; // Slate 800
+  const accentColor = [31, 180, 243]; // CyberTech Blue
+  const secondaryColor = [71, 85, 105]; // Slate 600
+  const lightBg = [248, 250, 252]; // Slate 50
+  const borderColor = [226, 232, 240]; // Slate 200
 
-  // --- Marca d'água ---
-  doc.setTextColor(230, 230, 230);
-  doc.setFontSize(50);
+  // Margens e Dimensões
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // --- Marca d'água Sutil ---
+  doc.setTextColor(248, 248, 248);
+  doc.setFontSize(45);
   doc.setFont("helvetica", "bold");
   doc.text('ORIGINAL - CYBERTECH RH', 105, 160, { 
     angle: 45, 
     align: 'center'
   });
 
-
-  doc.setDrawColor(200, 200, 200);
+  // --- FUNDO E BORDA EXTERNA ---
+  doc.setDrawColor(...borderColor);
   doc.setLineWidth(0.1);
-  doc.rect(10, 10, 190, 277);
+  doc.rect(10, 10, pageWidth - 20, 277);
 
+  // --- CABEÇALHO (BANNER) ---
   doc.setFillColor(...primaryColor);
-  doc.rect(10, 10, 190, 25, 'F');
+  doc.rect(10, 10, pageWidth - 20, 25, 'F');
   
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text('RECIBO DE PAGAMENTO', 14, 22);
+  doc.setFontSize(14);
+  doc.text('RECIBO DE PAGAMENTO DE SALÁRIO', 16, 22);
   
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(`REFERÊNCIA: ${month.toString().padStart(2, '0')}/${year}`, 140, 20);
-  doc.text(`DATA DE EMISSÃO: ${new Date().toLocaleDateString('pt-BR')}`, 140, 25);
+  doc.text(`REFERÊNCIA`, pageWidth - 50, 19);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(`${month.toString().padStart(2, '0')}/${year}`, pageWidth - 50, 25);
+
+  // --- BLOCOS DE INFO (EMPREGADOR / COLABORADOR) ---
+  doc.setTextColor(...primaryColor);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text('FONTE PAGADORA (EMPREGADOR)', 16, 45);
+  doc.setDrawColor(...accentColor);
+  doc.setLineWidth(0.5);
+  doc.line(16, 47, 40, 47);
 
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text('EMPREGADOR', 14, 42);
-  doc.setDrawColor(...accentColor);
-  doc.setLineWidth(0.5);
-  doc.line(14, 44, 40, 44);
-
+  doc.text(employee.storeName || 'CyberTech RH - Unidade Principal', 16, 55);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.text(employee.storeName || 'CyberTech RH - Unidade Principal', 14, 52);
-  doc.setFontSize(9);
-  doc.text('CNPJ: 00.000.000/0001-00', 14, 57);
+  doc.setTextColor(...secondaryColor);
+  doc.text('CNPJ: 00.000.000/0001-00', 16, 60);
+
+  // Colaborador (Box)
+  doc.setFillColor(...lightBg);
+  doc.roundedRect(110, 42, 85, 28, 2, 2, 'F');
+  doc.setDrawColor(...borderColor);
+  doc.rect(110, 42, 85, 28);
   
-  doc.setFillColor(...lightGrey);
-  doc.rect(110, 40, 85, 25, 'F');
+  doc.setTextColor(...primaryColor);
+  doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.text('COLABORADOR', 114, 46);
+  doc.text('COLABORADOR', 114, 48);
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(9);
+  doc.text(`NOME: ${employee.name.toUpperCase()}`, 114, 55);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(`NOME: ${employee.name}`, 114, 52);
-  doc.text(`CARGO: ${employee.role || 'Colaborador'}`, 114, 57);
-  doc.text(`ID: ${employee.id.substring(0, 8).toUpperCase()}`, 114, 62);
+  doc.text(`CARGO: ${employee.role || 'Colaborador'}`, 114, 61);
+  doc.text(`CÓDIGO: ${employee.id.substring(0, 8).toUpperCase()}`, 114, 66);
 
+  // --- TABELA DE VERBAS ---
   const bodyData = payroll.items.map(item => {
     let provento = ''; let desconto = '';
     if (item.type === 'EARNING') provento = 'R$ ' + item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -111,14 +136,15 @@ export async function generatePayslipBlob(
   });
 
   autoTable(doc, {
-    startY: 75,
-    head: [['CÓD', 'DESCRIÇÃO DA VERBA', 'REF', 'VENCIMENTOS', 'DESCONTOS']],
+    startY: 80,
+    head: [['CÓD', 'DESCRIÇÃO DA VERBA', 'REFERÊNCIA', 'VENCIMENTOS', 'DESCONTOS']],
     body: bodyData,
-    theme: 'striped',
+    theme: 'grid',
     styles: { 
-      fontSize: 8, 
-      cellPadding: 3,
-      font: 'helvetica'
+      fontSize: 7.5, 
+      cellPadding: 2.5,
+      font: 'helvetica',
+      lineColor: [240, 240, 240]
     },
     headStyles: { 
       fillColor: primaryColor,
@@ -129,69 +155,89 @@ export async function generatePayslipBlob(
     columnStyles: {
       0: { halign: 'center', cellWidth: 15 },
       1: { halign: 'left' },
-      2: { halign: 'center', cellWidth: 20 },
+      2: { halign: 'center', cellWidth: 25 },
       3: { halign: 'right', cellWidth: 35 },
       4: { halign: 'right', cellWidth: 35 }
     },
-    margin: { left: 14, right: 14 }
+    margin: { left: 16, right: 16 }
   });
 
   const finalY = (doc as any).lastAutoTable.finalY || 150;
   const totalProv = payroll.items.filter(i => i.type === 'EARNING').reduce((a,b) => a + b.amount, 0);
   const totalDesc = payroll.items.filter(i => i.type === 'DEDUCTION').reduce((a,b) => a + b.amount, 0);
 
-  doc.setDrawColor(230, 230, 230);
-  doc.line(14, finalY + 5, 196, finalY + 5);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text('TOTAL VENCIMENTOS', 100, finalY + 12);
-  doc.setFont("helvetica", "normal");
-  doc.text('R$ ' + totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, finalY + 12, { align: 'right' });
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text('TOTAL DESCONTOS', 100, finalY + 18);
-  doc.setFont("helvetica", "normal");
-  doc.text('R$ ' + totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, finalY + 18, { align: 'right' });
-
-  doc.setFillColor(...accentColor);
-  doc.rect(145, finalY + 5, 51, 20, 'F');
-  doc.setTextColor(255, 255, 255);
+  // --- SEÇÃO DE TOTAIS ---
+  const totalBoxY = finalY + 12;
+  
   doc.setFontSize(8);
-  doc.text('VALOR LÍQUIDO A RECEBER', 150, finalY + 11);
+  doc.setTextColor(...secondaryColor);
+  doc.setFont("helvetica", "bold");
+  doc.text('TOTAL DE VENCIMENTOS', 100, totalBoxY);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0,0,0);
+  doc.text('R$ ' + totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, totalBoxY, { align: 'right' });
+
+  doc.setFontSize(8);
+  doc.setTextColor(...secondaryColor);
+  doc.setFont("helvetica", "bold");
+  doc.text('TOTAL DE DESCONTOS', 100, totalBoxY + 7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(0,0,0);
+  doc.text('R$ ' + totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 140, totalBoxY + 7, { align: 'right' });
+
+  // Valor Líquido (Destaque)
+  doc.setFillColor(...accentColor);
+  doc.roundedRect(145, totalBoxY - 8, 51, 20, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7);
+  doc.text('VALOR LÍQUIDO A RECEBER', 149, totalBoxY - 2);
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text('R$ ' + payroll.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 150, finalY + 19);
+  doc.text('R$ ' + payroll.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 149, totalBoxY + 8);
 
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8);
-  const baseBoxY = finalY + 30;
+  // --- RODAPÉ DE BASES ---
+  const footerY = totalBoxY + 25;
+  doc.setFillColor(...lightBg);
+  doc.rect(16, footerY, 180, 15, 'F');
+  doc.setDrawColor(...borderColor);
+  doc.rect(16, footerY, 180, 15);
   
-  doc.setFillColor(240, 240, 240);
-  doc.rect(14, baseBoxY, 182, 12, 'F');
-  
-  doc.setFont("helvetica", "bold");
-  doc.text('SALÁRIO BASE', 16, baseBoxY + 5);
-  doc.text('BASE INSS', 55, baseBoxY + 5);
-  doc.text('BASE FGTS', 95, baseBoxY + 5);
-  doc.text('FGTS MÊS', 135, baseBoxY + 5);
-  doc.text('BASE IRRF', 170, baseBoxY + 5);
+  const colWidth = 180 / 5;
+  const bases = [
+    { label: 'SALÁRIO BASE', val: payroll.baseSalary },
+    { label: 'BASE INSS', val: payroll.grossSalary },
+    { label: 'BASE FGTS', val: payroll.grossSalary },
+    { label: 'FGTS MÊS', val: payroll.fgts },
+    { label: 'BASE IRRF', val: payroll.grossSalary - payroll.inss }
+  ];
 
-  doc.setFont("helvetica", "normal");
-  doc.text('R$ ' + payroll.baseSalary.toLocaleString('pt-BR'), 16, baseBoxY + 10);
-  doc.text('R$ ' + payroll.grossSalary.toLocaleString('pt-BR'), 55, baseBoxY + 10);
-  doc.text('R$ ' + payroll.grossSalary.toLocaleString('pt-BR'), 95, baseBoxY + 10);
-  doc.text('R$ ' + payroll.fgts.toLocaleString('pt-BR'), 135, baseBoxY + 10);
-  doc.text('R$ ' + (payroll.grossSalary - payroll.inss).toLocaleString('pt-BR'), 170, baseBoxY + 10);
+  bases.forEach((b, i) => {
+    doc.setFontSize(6);
+    doc.setTextColor(...secondaryColor);
+    doc.setFont("helvetica", "bold");
+    doc.text(b.label, 16 + (i * colWidth) + 3, footerY + 5);
+    doc.setFontSize(8);
+    doc.setTextColor(0,0,0);
+    doc.text('R$ ' + b.val.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 16 + (i * colWidth) + 3, footerY + 11);
+    if (i < 4) {
+      doc.setDrawColor(...borderColor);
+      doc.line(16 + ((i+1) * colWidth), footerY, 16 + ((i+1) * colWidth), footerY + 15);
+    }
+  });
 
+  // --- MENSAGEM E ASSINATURA ---
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text('DECLARO TER RECEBIDO A IMPORTÂNCIA LÍQUIDA DISCRIMINADA NESTE RECIBO.', 14, baseBoxY + 30);
+  doc.setFont("helvetica", "normal");
+  doc.text('Declaro ter recebido a importância líquida discriminada neste recibo, conferida e achada conforme.', 16, footerY + 25);
   
   doc.setDrawColor(0, 0, 0);
-  doc.line(100, baseBoxY + 55, 180, baseBoxY + 55);
-  doc.text('ASSINATURA DO COLABORADOR', 120, baseBoxY + 60);
+  doc.setLineWidth(0.2);
+  doc.line(100, footerY + 50, 190, footerY + 50);
+  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+  doc.text('ASSINATURA DO COLABORADOR', 125, footerY + 55);
+  doc.text(new Date().toLocaleDateString('pt-BR'), 16, footerY + 55);
 
   return doc.output('blob');
 }
@@ -207,8 +253,6 @@ async function uploadAndSavePayroll(
   month: number,
   year: number
 ) {
-  // 1. Upload to Supabase Storage (Buckets need to exist)
-  const ext = 'pdf';
   const fileName = `holerite_${month}_${year}.pdf`;
   const filePath = `${tenantId}/payrolls/${employee.id}/${fileName}`;
   
@@ -226,7 +270,6 @@ async function uploadAndSavePayroll(
 
   const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
 
-  // 2. Insert into DB
   const { error: dbError } = await supabase
     .from('payrolls')
     .upsert({
@@ -254,10 +297,8 @@ async function uploadAndSavePayroll(
 // =======================
 // DISPARO AUTOMÁTICO (E-MAIL E WHATSAPP)
 // =======================
-
 async function triggerAutoCommunications(tenantId: string, employee: Employee, pdfUrl: string, month: number, year: number) {
   try {
-    // 1. Busca configurações
     const [{ data: emailSettings }, { data: waSettings }] = await Promise.all([
       supabase.from('tenant_email_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
       supabase.from('tenant_whatsapp_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
@@ -265,10 +306,7 @@ async function triggerAutoCommunications(tenantId: string, employee: Employee, p
 
     const monthStr = month.toString().padStart(2, '0');
 
-    // 2. Disparo E-mail (VIA EDGE FUNCTION REAL)
     if (emailSettings?.auto_send_payroll && employee.email) {
-      console.log(`[AUTO-EMAIL] Disparando para ${employee.email}...`);
-      
       const { error: fError } = await supabase.functions.invoke('send-payroll-email', {
         body: {
           tenant_id: tenantId,
@@ -285,25 +323,19 @@ async function triggerAutoCommunications(tenantId: string, employee: Employee, p
           sent_email_at: new Date().toISOString(),
           status: 'SENT' 
         }).eq('employee_id', employee.id).eq('reference_month', month).eq('reference_year', year);
-      } else {
-        console.error('Erro ao disparar e-mail via Edge Function:', fError);
       }
     }
 
-    // 3. Disparo WhatsApp (API REAL)
     if (waSettings?.auto_send_payroll && waSettings.api_type !== 'none' && employee.phone) {
       const cleanPhone = employee.phone.replace(/\D/g, '');
       const message = `Olá ${employee.name}, seu holerite de ${monthStr}/${year} já está disponível: ${pdfUrl}`;
       
-      console.log(`[AUTO-WHATSAPP] Enviando via ${waSettings.api_type} para ${cleanPhone}...`);
-
       if (waSettings.api_type === 'evolution') {
-        // Exemplo de integração Evolution API
         await fetch(`${waSettings.base_url}/message/sendText/${waSettings.instance_id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': waSettings.token },
           body: JSON.stringify({ number: cleanPhone, text: message })
-        }).catch(err => console.error('Erro Evolution API:', err));
+        });
       }
 
       await supabase.from('payrolls').update({ 
@@ -338,15 +370,9 @@ export async function processBatch({ tenantId, employees, payrollData, reference
     }
 
     try {
-      // 1. Gera PDF do Holerite no Front
       const pdfBlob = await generatePayslipBlob(emp, item.payrollResult, referenceMonth, referenceYear);
-      
-      // 2. Salva e Faz Upload
       const pdfUrl = await uploadAndSavePayroll(tenantId, emp, item.payrollResult, pdfBlob, referenceMonth, referenceYear);
-
       results.push({ employeeId: emp.id, status: 'success', pdfUrl });
-      
-      // 3. Disparo Automático (Se configurado)
       await triggerAutoCommunications(tenantId, emp, pdfUrl, referenceMonth, referenceYear);
 
     } catch (e: any) {
