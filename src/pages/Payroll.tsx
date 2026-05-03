@@ -587,8 +587,8 @@ export default function Payroll() {
 
           <Dialog open={exportOpen} onOpenChange={setExportOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="h-8 text-[13px] gap-1.5">
-                <FileText className="w-3.5 h-3.5" /> Exportar Folha TXT
+              <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl text-white/60 hover:text-white hover:bg-white/10 font-bold text-[12px] gap-2 transition-all">
+                <FileText className="w-4 h-4" /> Exportar TXT
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">

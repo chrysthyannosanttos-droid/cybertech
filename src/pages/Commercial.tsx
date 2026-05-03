@@ -59,16 +59,14 @@ interface ModuleOption {
 }
 
 const AVAILABLE_MODULES: ModuleOption[] = [
-  { id: 'dashboard', label: 'Inteligência de Dados (BI)', description: 'Dashboards em tempo real com KPIs estratégicos', longDescription: 'Centralização de indicadores de performance, turnover, absenteísmo e custos operacionais em painéis interativos.', icon: PieChart, suggestedPrice: 0, category: 'CORE' },
-  { id: 'employees', label: 'Ecossistema de Colaboradores', description: 'Gestão 360º do ciclo de vida do funcionário', longDescription: 'Prontuário digital completo com histórico de cargos, salários e documentos.', icon: Users, suggestedPrice: 150, category: 'CORE' },
-  { id: 'attendance', label: 'Ponto Digital Biométrico', description: 'Reconhecimento facial e geolocalização antifraude', longDescription: 'Sistema de batida de ponto via mobile ou tablet com validação por GPS e foto.', icon: Clock, suggestedPrice: 200, category: 'ADVANCED' },
-  { id: 'payroll', label: 'Motor de Folha & Holerites', description: 'Cálculos automatizados e assinatura digital', longDescription: 'Automação total de proventos e descontos. Geração de holerites digitais.', icon: DollarSign, suggestedPrice: 250, category: 'CORE' },
-  { id: 'certificates', label: 'Gestão Médica & Atestados', description: 'Controle de CID e afastamentos preventivos', longDescription: 'Monitoramento inteligente de saúde ocupacional e integração com banco de horas.', icon: Calendar, suggestedPrice: 100, category: 'ADVANCED' },
-  { id: 'documents', label: 'GED Cloud (Documentos)', description: 'Repositório seguro com criptografia militar', longDescription: 'Armazenamento centralizado de contratos e exames com controle de validade.', icon: FileText, suggestedPrice: 100, category: 'CORE' },
-  { id: 'rescissions', label: 'Módulo de Offboarding', description: 'Cálculos rescisórios e integração eSocial', longDescription: 'Gestão técnica do desligamento com cálculos precisos de verbas.', icon: UserX, suggestedPrice: 150, category: 'ADVANCED' },
-  { id: 'service-providers', label: 'Gestão de Terceiros (PJ)', description: 'Controle de prestadores e contratos B2B', longDescription: 'Módulo especializado para profissionais autônomos e empresas prestadoras.', icon: Briefcase, suggestedPrice: 120, category: 'ADDON' },
-  { id: 'stores', label: 'Arquitetura Multi-Unidades', description: 'Gestão unificada de redes e filiais', longDescription: 'Estrutura preparada para empresas com múltiplas lojas e visão consolidada.', icon: Store, suggestedPrice: 100, category: 'ADDON' },
-  { id: 'whitelabel', label: 'White Label Experience', description: 'Sua marca, sua identidade, seu domínio', longDescription: 'Personalização total da plataforma com as cores e logotipo da sua empresa.', icon: Settings, suggestedPrice: 500, category: 'ADDON' },
+  { id: 'dashboard', label: 'Dashboard de Inteligência (BI)', description: 'Gestão visual com Ranking de Absenteísmo', longDescription: 'Painéis estratégicos com KPIs em tempo real, incluindo ranking inteligente de faltas e produtividade por unidade.', icon: PieChart, suggestedPrice: 0, category: 'CORE' },
+  { id: 'employees', label: 'Ecossistema de Colaboradores', description: 'Gestão 360º com Prontuário Digital', longDescription: 'Centralização total de dados, documentos e histórico funcional em um ambiente seguro e intuitivo.', icon: Users, suggestedPrice: 150, category: 'CORE' },
+  { id: 'payroll', label: 'Motor CLT Automatizado', description: 'Cálculos precisos e Holerites Oficiais', longDescription: 'Cálculo instantâneo de folha (INSS, IRRF, FGTS) com geração de PDFs no padrão contábil oficial.', icon: DollarSign, suggestedPrice: 300, category: 'CORE' },
+  { id: 'automation', label: 'Automação de Envios (Omnichannel)', description: 'Entrega via WhatsApp e E-mail', longDescription: 'O sistema dispara automaticamente os holerites e comunicados para o celular do colaborador.', icon: Zap, suggestedPrice: 200, category: 'ADVANCED' },
+  { id: 'attendance', label: 'Ponto Digital Biométrico', description: 'Reconhecimento facial e geolocalização', longDescription: 'Registro de jornada com prova de vida e validação por GPS, eliminando fraudes no ponto.', icon: Clock, suggestedPrice: 200, category: 'ADVANCED' },
+  { id: 'documents', label: 'GED Cloud & Assinatura Digital', description: 'Repositório seguro e conformidade LGPD', longDescription: 'Armazenamento de contratos e documentos com validade jurídica e controle de expiração.', icon: FileText, suggestedPrice: 150, category: 'CORE' },
+  { id: 'stores', label: 'Arquitetura Multi-Tenant', description: 'Gestão de Redes e Franquias', longDescription: 'Estrutura preparada para empresas com múltiplas unidades e visão consolidada de grupo.', icon: Store, suggestedPrice: 150, category: 'ADDON' },
+  { id: 'whitelabel', label: 'White Label Experience', description: 'Sua marca em todo o ecossistema', longDescription: 'Personalização total (cores, logo, domínio) para que o sistema tenha a identidade da sua empresa.', icon: Settings, suggestedPrice: 500, category: 'ADDON' },
 ];
 
 export default function Commercial() {
@@ -197,9 +195,9 @@ export default function Commercial() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(70, 70, 70);
-      const carta = `Agradecemos a oportunidade de apresentar nossa proposta de modernização tecnológica para a gestão de pessoas da sua empresa. A CyberTech RH é uma plataforma desenvolvida para eliminar burocracias operacionais, garantir conformidade jurídica e entregar uma experiência digital de alto nível para os seus colaboradores.
+      const carta = `Agradecemos a oportunidade de apresentar nossa solução definitiva de Automação para seu Departamento Pessoal. O CyberTech RH Hub não é apenas um software, mas um braço tecnológico que assume as tarefas repetitivas para que sua equipe foque no que importa: as pessoas.
 
-Nossa solução integra todos os processos de RH em um único ecossistema — do ponto eletrônico ao eSocial — reduzindo custos operacionais e aumentando a produtividade do departamento pessoal em até 70%.`;
+Com o novo Motor de Folha Automatizado e o Sistema de Envios Omnichannel, sua empresa elimina erros de cálculo e reduz o tempo de entrega de holerites de dias para segundos. Além disso, nossa inteligência de dados entrega um Ranking de Absenteísmo em tempo real, permitindo ações preventivas sobre a saúde e produtividade da sua equipe.`;
       const cartaLines = doc.splitTextToSize(carta, 180);
       doc.text(cartaLines, 15, y);
       y += (cartaLines.length * 5) + 10;
@@ -214,10 +212,10 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
       y += 12;
 
       const diferenciais = [
-        ['✦ 100% em Nuvem ou Local', 'Escolha a infraestrutura que melhor se adapta ao seu negócio'],
-        ['✦ Conformidade Legal', 'eSocial, LGPD e CLT integrados nativamente na plataforma'],
-        ['✦ Ponto Biométrico Antifraude', 'Registro por reconhecimento facial e GPS em tempo real'],
-        ['✦ Suporte Especializado', 'Equipe de especialistas em RH e tecnologia à disposição'],
+        ['✦ Automação de Folha CLT', 'Cálculos automáticos e geração de holerites no padrão contábil'],
+        ['✦ Envios Automatizados', 'Entrega direta no WhatsApp e E-mail do funcionário'],
+        ['✦ Inteligência de Absenteísmo', 'Ranking automático e controle rigoroso de faltas e atrasos'],
+        ['✦ White-Label Total', 'O sistema opera com a SUA marca e identidade visual'],
       ];
 
       (doc as any).autoTable({
