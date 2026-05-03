@@ -20,27 +20,49 @@ async function migrateAll() {
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const tableWidth = pageWidth - 35;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
       
-      // Desenha o modelo clássico simplificado para migração
-      doc.rect(10, 10, tableWidth, 277);
-      doc.rect(pageWidth - 20, 10, 10, 277);
+      doc.setLineWidth(0.1);
+      doc.setDrawColor(0);
+      doc.setTextColor(0);
+      
+      // Header
       doc.setFont("helvetica", "bold");
-      doc.text(p.employees?.store_name || 'CyberTech RH', 12, 16);
-      doc.text('RECIBO DE PAGAMENTO', tableWidth - 15, 16, { align: 'right' });
-      doc.text(`${p.reference_month}/${p.reference_year}`, tableWidth - 15, 23, { align: 'right' });
+      doc.setFontSize(12);
+      doc.text(p.employees?.name?.toUpperCase() || 'EMPRESA', margin, margin + 5);
+      doc.setFontSize(10);
+      doc.text("RECIBO DE PAGAMENTO DE SALÁRIO", pageWidth - margin, margin + 5, { align: 'right' });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(`REFERÊNCIA: ${p.reference_month}/${p.reference_year}`, pageWidth - margin, margin + 10, { align: 'right' });
+      doc.line(margin, margin + 18, pageWidth - margin, margin + 18);
 
+      // Tabela Simplificada para Histórico
       doc.autoTable({
-        startY: 40,
-        head: [['Cód', 'Descrição', 'Ref', 'Vencimentos', 'Descontos']],
+        startY: margin + 25,
+        head: [['Cód.', 'Descrição das Verbas', 'Ref.', 'Vencimentos', 'Descontos']],
         body: [
-          ['001', 'SALARIO BASE', '30 d', p.gross_salary.toFixed(2), ''],
-          ['900', 'INSS', '11%', '', p.inss_deduction.toFixed(2)],
-          ['910', 'IRRF', '-', '', p.irrf_deduction.toFixed(2)]
+          ['001', 'SALÁRIO BASE', '30.00', p.gross_salary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), ''],
+          ['900', 'INSS', '-', '', p.inss_deduction.toLocaleString('pt-BR', { minimumFractionDigits: 2 })],
+          ['910', 'IRRF', '-', '', p.irrf_deduction.toLocaleString('pt-BR', { minimumFractionDigits: 2 })]
         ],
-        theme: 'grid',
-        tableWidth: tableWidth
+        theme: 'plain',
+        headStyles: { fontStyle: 'bold', fontSize: 8, textColor: 0, lineWidth: 0.1, fillColor: [255, 255, 255] },
+        styles: { fontSize: 8, cellPadding: 2, font: 'helvetica' },
+        didDrawCell: (data) => {
+          if (data.section === 'body') {
+            doc.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+            doc.line(data.cell.x + data.cell.width, data.cell.y, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+          }
+        }
       });
+
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.rect(pageWidth - 85, finalY, 85 - margin, 12);
+      doc.setFont("helvetica", "bold");
+      doc.text(`VALOR LÍQUIDO: R$ ${p.net_salary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, finalY + 8, { align: 'right' });
 
       const pdfBuffer = doc.output('arraybuffer');
       const fileName = `holerite_${p.reference_month}_${p.reference_year}.pdf`;
