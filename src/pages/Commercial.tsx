@@ -703,8 +703,6 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
                     </table>
                  </div>
 
-                 <div className="flex justify-center gap-6 pt-10 no-print">
-                    <Button variant="outline" className="h-14 px-10 rounded-2xl gap-3 font-black" onClick={handleGeneratePdf}><Download className="w-5 h-5" /> Exportar PDF</Button>
                     <Button className="h-14 px-10 rounded-2xl bg-primary gap-3 font-black shadow-xl" onClick={() => handleGenerateContract('cloud')}><FileSignature className="w-5 h-5" /> Gerar Contrato Nuvem</Button>
                     <Button className="h-14 px-10 rounded-2xl bg-slate-900 gap-3 font-black shadow-xl" onClick={() => handleGenerateContract('local')}><FileSignature className="w-5 h-5" /> Gerar Contrato Físico</Button>
                  </div>
