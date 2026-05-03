@@ -554,7 +554,8 @@ export default function Payroll() {
                 {suggestions.map((emp) => (
                   <button
                     key={emp.id}
-                    onClick={() => {
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // Impede o blur do input antes da seleção
                       setSearchTerm(emp.name);
                       setShowSuggestions(false);
                     }}
