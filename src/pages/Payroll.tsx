@@ -63,6 +63,7 @@ export default function Payroll() {
   const [batchErrors, setBatchErrors] = useState<{employeeName: string, error: string}[]>([]);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [bulkPostOpen, setBulkPostOpen] = useState(false);
+  const [existingPayrolls, setExistingPayrolls] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -118,6 +119,7 @@ export default function Payroll() {
       
       setIsLoading(false);
     };
+
     fetchData();
     
     const channel = supabase
@@ -130,6 +132,17 @@ export default function Payroll() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    const fetchExistingPayrolls = async () => {
+      let q = supabase.from('payrolls').select('*').eq('reference_month', refMonth).eq('reference_year', refYear);
+      let tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      if (tenantId) q = q.eq('tenant_id', tenantId);
+      const { data } = await q;
+      setExistingPayrolls(data || []);
+    };
+    fetchExistingPayrolls();
+  }, [refMonth, refYear, currentUser]);
 
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'tenant';
 
@@ -637,7 +650,20 @@ export default function Payroll() {
                       <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{p.storeName.replace('SUPER ', '')}</span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <span className="font-mono-data text-[12px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="font-mono-data text-[12px] text-white/80">R$ {p.salary.toLocaleString('pt-BR')}</span>
+                        {existingPayrolls.find(ep => ep.employee_id === p.employeeId) && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-blue-400 hover:bg-blue-500/10"
+                            onClick={() => window.open(existingPayrolls.find(ep => ep.employee_id === p.employeeId)?.pdf_url, '_blank')}
+                            title="Reimprimir Holerite"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-center gap-2">
