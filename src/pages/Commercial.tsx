@@ -697,30 +697,28 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
                           <tr className="border-b"><td className="p-6 bg-slate-50">Colaboradores</td><td className="p-6 text-center text-primary">{employeeCount} Usuários</td><td className="p-6 text-center">{employeeCount} Usuários</td></tr>
                           <tr className="bg-slate-900 text-white text-xl">
                              <td className="p-8 uppercase text-[11px]">Investimento Mensal</td>
-                             <td className="p-8 text-center text-primary border-l border-white/10">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</td>
-                             <td className="p-8 text-center border-l border-white/10">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR')}</td>
+                              <td className="p-8 text-center text-primary border-l border-white/10">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="p-8 text-center border-l border-white/10">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           </tr>
                        </tbody>
                     </table>
                  </div>
-                  <div className="flex flex-wrap justify-center gap-4 pt-10 no-print">
-                    <Button variant="outline" className="h-14 px-8 rounded-2xl gap-3 font-black text-primary border-primary/20 bg-primary/5" onClick={() => generateClientGuidePDF(clientName || 'Cliente')}>
                       <Rocket className="w-5 h-5" /> 
                       Guia do Sistema
                     </Button>
-                    <Button variant="outline" className="h-14 px-8 rounded-2xl gap-3 font-black text-slate-600" onClick={() => generateServerComparisonPDF(clientName || 'Cliente')}>
+                    <Button variant="outline" className="h-14 px-6 rounded-2xl gap-3 font-black text-slate-600 border-slate-200 hover:bg-slate-50 transition-all" onClick={() => generateServerComparisonPDF(clientName || 'Cliente')}>
                       <Server className="w-5 h-5 text-primary" /> 
                       Comparativo Técnico
                     </Button>
-                    <Button variant="outline" className="h-14 px-8 rounded-2xl gap-3 font-black" onClick={handleGeneratePdf}>
+                    <Button variant="outline" className="h-14 px-6 rounded-2xl gap-3 font-black text-slate-600 border-slate-200 hover:bg-slate-50 transition-all" onClick={handleGeneratePdf}>
                       <Download className="w-5 h-5" /> 
                       Exportar PDF
                     </Button>
-                    <Button className="h-14 px-8 rounded-2xl bg-primary gap-3 font-black shadow-xl" onClick={() => handleGenerateContract('cloud')}>
+                    <Button className="h-14 px-6 rounded-2xl bg-primary gap-3 font-black shadow-xl hover:scale-[1.02] transition-all" onClick={() => handleGenerateContract('cloud')}>
                       <FileSignature className="w-5 h-5" /> 
                       Contrato Nuvem
                     </Button>
-                    <Button className="h-14 px-8 rounded-2xl bg-slate-900 gap-3 font-black shadow-xl" onClick={() => handleGenerateContract('local')}>
+                    <Button className="h-14 px-6 rounded-2xl bg-slate-900 gap-3 font-black shadow-xl hover:scale-[1.02] transition-all" onClick={() => handleGenerateContract('local')}>
                       <FileSignature className="w-5 h-5" /> 
                       Contrato Físico
                     </Button>
