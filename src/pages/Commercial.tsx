@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { generateServerComparisonPDF } from '@/services/ServerComparisonService';
 import { generateClientGuidePDF } from '@/services/ClientGuideService';
