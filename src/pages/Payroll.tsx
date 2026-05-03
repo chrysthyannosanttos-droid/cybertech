@@ -422,7 +422,7 @@ export default function Payroll() {
                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
                 {isProcessing ? `Processando...` : `Fechar Lote (${selectedIds.length})`}
               </Button>
-              {batchResults.length > 0 && (
+              {(batchResults.length > 0 || existingPayrolls.length > 0) && (
                 <Button 
                   onClick={() => setBulkPostOpen(true)}
                   className="h-10 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[12px] gap-2 animate-in fade-in zoom-in duration-200"
@@ -687,37 +687,46 @@ export default function Payroll() {
                     {isAdmin && (
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          {batchResults.find(r => r.employeeId === p.employeeId) && (
-                            <div className="flex items-center gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
-                                onClick={() => window.open(batchResults.find(r => r.employeeId === p.employeeId)?.pdfUrl, '_blank')}
-                                title="Ver Holerite"
-                              >
-                                <FileText className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10"
-                                onClick={() => handleSendSingleWhatsApp(p, batchResults.find(r => r.employeeId === p.employeeId))}
-                                title="Enviar por WhatsApp"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-blue-400 hover:bg-blue-500/10"
-                                onClick={() => handleSendSingleEmail(p, batchResults.find(r => r.employeeId === p.employeeId))}
-                                title="Enviar por E-mail"
-                              >
-                                <Mail className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          )}
+                          {(() => {
+                            const result = batchResults.find(r => r.employeeId === p.employeeId) || 
+                                           existingPayrolls.find(ep => ep.employee_id === p.employeeId);
+                            
+                            if (!result) return null;
+
+                            const pdfUrl = (result as any).pdfUrl || (result as any).pdf_url;
+
+                            return (
+                              <div className="flex items-center gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-emerald-400 hover:bg-emerald-500/10"
+                                  onClick={() => window.open(pdfUrl, '_blank')}
+                                  title="Ver Holerite"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10"
+                                  onClick={() => handleSendSingleWhatsApp(p, { pdfUrl })}
+                                  title="Enviar por WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-blue-400 hover:bg-blue-500/10"
+                                  onClick={() => handleSendSingleEmail(p, { pdfUrl })}
+                                  title="Enviar por E-mail"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            );
+                          })()}
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/20 hover:text-rose-500 hover:bg-rose-500/10 transition-colors" onClick={() => handleDeleteOne(p.employeeId, p.employeeName)}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -755,8 +764,8 @@ export default function Payroll() {
       <BulkPostModal 
         open={bulkPostOpen}
         onOpenChange={setBulkPostOpen}
-        selectedEmployees={dbEmployees.filter(e => batchResults.some(r => r.employeeId === e.id))}
-        batchResults={batchResults}
+        selectedEmployees={dbEmployees.filter(e => (batchResults.some(r => r.employeeId === e.id) || existingPayrolls.some(ep => ep.employee_id === e.id)))}
+        batchResults={[...batchResults, ...existingPayrolls.map(ep => ({ employeeId: ep.employee_id, pdfUrl: ep.pdf_url }))]}
         referenceMonth={refMonth}
         referenceYear={refYear}
       />
