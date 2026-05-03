@@ -116,7 +116,7 @@ export function BulkPostModal({
             setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
         } else {
             // Chamada Real para a Edge Function
-            const { error: fError } = await supabase.functions.invoke('send-payroll-email', {
+            const { data: fData, error: fError } = await supabase.functions.invoke('send-payroll-email', {
                 body: {
                   tenant_id: emp.tenant_id || emp.tenantId,
                   employee_email: emp.email,
@@ -127,14 +127,15 @@ export function BulkPostModal({
                 }
             });
 
-            if (!fError) {
+            if (!fError && fData?.success) {
                 setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail enviado' }]);
                 await supabase.from('payrolls').update({ 
                     status: 'SENT',
                     sent_email_at: new Date().toISOString() 
                 }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
             } else {
-                setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Falha no disparo' }]);
+                const errorMsg = fError?.message || fData?.error || 'Erro desconhecido no servidor';
+                setLog(prev => [...prev, { name: emp.name, status: 'error', message: `Falha: ${errorMsg}` }]);
             }
         }
         setProgress(((i + 1) / total) * 100);

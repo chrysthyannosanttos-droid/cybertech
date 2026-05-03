@@ -324,7 +324,44 @@ export default function Payroll() {
       toast({ title: 'E-mail não cadastrado', description: `O funcionário ${p.employeeName} não possui e-mail cadastrado.`, variant: 'destructive' });
       return;
     }
-    toast({ title: 'E-mail enviado', description: `O holerite foi enviado para ${emp.email}` });
+
+    toast({ title: 'Enviando e-mail...', description: 'Aguarde o processamento.' });
+
+    try {
+      let tenantId = (currentUser as any)?.tenantId || (currentUser as any)?.tenant_id;
+      if (!tenantId) {
+        const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+        tenantId = tData?.id;
+      }
+
+      const { data: fData, error: fError } = await supabase.functions.invoke('send-payroll-email', {
+        body: {
+          tenant_id: tenantId,
+          employee_email: emp.email,
+          employee_name: emp.name,
+          pdf_url: result.pdfUrl,
+          month: refMonth.toString().padStart(2, '0'),
+          year: refYear.toString()
+        }
+      });
+
+      if (!fError && fData?.success) {
+        toast({ title: 'E-mail enviado com sucesso!', description: `O holerite foi enviado para ${emp.email}` });
+        await supabase.from('payrolls').update({ 
+          status: 'SENT',
+          sent_email_at: new Date().toISOString() 
+        }).eq('employee_id', emp.id).eq('reference_month', refMonth).eq('reference_year', refYear);
+      } else {
+        const errorMsg = fError?.message || fData?.error || 'Erro desconhecido';
+        toast({ 
+          title: 'Falha no envio', 
+          description: `Motivo: ${errorMsg}`, 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro de sistema', description: err.message, variant: 'destructive' });
+    }
   };
 
   const totalNet = payroll.reduce((s, p) => s + p.netSalary, 0);
