@@ -331,7 +331,9 @@ export async function processBatch({ tenantId, employees, payrollData, reference
       const pdfBlob = await generatePayslipBlob(emp, item.payrollResult, referenceMonth, referenceYear);
       const pdfUrl = await uploadAndSavePayroll(tenantId, emp, item.payrollResult, pdfBlob, referenceMonth, referenceYear);
       results.push({ employeeId: emp.id, status: 'success', pdfUrl });
-      await triggerAutoCommunications(tenantId, emp, pdfUrl, referenceMonth, referenceYear);
+      
+      // triggerAutoCommunications removido a pedido do usuário para garantir controle manual
+      // await triggerAutoCommunications(tenantId, emp, pdfUrl, referenceMonth, referenceYear);
 
     } catch (e: any) {
       console.error(`Error processing ${emp.name}:`, e);
