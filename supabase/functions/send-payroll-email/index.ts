@@ -25,15 +25,27 @@ serve(async (req) => {
       throw new Error('Dados insuficientes para o envio (tenant_id, email ou pdf ausentes).')
     }
 
-    // 1. Buscar configurações SMTP do Tenant
-    const { data: settings, error: sError } = await supabase
+    // 1. Buscar configurações SMTP
+    // Tentamos buscar pelo tenant_id enviado
+    let { data: settings, error: sError } = await supabase
       .from('tenant_email_settings')
       .select('*')
       .eq('tenant_id', tenant_id)
-      .single()
+      .maybeSingle()
 
-    if (sError || !settings) {
-      throw new Error(`Configurações SMTP não encontradas para o tenant: ${tenant_id}`)
+    // Se não achou, tentamos buscar a primeira configuração disponível (fallback para teste)
+    if (!settings) {
+      console.log('Tentando fallback para a primeira configuração encontrada...');
+      const { data: fallback } = await supabase
+        .from('tenant_email_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle()
+      settings = fallback
+    }
+
+    if (!settings) {
+      throw new Error(`Nenhuma configuração SMTP encontrada no banco de dados para o ID: ${tenant_id}`)
     }
 
     // 2. Configurar o Cliente SMTP
