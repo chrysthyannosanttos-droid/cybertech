@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { saveAs } from 'file-saver';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,8 +69,6 @@ export function parseExcelDate(val: any) {
   }
   return null;
 }
-
-import { saveAs } from 'file-saver';
 
 export function downloadPdf(doc: any, filename: string) {
   const blob = doc.output('blob');
