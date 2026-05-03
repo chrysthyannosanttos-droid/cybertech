@@ -115,27 +115,26 @@ export function BulkPostModal({
         } else if (!result?.pdfUrl) {
             setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
         } else {
-            // Chamada Real para a Edge Function
-            const { data: fData, error: fError } = await supabase.functions.invoke('send-payroll-email', {
-                body: {
-                  tenant_id: emp.tenant_id || emp.tenantId,
-                  employee_email: emp.email,
-                  employee_name: emp.name,
-                  pdf_url: result.pdfUrl,
-                  month: referenceMonth.toString().padStart(2, '0'),
-                  year: referenceYear.toString()
-                }
-            });
+            // Chamada para WhatsApp (Modo Gratuito)
+            if (emp.phone) {
+                let cleanPhone = emp.phone.replace(/\D/g, '');
+                if (cleanPhone.length === 11) cleanPhone = '55' + cleanPhone;
+                const message = encodeURIComponent(`Olá ${emp.name}, seu holerite de ${referenceMonth.toString().padStart(2, '0')}/${referenceYear} está disponível: ${result.pdfUrl}`);
+                const waLink = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${message}`;
+                
+                // No modo em massa, abrimos as abas com um pequeno intervalo para não travar o navegador
+                setTimeout(() => {
+                    window.open(waLink, '_blank');
+                }, i * 1500); 
 
-            if (!fError && fData?.success) {
-                setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail enviado' }]);
+                setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'WhatsApp Web aberto' }]);
+                
                 await supabase.from('payrolls').update({ 
                     status: 'SENT',
-                    sent_email_at: new Date().toISOString() 
+                    sent_whatsapp_at: new Date().toISOString() 
                 }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
             } else {
-                const errorMsg = fError?.message || fData?.error || 'Erro desconhecido no servidor';
-                setLog(prev => [...prev, { name: emp.name, status: 'error', message: `Falha: ${errorMsg}` }]);
+                setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Telefone ausente' }]);
             }
         }
         setProgress(((i + 1) / total) * 100);
