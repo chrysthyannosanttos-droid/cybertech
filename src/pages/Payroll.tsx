@@ -65,6 +65,7 @@ export default function Payroll() {
   const [bulkPostOpen, setBulkPostOpen] = useState(false);
   const [existingPayrolls, setExistingPayrolls] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -190,6 +191,13 @@ export default function Payroll() {
   useEffect(() => {
     setPayrollData(payroll);
   }, [payroll]);
+
+  const suggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 2) return [];
+    return dbEmployees
+      .filter(emp => emp.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .slice(0, 5); // Limita a 5 sugestões
+  }, [searchTerm, dbEmployees]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === payrollData.length && payrollData.length > 0) {
@@ -531,9 +539,38 @@ export default function Payroll() {
               type="text"
               placeholder="Buscar colaborador..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowSuggestions(true);
+              }}
               className="h-10 pl-10 pr-4 bg-white/5 border border-white/10 rounded-xl text-[12px] font-medium text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 w-full md:w-[250px] transition-all"
             />
+
+            {/* Lista de Sugestões */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 w-full mt-2 bg-[#0c0c14] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                {suggestions.map((emp) => (
+                  <button
+                    key={emp.id}
+                    onClick={() => {
+                      setSearchTerm(emp.name);
+                      setShowSuggestions(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-left transition-colors border-b border-white/5 last:border-none"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                      {emp.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-bold text-white">{emp.name}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase font-medium">{emp.department || 'Geral'}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <Select value={storeFilter} onValueChange={setStoreFilter}>
