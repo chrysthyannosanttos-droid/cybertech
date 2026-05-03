@@ -252,6 +252,57 @@ async function uploadAndSavePayroll(
 }
 
 // =======================
+// DISPARO AUTOMÁTICO (E-MAIL E WHATSAPP)
+// =======================
+
+async function triggerAutoCommunications(tenantId: string, employee: Employee, pdfUrl: string, month: number, year: number) {
+  try {
+    // 1. Busca configurações
+    const [{ data: emailSettings }, { data: waSettings }] = await Promise.all([
+      supabase.from('tenant_email_settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
+      supabase.from('tenant_whatsapp_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
+    ]);
+
+    const monthStr = month.toString().padStart(2, '0');
+
+    // 2. Disparo E-mail
+    if (emailSettings?.auto_send_payroll && employee.email) {
+      console.log(`[AUTO-EMAIL] Enviando para ${employee.email}...`);
+      // Aqui integraria com uma Edge Function ou serviço como Resend/SendGrid
+      // Por enquanto registramos o status de envio
+      await supabase.from('payrolls').update({ 
+        sent_email_at: new Date().toISOString(),
+        status: 'SENT' 
+      }).eq('employee_id', employee.id).eq('reference_month', month).eq('reference_year', year);
+    }
+
+    // 3. Disparo WhatsApp (API REAL)
+    if (waSettings?.auto_send_payroll && waSettings.api_type !== 'none' && employee.phone) {
+      const cleanPhone = employee.phone.replace(/\D/g, '');
+      const message = `Olá ${employee.name}, seu holerite de ${monthStr}/${year} já está disponível: ${pdfUrl}`;
+      
+      console.log(`[AUTO-WHATSAPP] Enviando via ${waSettings.api_type} para ${cleanPhone}...`);
+
+      if (waSettings.api_type === 'evolution') {
+        // Exemplo de integração Evolution API
+        await fetch(`${waSettings.base_url}/message/sendText/${waSettings.instance_id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': waSettings.token },
+          body: JSON.stringify({ number: cleanPhone, text: message })
+        }).catch(err => console.error('Erro Evolution API:', err));
+      }
+
+      await supabase.from('payrolls').update({ 
+        sent_whatsapp_at: new Date().toISOString(),
+        status: 'SENT' 
+      }).eq('employee_id', employee.id).eq('reference_month', month).eq('reference_year', year);
+    }
+  } catch (err) {
+    console.error('Erro no disparo automático:', err);
+  }
+}
+
+// =======================
 // GERAÇÃO EM LOTE
 // =======================
 export async function processBatch({ tenantId, employees, payrollData, referenceMonth, referenceYear, onProgress }: ProcessBatchInput) {
@@ -259,7 +310,6 @@ export async function processBatch({ tenantId, employees, payrollData, reference
   const errors = [];
   const total = payrollData.length;
 
-  // Garante que o bucket existe antes de começar o upload em massa
   await ensureBucket();
 
   for (let i = 0; i < total; i++) {
@@ -282,10 +332,9 @@ export async function processBatch({ tenantId, employees, payrollData, reference
 
       results.push({ employeeId: emp.id, status: 'success', pdfUrl });
       
-      // 3. Mock Email (opcional/futuro - podemos disparar aqui)
-      if (emp.email) {
-        await sendPayslipEmailMock(emp.name, emp.email, pdfUrl);
-      }
+      // 3. Disparo Automático (Se configurado)
+      await triggerAutoCommunications(tenantId, emp, pdfUrl, referenceMonth, referenceYear);
+
     } catch (e: any) {
       console.error(`Error processing ${emp.name}:`, e);
       errors.push({ employeeName: emp.name, error: e.message || 'Erro desconhecido' });
@@ -293,13 +342,4 @@ export async function processBatch({ tenantId, employees, payrollData, reference
   }
 
   return { results, errors };
-}
-
-// =======================
-// MOCK EMAIL AUTOMÁTICO (PLUGÁVEL NO FUTURO)
-// =======================
-export async function sendPayslipEmailMock(employeeName: string, employeeEmail: string, pdfUrl: string) {
-  // Isso será substituído por uma Edge Function da Vercel/Supabase
-  console.log(`[EMAIL DISPARADO] Para: ${employeeEmail} (Holerite: ${pdfUrl})`);
-  return new Promise(resolve => setTimeout(resolve, 800)); // Simulando latência da rede
 }

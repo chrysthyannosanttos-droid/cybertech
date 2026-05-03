@@ -24,7 +24,7 @@ import Settings from "@/pages/Settings";
 import AuditLogs from "@/pages/AuditLogs";
 import UserManagement from "@/pages/UserManagement";
 import Holerites from "@/pages/Holerites";
-import EmailSettings from "@/pages/EmailSettings";
+import CommunicationSettings from "@/pages/CommunicationSettings";
 import NotFound from "@/pages/NotFound";
 import Attendance from "@/pages/Attendance";
 import Vacations from "@/pages/Vacations";
@@ -69,7 +69,7 @@ function AppRoutes() {
         <Route path="/rescissions" element={<Rescissions />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/company" element={<CompanySettings />} />
-        <Route path="/settings/email" element={<EmailSettings />} />
+        <Route path="/settings/email" element={<CommunicationSettings />} />
         <Route path="/logs" element={<AuditLogs />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/holerites" element={<Holerites />} />

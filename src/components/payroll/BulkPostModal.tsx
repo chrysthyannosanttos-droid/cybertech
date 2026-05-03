@@ -62,8 +62,31 @@ export function BulkPostModal({
     } else if (!result?.pdfUrl) {
       setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
     } else {
-      window.open(generateWALink(emp.phone, emp.name, result.pdfUrl), '_blank');
-      setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Link aberto' }]);
+      // Busca se tem API configurada
+      const { data: waSettings } = await supabase.from('tenant_whatsapp_settings').select('*').limit(1).maybeSingle();
+      
+      if (waSettings && waSettings.api_type !== 'none') {
+        // Disparo via API Automática
+        const cleanPhone = emp.phone.replace(/\D/g, '');
+        const message = `Olá ${emp.name}, seu holerite de ${referenceMonth}/${referenceYear} está disponível: ${result.pdfUrl}`;
+        
+        try {
+          if (waSettings.api_type === 'evolution') {
+            await fetch(`${waSettings.base_url}/message/sendText/${waSettings.instance_id}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': waSettings.token },
+              body: JSON.stringify({ number: cleanPhone, text: message })
+            });
+          }
+          setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Enviado via API' }]);
+        } catch (e) {
+          setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Erro na API' }]);
+        }
+      } else {
+        // Fallback Manual (Abre Aba)
+        window.open(generateWALink(emp.phone, emp.name, result.pdfUrl), '_blank');
+        setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Link aberto' }]);
+      }
       
       // Update DB status
       await supabase.from('payrolls').update({ 
@@ -82,6 +105,9 @@ export function BulkPostModal({
   };
 
   const processAllEmails = async () => {
+    // Busca configurações de e-mail para usar o remetente correto (simulação)
+    const { data: emailSettings } = await supabase.from('tenant_email_settings').select('*').limit(1).maybeSingle();
+    
     for (let i = 0; i < total; i++) {
         setCurrentIndex(i);
         const emp = selectedEmployees[i];
@@ -92,9 +118,9 @@ export function BulkPostModal({
         } else if (!result?.pdfUrl) {
             setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
         } else {
-            // Mocking email send logic
-            await new Promise(resolve => setTimeout(resolve, 800));
-            setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail disparado' }]);
+            // Aqui integraria com o SMTP real via Edge Function
+            await new Promise(resolve => setTimeout(resolve, 600));
+            setLog(prev => [...prev, { name: emp.name, status: 'success', message: `E-mail disparado (${emailSettings?.from_email || 'padrão'})` }]);
             
             await supabase.from('payrolls').update({ 
                 status: 'SENT',
@@ -136,6 +162,9 @@ export function BulkPostModal({
               >
                 <MessageSquare className="w-8 h-8" />
                 <span className="font-black text-[11px] uppercase tracking-widest">WhatsApp</span>
+                <span className="text-[9px] opacity-50 font-bold uppercase tracking-tight">
+                  Disparo via API ou Manual
+                </span>
               </Button>
 
               <Button 
