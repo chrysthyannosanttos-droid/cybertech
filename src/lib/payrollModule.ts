@@ -39,64 +39,58 @@ export async function generatePayslipBlob(employee: any, result: any, month: num
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   
-  // Design: Classic Premium (Grey Borders & Professional Typography)
-  const borderColor = [180, 180, 180];
-  const darkTextColor = [30, 41, 59];
-  const tableWidth = pageWidth - 42;
+  // Design: Padrão Contabilidade Raiz (Grades Pretas e Bordas Definidas)
+  doc.setLineWidth(0.3);
+  doc.setDrawColor(0);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "normal");
 
-  doc.setLineWidth(0.1);
-  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+  const tableWidth = pageWidth - 40; // Espaço para o canhoto vertical
 
   // --- 1. CANHOTO VERTICAL (DIREITA) ---
-  doc.rect(pageWidth - 22, 10, 12, 277);
-  doc.setFontSize(6.5);
-  doc.setTextColor(100);
+  doc.rect(pageWidth - 25, 10, 15, 277);
+  doc.setFontSize(7);
   doc.text("DECLARO TER RECEBIDO A IMPORTÂNCIA LÍQUIDA DISCRIMINADA NESTE RECIBO.", pageWidth - 16, 20, { angle: 270 });
-  
-  doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
-  doc.line(pageWidth - 17, 260, pageWidth - 17, 140);
-  doc.text("ASSINATURA DO FUNCIONÁRIO", pageWidth - 19, 160, { angle: 270 });
-  doc.text("DATA: ____/____/________", pageWidth - 19, 275, { angle: 270 });
+  doc.line(pageWidth - 18, 260, pageWidth - 18, 140); // Linha de assinatura
+  doc.setFont("helvetica", "bold");
+  doc.text("ASSINATURA DO FUNCIONÁRIO", pageWidth - 20, 160, { angle: 270 });
+  doc.setFont("helvetica", "normal");
+  doc.text("____/____/________", pageWidth - 18, 275, { angle: 270 });
+  doc.text("DATA", pageWidth - 21, 280, { angle: 270 });
 
   // --- 2. CABEÇALHO EMPREGADOR ---
-  doc.setTextColor(darkTextColor[0], darkTextColor[1], darkTextColor[2]);
-  doc.rect(10, 10, tableWidth, 24);
-  
-  doc.setFontSize(6);
-  doc.setFont("helvetica", "bold");
-  doc.text("EMPREGADOR", 12, 13);
-  
-  doc.setFontSize(11);
-  doc.text(employee.storeName?.toUpperCase() || 'CYBERTECH SOLUCOES RH', 15, 19);
-  
-  doc.setFont("helvetica", "normal");
+  doc.rect(10, 10, tableWidth, 25);
   doc.setFontSize(7);
-  doc.text("CNPJ: 00.000.000/0000-00", 15, 24);
-  doc.text("ENDEREÇO OPERACIONAL COMPLETO DA UNIDADE", 15, 28);
-
+  doc.text("EMPREGADOR", 12, 14);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
+  doc.text(employee.storeName?.toUpperCase() || 'EMPRESA CLIENTE LTDA', 15, 20);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(`Endereço: RUA EXEMPLO, 123 - CENTRO`, 15, 26);
+  doc.text(`CNPJ: 00.000.000/0000-00`, 15, 31);
+
   doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
   doc.text("Recibo de Pagamento de Salário", tableWidth - 5, 18, { align: 'right' });
   doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Referente ao Mês/Ano: ${month.toString().padStart(2, '0')}/${year}`, tableWidth - 5, 26, { align: 'right' });
+  doc.text(`Referente ao Mês / Ano: ${month}/${year}`, tableWidth - 5, 25, { align: 'right' });
 
   // --- 3. DADOS DO FUNCIONÁRIO ---
-  doc.rect(10, 34, tableWidth, 14);
-  doc.setFontSize(6);
-  doc.setFont("helvetica", "bold");
-  doc.text("CÓDIGO", 12, 38);
-  doc.text("NOME DO FUNCIONÁRIO", 32, 38);
-  doc.text("CBO", 125, 38);
-  doc.text("FUNÇÃO", 145, 38);
+  doc.rect(10, 35, tableWidth, 15);
+  doc.setFontSize(7);
+  doc.text("CÓDIGO", 12, 39);
+  doc.text("NOME DO FUNCIONÁRIO", 35, 39);
+  doc.text("CBO", 125, 39);
+  doc.text("FUNÇÃO", 145, 39);
 
   doc.setFontSize(9);
-  doc.text(employee.id.substring(0, 6).toUpperCase(), 12, 44);
-  doc.text(employee.name.toUpperCase(), 32, 44);
-  doc.text(employee.cbo || '0000-00', 125, 44);
-  doc.text(employee.role?.toUpperCase() || 'COLABORADOR', 145, 44);
+  doc.setFont("helvetica", "bold");
+  doc.text(employee.id.substring(0, 6).toUpperCase(), 12, 46);
+  doc.text(employee.name.toUpperCase(), 35, 46);
+  doc.text(employee.cbo || '0000-00', 125, 46);
+  doc.text(employee.role?.toUpperCase() || 'VENDEDOR(A)', 145, 46);
 
   // --- 4. TABELA DE VERBAS ---
   const bodyData = result.items.map((item: any) => [
@@ -108,97 +102,94 @@ export async function generatePayslipBlob(employee: any, result: any, month: num
   ]);
 
   autoTable(doc, {
-    startY: 48,
-    head: [['Cód.', 'Descrição das Verbas', 'Referência', 'Proventos', 'Descontos']],
+    startY: 50,
+    head: [['Cód.', 'Descrição', 'Referência', 'Proventos', 'Descontos']],
     body: bodyData,
-    theme: 'plain',
+    theme: 'grid',
     headStyles: { 
-      fontSize: 7.5, 
+      fontSize: 8, 
       fontStyle: 'bold', 
-      textColor: darkTextColor, 
-      lineWidth: 0.1, 
-      lineColor: borderColor, 
-      fillColor: [248, 250, 252],
+      textColor: 0, 
+      lineWidth: 0.2, 
+      lineColor: 0, 
+      fillColor: [255, 255, 255],
       halign: 'center'
     },
     styles: { 
       fontSize: 8, 
-      cellPadding: 2.5, 
-      textColor: [50, 50, 50], 
+      cellPadding: 2, 
+      textColor: 0, 
       font: 'helvetica',
-      lineWidth: 0.1,
-      lineColor: borderColor
+      lineWidth: 0.2,
+      lineColor: 0
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 12 },
+      0: { halign: 'center', cellWidth: 15 },
       1: { halign: 'left' },
       2: { halign: 'center', cellWidth: 25 },
-      3: { halign: 'right', cellWidth: 32 },
-      4: { halign: 'right', cellWidth: 32 }
+      3: { halign: 'right', cellWidth: 30 },
+      4: { halign: 'right', cellWidth: 30 }
     },
-    margin: { left: 10, right: 32 },
+    margin: { left: 10, right: 30 },
     tableWidth: tableWidth
   });
 
   const finalY = (doc as any).lastAutoTable.finalY || 150;
-  const footerStart = 250;
+  const footerStart = 255;
 
-  // Linhas verticais de fechamento
-  doc.line(10, finalY, 10, footerStart);
-  doc.line(22, finalY, 22, footerStart);
-  doc.line(tableWidth - 89, finalY, tableWidth - 89, footerStart);
-  doc.line(tableWidth - 64, finalY, tableWidth - 64, footerStart);
-  doc.line(tableWidth - 32, finalY, tableWidth - 32, footerStart);
-  doc.line(tableWidth + 10, finalY, tableWidth + 10, footerStart);
+  // Linhas verticais para fechar a grade até o rodapé
+  doc.rect(10, finalY, tableWidth, footerStart - finalY);
+  doc.line(25, finalY, 25, footerStart); // Coluna Cód
+  doc.line(tableWidth - 85, finalY, tableWidth - 85, footerStart); // Coluna Ref
+  doc.line(tableWidth - 60, finalY, tableWidth - 60, footerStart); // Coluna Prov
+  doc.line(tableWidth - 30, finalY, tableWidth - 30, footerStart); // Coluna Desc
 
-  // --- 5. TOTAIS E LÍQUIDO ---
-  doc.rect(10, footerStart, tableWidth, 18);
-  doc.line(tableWidth - 64, footerStart, tableWidth - 64, footerStart + 18);
-  doc.line(tableWidth - 32, footerStart, tableWidth - 32, footerStart + 18);
+  // --- 5. TOTAIS E MENSAGENS ---
+  doc.rect(10, footerStart, tableWidth, 15);
+  doc.line(tableWidth - 60, footerStart, tableWidth - 60, footerStart + 15);
+  doc.line(tableWidth - 30, footerStart, tableWidth - 30, footerStart + 15);
   
-  doc.setFontSize(6);
-  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
   doc.text("MENSAGENS", 12, footerStart + 4);
-  doc.text("TOTAL VENCIMENTOS", tableWidth - 62, footerStart + 6);
-  doc.text("TOTAL DESCONTOS", tableWidth - 30, footerStart + 6);
+  doc.text("Total dos Vencimentos", tableWidth - 58, footerStart + 5);
+  doc.text("Total dos Descontos", tableWidth - 28, footerStart + 5);
 
   const totalProv = result.items.filter(i => i.type === 'EARNING').reduce((a, b) => a + b.amount, 0);
   const totalDesc = result.items.filter(i => i.type === 'DEDUCTION').reduce((a, b) => a + b.amount, 0);
 
   doc.setFontSize(9);
-  doc.text(totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tableWidth - 35, footerStart + 13, { align: 'right' });
-  doc.text(totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tableWidth + 7, footerStart + 13, { align: 'right' });
+  doc.setFont("helvetica", "bold");
+  doc.text(totalProv.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tableWidth - 32, footerStart + 12, { align: 'right' });
+  doc.text(totalDesc.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tableWidth + 8, footerStart + 12, { align: 'right' });
 
-  // Bloco Valor Líquido
-  doc.setFillColor(248, 250, 252);
-  doc.rect(tableWidth - 64, footerStart + 18, 74, 14, 'FD');
+  // Bloco Líquido
+  doc.rect(tableWidth - 60, footerStart + 15, 70, 12);
   doc.setFontSize(8);
-  doc.text("LÍQUIDO A RECEBER ->", tableWidth - 61, footerStart + 27);
-  doc.setFontSize(12);
-  doc.text(`R$ ${result.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, tableWidth + 7, footerStart + 28, { align: 'right' });
+  doc.text("Líquido a Receber ->", tableWidth - 58, footerStart + 23);
+  doc.setFontSize(11);
+  doc.text(result.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tableWidth + 8, footerStart + 24, { align: 'right' });
 
-  // --- 6. BASES DE CÁLCULO (RODAPÉ) ---
-  const baseLineY = 278;
+  // --- 6. BASES (RODAPÉ) ---
+  const baseLineY = 282;
   doc.line(10, baseLineY, tableWidth + 10, baseLineY);
   const colW = tableWidth / 6;
-  const labels = ["Salário Base", "Base Calc. INSS", "Base Calc. FGTS", "FGTS do Mês", "Base Calc. IRRF", "Faixa IRRF"];
+  const labels = ["Salário Base", "Base Cálc. INSS", "Base Cálc. FGTS", "FGTS do Mês", "Base Cálc. IRRF", "Faixa IRRF"];
   const vals = [result.baseSalary, result.grossSalary, result.grossSalary, result.fgts, result.grossSalary - (result.inss || 0), "0"];
 
   labels.forEach((l, i) => {
     doc.setFontSize(6);
-    doc.setFont("helvetica", "bold");
-    doc.text(l.toUpperCase(), 12 + (i * colW), baseLineY + 5);
-    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
+    doc.text(l.toUpperCase(), 12 + (i * colW), baseLineY + 4);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
     const v = typeof vals[i] === 'number' ? vals[i].toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : vals[i];
-    doc.text(v, 12 + (i * colW), baseLineY + 12);
-    if (i > 0) doc.line(10 + (i * colW), baseLineY, 10 + (i * colW), baseLineY + 16);
+    doc.text(v, 12 + (i * colW), baseLineY + 11);
+    if (i > 0) doc.line(10 + (i * colW), baseLineY, 10 + (i * colW), baseLineY + 15);
   });
 
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
   doc.text("1ª VIA - EMPREGADOR", 10, 290);
-  doc.text("CyberTech RH Hub - Excelência em Gestão", pageWidth - 32, 290, { align: 'right' });
 
   return doc.output('blob');
 }
