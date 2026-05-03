@@ -39,129 +39,137 @@ export async function generatePayslipBlob(employee: any, result: any, month: num
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 12;
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   
-  // Cores Modernas (Fintech Style)
-  const primaryColor = [37, 99, 235]; // Azul Principal
-  const secondaryColor = [100, 116, 139]; // Cinza Slate
-  const textColor = [15, 23, 42]; // Preto Slate
+  // Estilo Executivo (Preto e Branco / Linhas Finas)
+  doc.setLineWidth(0.1);
+  doc.setDrawColor(0);
+  doc.setTextColor(0);
   
-  // --- HEADER (MODERNO) ---
-  doc.setFillColor(15, 23, 42); // Fundo Escuro para Header
-  doc.rect(0, 0, pageWidth, 45, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
+  // --- HEADER (DADOS DA EMPRESA) ---
   doc.setFont("helvetica", "bold");
-  doc.text(employee.storeName?.toUpperCase() || 'CYBERTECH RH SOLUTIONS', margin, 20);
+  doc.setFontSize(12);
+  doc.text(employee.storeName?.toUpperCase() || 'EMPRESA EXECUTIVA LTDA', margin, margin + 5);
   
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text("RECIBO DE PAGAMENTO DE SALÁRIO", margin, 28);
-  
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text(`${monthNames[month - 1].toUpperCase()} / ${year}`, pageWidth - margin, 25, { align: 'right' });
+  doc.text("CNPJ: 00.000.000/0000-00", margin, margin + 10);
+  doc.text("ENDEREÇO DA UNIDADE OPERACIONAL", margin, margin + 14);
 
-  // --- EMPLOYEE CARD ---
-  const cardY = 55;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(margin, cardY, pageWidth - (margin * 2), 22, 3, 3, 'F');
-  
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("RECIBO DE PAGAMENTO DE SALÁRIO", pageWidth - margin, margin + 5, { align: 'right' });
+  doc.setFont("helvetica", "normal");
+  doc.text(`REFERÊNCIA: ${monthNames[month - 1].toUpperCase()} / ${year}`, pageWidth - margin, margin + 10, { align: 'right' });
+
+  doc.line(margin, margin + 18, pageWidth - margin, margin + 18);
+
+  // --- DADOS DO FUNCIONÁRIO ---
+  const dataY = margin + 25;
   doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.text("COLABORADOR", margin + 5, cardY + 7);
-  doc.text("FUNÇÃO / CBO", margin + 100, cardY + 7);
-  
-  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.setFontSize(10);
-  doc.text(employee.name.toUpperCase(), margin + 5, cardY + 15);
-  doc.text(`${employee.role?.toUpperCase() || 'COLABORADOR'} / ${employee.cbo || '0000-00'}`, margin + 100, cardY + 15);
+  doc.text("CÓDIGO", margin, dataY);
+  doc.text("NOME DO FUNCIONÁRIO", margin + 20, dataY);
+  doc.text("CBO", margin + 120, dataY);
+  doc.text("CARGO / FUNÇÃO", margin + 140, dataY);
 
-  // --- ITEMS TABLE ---
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text(employee.id.substring(0, 8).toUpperCase(), margin, dataY + 5);
+  doc.text(employee.name.toUpperCase(), margin + 20, dataY + 5);
+  doc.text(employee.cbo || '0000-00', margin + 120, dataY + 5);
+  doc.text(employee.role?.toUpperCase() || 'COLABORADOR', margin + 140, dataY + 5);
+
+  doc.line(margin, dataY + 8, pageWidth - margin, dataY + 8);
+
+  // --- TABELA DE VENCIMENTOS E DESCONTOS ---
   const bodyData = result.items.map((item: any) => [
     item.code.toString().padStart(3, '0'),
     item.description.toUpperCase(),
     item.reference || '-',
-    item.type === 'EARNING' ? `R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '',
-    item.type === 'DEDUCTION' ? `R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''
+    item.type === 'EARNING' ? item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
+    item.type === 'DEDUCTION' ? item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''
   ]);
 
   autoTable(doc, {
-    startY: cardY + 30,
-    head: [['CÓD', 'DESCRIÇÃO', 'REFERÊNCIA', 'VENCIMENTOS', 'DESCONTOS']],
+    startY: dataY + 12,
+    head: [['Cód.', 'Descrição das Verbas', 'Ref.', 'Vencimentos', 'Descontos']],
     body: bodyData,
     theme: 'plain',
     headStyles: { 
-      fillColor: [241, 245, 249], 
-      textColor: [71, 85, 105], 
-      fontSize: 7, 
-      fontStyle: 'bold',
-      cellPadding: 4 
+      fontStyle: 'bold', 
+      fontSize: 8, 
+      textColor: 0,
+      lineWidth: 0.1,
+      lineColor: 0,
+      fillColor: [255, 255, 255]
     },
     styles: { 
       fontSize: 8, 
-      cellPadding: 4, 
-      textColor: [30, 41, 59],
+      cellPadding: 2, 
+      textColor: 0,
       font: 'helvetica' 
     },
     columnStyles: {
+      0: { halign: 'center' },
+      2: { halign: 'center' },
       3: { halign: 'right', fontStyle: 'bold' },
-      4: { halign: 'right', fontStyle: 'bold', textColor: [220, 38, 38] }
+      4: { halign: 'right', fontStyle: 'bold' }
+    },
+    didDrawCell: (data) => {
+      // Linhas verticais discretas entre colunas
+      if (data.section === 'body') {
+        doc.line(data.cell.x, data.cell.y, data.cell.x, data.cell.y + data.cell.height);
+        doc.line(data.cell.x + data.cell.width, data.cell.y, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+      }
     }
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const finalY = (doc as any).lastAutoTable.finalY + 5;
 
-  // --- NET SALARY CARD (DESTACADO) ---
-  const netWidth = 70;
-  doc.setFillColor(37, 99, 235);
-  doc.roundedRect(pageWidth - margin - netWidth, finalY, netWidth, 25, 3, 3, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(7);
+  // --- RESUMO DE TOTAIS ---
+  const totalEarning = result.items.filter(i => i.type === 'EARNING').reduce((a, b) => a + b.amount, 0);
+  const totalDeduction = result.items.filter(i => i.type === 'DEDUCTION').reduce((a, b) => a + b.amount, 0);
+
+  doc.line(margin, finalY, pageWidth - margin, finalY);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.text("VALOR LÍQUIDO A RECEBER", pageWidth - margin - netWidth + 5, finalY + 8);
+  doc.text("TOTAL VENCIMENTOS", pageWidth - 80, finalY + 5);
+  doc.text("TOTAL DESCONTOS", pageWidth - 45, finalY + 5);
   
-  doc.setFontSize(14);
-  doc.text(`R$ ${result.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, finalY + 18, { align: 'right' });
+  doc.setFont("helvetica", "normal");
+  doc.text(totalEarning.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), pageWidth - 55, finalY + 10, { align: 'right' });
+  doc.text(totalDeduction.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), pageWidth - margin, finalY + 10, { align: 'right' });
 
-  // --- BASES (RODAPÉ TÉCNICO) ---
-  const footerY = pageHeight - 60;
-  doc.setDrawColor(226, 232, 240);
+  // --- VALOR LÍQUIDO ---
+  doc.rect(pageWidth - 85, finalY + 15, 85 - margin, 12);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("VALOR LÍQUIDO A RECEBER: ", pageWidth - 82, finalY + 23);
+  doc.text(`R$ ${result.netSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 2, finalY + 23, { align: 'right' });
+
+  // --- BASES DE CÁLCULO ---
+  const footerY = pageHeight - 50;
   doc.line(margin, footerY, pageWidth - margin, footerY);
-  
-  const colWidth = (pageWidth - (margin * 2)) / 5;
-  const bases = [
-    { label: 'SALÁRIO BASE', val: result.baseSalary },
-    { label: 'BASE INSS', val: result.grossSalary },
-    { label: 'BASE FGTS', val: result.grossSalary },
-    { label: 'FGTS MÊS', val: result.fgts },
-    { label: 'BASE IRRF', val: result.grossSalary - (result.inss || 0) }
-  ];
+  const colW = (pageWidth - (margin * 2)) / 5;
+  const labels = ["Salário Base", "Base INSS", "Base FGTS", "FGTS Mês", "Base IRRF"];
+  const values = [result.baseSalary, result.grossSalary, result.grossSalary, result.fgts, result.grossSalary - (result.inss || 0)];
 
-  bases.forEach((b, i) => {
-    doc.setFontSize(6);
-    doc.setTextColor(100, 116, 139);
-    doc.text(b.label, margin + (i * colWidth), footerY + 10);
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
+  labels.forEach((label, i) => {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(label, margin + (i * colW), footerY + 5);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text(`R$ ${b.val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, margin + (i * colWidth), footerY + 18);
+    doc.text(`R$ ${values[i].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, margin + (i * colW), footerY + 10);
   });
 
-  // --- SIGNATURE AREA ---
+  // --- ASSINATURA ---
+  doc.line(margin, pageHeight - 20, margin + 100, pageHeight - 20);
   doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
   doc.setFont("helvetica", "normal");
-  doc.text("DECLARO TER RECEBIDO A IMPORTÂNCIA LÍQUIDA DISCRIMINADA NESTE RECIBO.", margin, pageHeight - 30);
-  
-  doc.setDrawColor(37, 99, 235);
-  doc.line(margin, pageHeight - 20, margin + 80, pageHeight - 20);
-  doc.text("ASSINATURA DO COLABORADOR", margin, pageHeight - 15);
-  doc.text(`DATA: ____/____/________`, pageWidth - margin, pageHeight - 15, { align: 'right' });
+  doc.text("ASSINATURA DO FUNCIONÁRIO", margin, pageHeight - 16);
+  doc.text(new Date().toLocaleDateString('pt-BR'), pageWidth - margin, pageHeight - 16, { align: 'right' });
 
   return doc.output('blob');
 }
