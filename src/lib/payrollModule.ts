@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PayrollResult } from './cltEngine';
 import { Employee } from '@/types';
