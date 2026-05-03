@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { generateServerComparisonPDF } from '@/services/ServerComparisonService';
+import { generateClientGuidePDF } from '@/services/ClientGuideService';
 
 interface ModuleOption {
   id: string;
@@ -703,6 +704,10 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
                     </table>
                  </div>
                   <div className="flex flex-wrap justify-center gap-4 pt-10 no-print">
+                    <Button variant="outline" className="h-14 px-8 rounded-2xl gap-3 font-black text-primary border-primary/20 bg-primary/5" onClick={() => generateClientGuidePDF(clientName || 'Cliente')}>
+                      <Rocket className="w-5 h-5" /> 
+                      Guia do Sistema
+                    </Button>
                     <Button variant="outline" className="h-14 px-8 rounded-2xl gap-3 font-black text-slate-600" onClick={() => generateServerComparisonPDF(clientName || 'Cliente')}>
                       <Server className="w-5 h-5 text-primary" /> 
                       Comparativo Técnico
