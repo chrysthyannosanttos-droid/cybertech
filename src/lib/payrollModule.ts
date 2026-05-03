@@ -265,15 +265,29 @@ async function triggerAutoCommunications(tenantId: string, employee: Employee, p
 
     const monthStr = month.toString().padStart(2, '0');
 
-    // 2. Disparo E-mail
+    // 2. Disparo E-mail (VIA EDGE FUNCTION REAL)
     if (emailSettings?.auto_send_payroll && employee.email) {
-      console.log(`[AUTO-EMAIL] Enviando para ${employee.email}...`);
-      // Aqui integraria com uma Edge Function ou serviço como Resend/SendGrid
-      // Por enquanto registramos o status de envio
-      await supabase.from('payrolls').update({ 
-        sent_email_at: new Date().toISOString(),
-        status: 'SENT' 
-      }).eq('employee_id', employee.id).eq('reference_month', month).eq('reference_year', year);
+      console.log(`[AUTO-EMAIL] Disparando para ${employee.email}...`);
+      
+      const { error: fError } = await supabase.functions.invoke('send-payroll-email', {
+        body: {
+          tenant_id: tenantId,
+          employee_email: employee.email,
+          employee_name: employee.name,
+          pdf_url: pdfUrl,
+          month: monthStr,
+          year: year.toString()
+        }
+      });
+
+      if (!fError) {
+        await supabase.from('payrolls').update({ 
+          sent_email_at: new Date().toISOString(),
+          status: 'SENT' 
+        }).eq('employee_id', employee.id).eq('reference_month', month).eq('reference_year', year);
+      } else {
+        console.error('Erro ao disparar e-mail via Edge Function:', fError);
+      }
     }
 
     // 3. Disparo WhatsApp (API REAL)

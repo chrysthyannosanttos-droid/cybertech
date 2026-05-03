@@ -105,9 +105,6 @@ export function BulkPostModal({
   };
 
   const processAllEmails = async () => {
-    // Busca configurações de e-mail para usar o remetente correto (simulação)
-    const { data: emailSettings } = await supabase.from('tenant_email_settings').select('*').limit(1).maybeSingle();
-    
     for (let i = 0; i < total; i++) {
         setCurrentIndex(i);
         const emp = selectedEmployees[i];
@@ -118,14 +115,27 @@ export function BulkPostModal({
         } else if (!result?.pdfUrl) {
             setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
         } else {
-            // Aqui integraria com o SMTP real via Edge Function
-            await new Promise(resolve => setTimeout(resolve, 600));
-            setLog(prev => [...prev, { name: emp.name, status: 'success', message: `E-mail disparado (${emailSettings?.from_email || 'padrão'})` }]);
-            
-            await supabase.from('payrolls').update({ 
-                status: 'SENT',
-                sent_email_at: new Date().toISOString() 
-            }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
+            // Chamada Real para a Edge Function
+            const { error: fError } = await supabase.functions.invoke('send-payroll-email', {
+                body: {
+                  tenant_id: emp.tenant_id || emp.tenantId,
+                  employee_email: emp.email,
+                  employee_name: emp.name,
+                  pdf_url: result.pdfUrl,
+                  month: referenceMonth.toString().padStart(2, '0'),
+                  year: referenceYear.toString()
+                }
+            });
+
+            if (!fError) {
+                setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail enviado' }]);
+                await supabase.from('payrolls').update({ 
+                    status: 'SENT',
+                    sent_email_at: new Date().toISOString() 
+                }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
+            } else {
+                setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Falha no disparo' }]);
+            }
         }
         setProgress(((i + 1) / total) * 100);
     }
