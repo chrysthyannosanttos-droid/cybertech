@@ -135,6 +135,223 @@ export default function Commercial() {
       const doc = new jsPDF();
       const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
       const actualCount = Math.max(1, Number(employeeCount) || 0);
+      const propNum = `CT-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
+      const validity = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR');
+
+      const addWatermark = () => {
+        if (logoBase64) {
+          doc.setGState(new (doc as any).GState({ opacity: 0.04 }));
+          doc.addImage(logoBase64, 'PNG', 35, 80, 140, 140);
+          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+        }
+      };
+
+      const addPageFooter = (pageLabel: string) => {
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`CyberTech RH © ${new Date().getFullYear()}  |  ${propNum}  |  Válida até: ${validity}  |  ${pageLabel}`, 105, 290, { align: 'center' });
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.line(15, 287, 195, 287);
+      };
+
+      // ── PÁG 1: CAPA ────────────────────────────────────────────────────
+      addWatermark();
+      // Faixa topo
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 60, 'F');
+      // Faixa accent
+      doc.setFillColor(0, 163, 255);
+      doc.rect(0, 60, 210, 3, 'F');
+
+      if (logoBase64) doc.addImage(logoBase64, 'PNG', 12, 10, 35, 35);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CYBERTECH RH', 55, 28);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 163, 255);
+      doc.text('INTELIGÊNCIA DIGITAL EM GESTÃO DE PESSOAL', 55, 37);
+      doc.setTextColor(180, 180, 180);
+      doc.setFontSize(7.5);
+      doc.text(`Nº ${propNum}   |   ${new Date().toLocaleDateString('pt-BR')}`, 55, 47);
+
+      // Bloco cliente
+      doc.setFillColor(248, 249, 251);
+      doc.roundedRect(15, 70, 180, 26, 3, 3, 'F');
+      doc.setDrawColor(0, 163, 255);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(15, 70, 180, 26, 3, 3, 'S');
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PROPOSTA PREPARADA PARA:', 22, 78);
+      doc.setTextColor(10, 15, 29);
+      doc.setFontSize(14);
+      doc.text(clientName.toUpperCase(), 22, 87);
+      if (clientCnpj) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text('CNPJ: ' + clientCnpj, 155, 87, { align: 'right' });
+      }
+
+      // Carta de apresentação
+      let y = 107;
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(10.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Prezado(a) responsável pela ${clientName},`, 15, y);
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      const carta = `Agradecemos a oportunidade de apresentar nossa proposta de modernização tecnológica para a gestão de pessoas da sua empresa. A CyberTech RH é uma plataforma desenvolvida para eliminar burocracias operacionais, garantir conformidade jurídica e entregar uma experiência digital de alto nível para os seus colaboradores.
+
+Nossa solução integra todos os processos de RH em um único ecossistema — do ponto eletrônico ao eSocial — reduzindo custos operacionais e aumentando a produtividade do departamento pessoal em até 70%.`;
+      const cartaLines = doc.splitTextToSize(carta, 180);
+      doc.text(cartaLines, 15, y);
+      y += (cartaLines.length * 5) + 10;
+
+      // Diferenciais
+      doc.setFillColor(10, 15, 29);
+      doc.roundedRect(15, y, 180, 8, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('POR QUE ESCOLHER A CYBERTECH RH?', 105, y + 5.5, { align: 'center' });
+      y += 12;
+
+      const diferenciais = [
+        ['✦ 100% em Nuvem ou Local', 'Escolha a infraestrutura que melhor se adapta ao seu negócio'],
+        ['✦ Conformidade Legal', 'eSocial, LGPD e CLT integrados nativamente na plataforma'],
+        ['✦ Ponto Biométrico Antifraude', 'Registro por reconhecimento facial e GPS em tempo real'],
+        ['✦ Suporte Especializado', 'Equipe de especialistas em RH e tecnologia à disposição'],
+      ];
+
+      (doc as any).autoTable({
+        startY: y,
+        body: diferenciais,
+        theme: 'plain',
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: {
+          0: { fontStyle: 'bold', textColor: [0, 100, 200], cellWidth: 65 },
+          1: { textColor: [80, 80, 80] },
+        },
+        didDrawPage: addWatermark,
+      });
+      y = (doc as any).lastAutoTable.finalY + 6;
+      addPageFooter('Página 1 de 3');
+
+      // ── PÁG 2: ESCOPO ─────────────────────────────────────────────────
+      doc.addPage();
+      addWatermark();
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 18, 'F');
+      doc.setFillColor(0, 163, 255);
+      doc.rect(0, 18, 210, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ESCOPO DA SOLUÇÃO CONTRATADA', 105, 12, { align: 'center' });
+
+      y = 28;
+      const moduleData = AVAILABLE_MODULES
+        .filter(m => selectedModules.includes(m.id))
+        .map(m => [
+          m.label,
+          m.category === 'CORE' ? 'Core' : m.category === 'ADVANCED' ? 'Avançado' : 'Add-on',
+          m.longDescription,
+        ]);
+
+      (doc as any).autoTable({
+        startY: y,
+        head: [['Módulo', 'Tipo', 'Descrição']],
+        body: moduleData,
+        theme: 'striped',
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 4 },
+        columnStyles: {
+          0: { cellWidth: 52, fontStyle: 'bold' },
+          1: { cellWidth: 22, halign: 'center', textColor: [0, 100, 200] },
+        },
+        didDrawPage: addWatermark,
+      });
+      addPageFooter('Página 2 de 3');
+
+      // ── PÁG 3: INVESTIMENTO ────────────────────────────────────────────
+      doc.addPage();
+      addWatermark();
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 18, 'F');
+      doc.setFillColor(0, 163, 255);
+      doc.rect(0, 18, 210, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESUMO DO INVESTIMENTO', 105, 12, { align: 'center' });
+
+      y = 28;
+      (doc as any).autoTable({
+        startY: y,
+        head: [['Componente de Custo', 'Servidor Nuvem (SaaS)', 'Servidor Físico (On-Premise)']],
+        body: [
+          ['Implementação e Setup Inicial', 'R$ ' + pricing.cloud.setup, 'R$ ' + pricing.local.setup],
+          ['Manutenção de Infraestrutura / mês', 'R$ ' + pricing.cloud.maintenance, 'R$ ' + pricing.local.maintenance],
+          ['Licenciamento por Colaborador / mês', 'R$ ' + pricing.cloud.perUser, 'R$ ' + pricing.local.perUser],
+          ['Volume de Colaboradores Contratados', `${actualCount} usuários`, `${actualCount} usuários`],
+          ['INVESTIMENTO MENSAL RECORRENTE', 'R$ ' + calculateMonthlyTotal('cloud').toLocaleString('pt-BR'), 'R$ ' + calculateMonthlyTotal('local').toLocaleString('pt-BR')],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 9, cellPadding: 5 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          1: { textColor: [0, 100, 200], fontStyle: 'bold', halign: 'right' },
+          2: { fontStyle: 'bold', halign: 'right' },
+        },
+        didDrawPage: addWatermark,
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 12;
+
+      // Nota de validade
+      doc.setFillColor(255, 248, 230);
+      doc.roundedRect(15, y, 180, 14, 3, 3, 'F');
+      doc.setTextColor(160, 100, 0);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('⚠  Esta proposta é válida até ' + validity + '. Após essa data os valores poderão ser revisados.', 105, y + 9, { align: 'center' });
+      y += 22;
+
+      // Próximos passos
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(10, 15, 29);
+      doc.text('Próximos Passos para Contratação:', 15, y);
+      y += 7;
+      const steps = ['1. Aprovação desta proposta pela CONTRATANTE', '2. Assinatura do Contrato de Licenciamento', '3. Pagamento da Taxa de Setup', '4. Kickoff de Implantação com a equipe CyberTech'];
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(70, 70, 70);
+      steps.forEach(s => { doc.text(s, 15, y); y += 6; });
+
+      addPageFooter('Página 3 de 3');
+
+      doc.save(`Proposta_CyberTech_${propNum}_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: '✅ Proposta Gerada!', description: 'PDF profissional em 3 páginas exportado.' });
+    } catch (error) {
+      toast({ title: 'Erro ao gerar PDF', variant: 'destructive' });
+    } finally { setIsGeneratingPdf(false); }
+  };
+
+  const handleGeneratePdf_UNUSED = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const doc = new jsPDF();
+      const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
+      const actualCount = Math.max(1, Number(employeeCount) || 0);
       const propNum = Math.floor(Math.random() * 9000) + 1000;
 
       const addWatermark = () => {
@@ -257,6 +474,204 @@ export default function Commercial() {
   };
 
   const handleGenerateContract = async (type: 'cloud' | 'local') => {
+    setIsGeneratingContract(true);
+    try {
+      const doc = new jsPDF();
+      const logoBase64 = await getBase64ImageFromUrl('/logo-cybertech.png');
+      const current = pricing[type];
+      const actualCount = Math.max(1, Number(employeeCount) || 0);
+      const totalMensal = calculateMonthlyTotal(type).toLocaleString('pt-BR');
+      const modality = type === 'cloud' ? 'SERVIDOR EM NUVEM (SaaS)' : 'SERVIDOR FÍSICO LOCAL (On-Premise)';
+      const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const contractNum = `CTRH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
+
+      const addContractWatermark = () => {
+        if (logoBase64) {
+          doc.setGState(new (doc as any).GState({ opacity: 0.03 }));
+          doc.addImage(logoBase64, 'PNG', 35, 80, 140, 140);
+          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+        }
+      };
+
+      const addContractFooter = (page: number, total: number) => {
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.setFont('helvetica', 'normal');
+        doc.line(15, 285, 195, 285);
+        doc.text(`${contractNum}  |  Página ${page} de ${total}  |  Documento gerado em ${new Date().toLocaleDateString('pt-BR')}`, 105, 290, { align: 'center' });
+      };
+
+      let y = 0;
+
+      // ── CABEÇALHO COM BARRA LATERAL AZUL ──────────────────────────────
+      addContractWatermark();
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 50, 'F');
+      doc.setFillColor(0, 163, 255);
+      doc.rect(0, 50, 210, 3, 'F');
+      if (logoBase64) doc.addImage(logoBase64, 'PNG', 12, 8, 32, 32);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CYBERTECH RH', 50, 22);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(180, 220, 255);
+      doc.text('Inteligência Digital em Gestão de Pessoal', 50, 30);
+      doc.setTextColor(0, 163, 255);
+      doc.setFontSize(7.5);
+      doc.text(contractNum, 50, 38);
+      doc.text(`Emitido em: ${today}`, 130, 38);
+
+      // Título centralizado
+      y = 62;
+      doc.setTextColor(10, 15, 29);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INSTRUMENTO PARTICULAR DE CONTRATO', 105, y, { align: 'center' });
+      y += 7;
+      doc.setFontSize(10);
+      doc.setTextColor(0, 100, 180);
+      doc.text(`LICENCIAMENTO DE SOFTWARE – MODALIDADE ${type === 'cloud' ? 'NUVEM' : 'LOCAL'}`, 105, y, { align: 'center' });
+      y += 5;
+      doc.setDrawColor(0, 163, 255);
+      doc.setLineWidth(0.8);
+      doc.line(15, y, 195, y);
+      y += 8;
+
+      // ── QUALIFICAÇÃO DAS PARTES ────────────────────────────────────────
+      const clauseTitle = (text: string) => {
+        doc.setFillColor(10, 15, 29);
+        doc.roundedRect(15, y, 180, 8, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(text, 20, y + 5.5);
+        y += 12;
+      };
+
+      const clauseBody = (text: string) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(50, 50, 50);
+        const lines = doc.splitTextToSize(text, 175);
+        doc.text(lines, 15, y);
+        y += (lines.length * 4.8) + 5;
+      };
+
+      clauseTitle('I – PARTES CONTRATANTES');
+      clauseBody(`CONTRATADA: CYBERTECH RH SOLUÇÕES EM TECNOLOGIA LTDA, pessoa jurídica de direito privado, CNPJ nº 00.000.000/0001-00, doravante denominada CONTRATADA.`);
+      clauseBody(`CONTRATANTE: ${clientName.toUpperCase()}, ${clientCnpj ? 'CNPJ nº ' + clientCnpj + ',' : ''} doravante denominada CONTRATANTE.`);
+
+      clauseTitle('II – OBJETO DO CONTRATO');
+      clauseBody(`O presente instrumento tem por objeto o licenciamento não exclusivo de uso do Software CyberTech RH (HR-HUB PLUS), plataforma de gestão de pessoas, na modalidade ${modality}. Módulos contratados: ${AVAILABLE_MODULES.filter(m => selectedModules.includes(m.id)).map(m => m.label).join(', ')}.`);
+
+      clauseTitle('III – PRAZO E VIGÊNCIA');
+      clauseBody(`O prazo de vigência deste contrato é de 12 (doze) meses contados da data de sua assinatura, renovando-se automaticamente por iguais períodos, salvo aviso prévio de rescisão com 30 (trinta) dias de antecedência.`);
+
+      clauseTitle('IV – VALOR E FORMA DE PAGAMENTO');
+      clauseBody(`A CONTRATANTE pagará à CONTRATADA: (a) Taxa de Implantação e Setup (valor único): R$ ${current.setup}; (b) Licença mensal por colaborador: R$ ${current.perUser} × ${actualCount} usuários; (c) Taxa de manutenção de infraestrutura: R$ ${current.maintenance}/mês. Total recorrente mensal: R$ ${totalMensal}. O vencimento será todo dia 10 do mês subsequente ao de competência.`);
+
+      addContractFooter(1, 2);
+
+      // ── PÁG 2 ─────────────────────────────────────────────────────────
+      doc.addPage();
+      addContractWatermark();
+      doc.setFillColor(10, 15, 29);
+      doc.rect(0, 0, 210, 12, 'F');
+      doc.setFillColor(0, 163, 255);
+      doc.rect(0, 12, 210, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`CONTRATO ${contractNum} – CONTINUAÇÃO`, 105, 8.5, { align: 'center' });
+      y = 22;
+
+      clauseTitle('V – OBRIGAÇÕES DA CONTRATADA (SLA)');
+      clauseBody(`A CONTRATADA garante: (a) Disponibilidade mínima de 99,5% ao mês; (b) Suporte técnico via canais digitais em horário comercial (seg-sex, 08h–18h); (c) Atualizações da plataforma sem custo adicional; (d) Backup diário dos dados da CONTRATANTE.`);
+
+      clauseTitle('VI – PROTEÇÃO DE DADOS PESSOAIS – LGPD');
+      clauseBody(`As partes comprometem-se a observar a Lei nº 13.709/2018 (LGPD). A CONTRATADA atuará como Operadora, processando dados pessoais somente conforme instruções da CONTRATANTE (Controladora). Dados serão tratados com confidencialidade e não compartilhados com terceiros sem autorização expressa.`);
+
+      clauseTitle('VII – PROPRIEDADE INTELECTUAL E CONFIDENCIALIDADE');
+      clauseBody(`O Software é de propriedade exclusiva da CONTRATADA. O presente contrato não implica cessão de direitos. A CONTRATANTE se compromete a não copiar, modificar, sublicenciar ou fazer engenharia reversa do Software, mantendo sigilo sobre informações confidenciais por 5 anos após o término contratual.`);
+
+      clauseTitle('VIII – RESCISÃO');
+      clauseBody(`Este contrato poderá ser rescindido: (a) Por mútuo acordo, mediante comunicação formal; (b) Por qualquer das partes, com aviso prévio de 30 dias; (c) Imediatamente por inadimplência superior a 30 dias ou violação grave das cláusulas contratuais.`);
+
+      clauseTitle('IX – DISPOSIÇÕES GERAIS');
+      clauseBody(`Este instrumento representa o acordo integral entre as partes, substituindo quaisquer entendimentos anteriores. Eventuais aditivos deverão ser formalizados por escrito. As partes elegem o foro da comarca da sede da CONTRATANTE para dirimir quaisquer litígios, com renúncia expressa a qualquer outro.`);
+
+      // Tabela financeira resumida
+      y += 4;
+      (doc as any).autoTable({
+        startY: y,
+        head: [['Resumo Financeiro', 'Valor']],
+        body: [
+          ['Setup Inicial (único)', 'R$ ' + current.setup],
+          ['Manutenção Mensal', 'R$ ' + current.maintenance],
+          [`Licenciamento (${actualCount} usuários × R$ ${current.perUser})`, 'R$ ' + (Number(current.perUser) * actualCount).toLocaleString('pt-BR')],
+          ['TOTAL MENSAL CONTRATADO', 'R$ ' + totalMensal],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [10, 15, 29], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 8.5, cellPadding: 4 },
+        columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right', textColor: [0, 100, 200], fontStyle: 'bold' } },
+      });
+      y = (doc as any).lastAutoTable.finalY + 14;
+
+      // Assinaturas
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(50, 50, 50);
+      doc.text(`Por estarem justas e acordadas, firmam o presente em 2 (duas) vias de igual teor e forma,`, 15, y);
+      y += 5;
+      doc.text(`na cidade de ________________________, em ${today}.`, 15, y);
+      y += 18;
+
+      doc.setDrawColor(100, 100, 100);
+      doc.setLineWidth(0.5);
+      doc.line(15, y, 92, y);
+      doc.line(118, y, 195, y);
+      y += 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('CYBERTECH RH (CONTRATADA)', 53, y, { align: 'center' });
+      doc.text(clientName.toUpperCase(), 156, y, { align: 'center' });
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(130, 130, 130);
+      doc.setFontSize(7.5);
+      doc.text('Representante Legal', 53, y, { align: 'center' });
+      doc.text('Representante Legal / CONTRATANTE', 156, y, { align: 'center' });
+      y += 14;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 30, 30);
+      doc.text('TESTEMUNHAS:', 15, y);
+      y += 6;
+      doc.line(15, y, 90, y);
+      doc.line(115, y, 195, y);
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(130, 130, 130);
+      doc.text('Nome / CPF', 52, y, { align: 'center' });
+      doc.text('Nome / CPF', 155, y, { align: 'center' });
+
+      addContractFooter(2, 2);
+
+      doc.save(`Contrato_CyberTech_${contractNum}_${clientName.replace(/\s/g, '_')}.pdf`);
+      toast({ title: '✅ Contrato Jurídico Gerado!', description: `Documento oficial em 2 páginas exportado.` });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Erro ao gerar Contrato', variant: 'destructive' });
+    } finally { setIsGeneratingContract(false); }
+  };
+
+  const handleGenerateContract_UNUSED = async (type: 'cloud' | 'local') => {
     setIsGeneratingContract(true);
     try {
       const doc = new jsPDF();
