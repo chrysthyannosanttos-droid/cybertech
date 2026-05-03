@@ -609,19 +609,35 @@ export default function Tenants() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-8 gap-1.5 font-bold text-[11px] uppercase tracking-widest ${
-                selectedTenant.subscription.status === 'active'
-                  ? 'border-rose-500/20 text-rose-400 hover:bg-rose-500/10'
-                  : 'border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10'
-              }`}
-              onClick={() => toggleStatus(selectedTenant.id)}
-            >
-              <PowerOff className="w-3.5 h-3.5" />
-              {selectedTenant.subscription.status === 'active' ? 'Suspender Empresa' : 'Ativar Empresa'}
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-amber-500/20 text-amber-500 hover:bg-amber-500/10 font-bold text-[11px] uppercase tracking-widest"
+                onClick={async () => {
+                  const newExpiry = new Date();
+                  newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+                  const expiryStr = newExpiry.toISOString().split('T')[0];
+                  
+                  const { error } = await supabase
+                    .from('tenants')
+                    .update({
+                      subscription: { ...selectedTenant.subscription, status: 'active', expiryDate: expiryStr }
+                    })
+                    .eq('id', selectedTenant.id);
+
+                  if (error) {
+                    toast({ title: 'Erro ao renovar', description: error.message, variant: 'destructive' });
+                  } else {
+                    toast({ title: 'Licença Renovada!', description: `Nova validade: ${new Date(expiryStr).toLocaleDateString('pt-BR')}` });
+                    fetchData();
+                  }
+                }}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Renovar Licença (1 Ano)
+              </Button>
+            )}
             
             {isAdmin && (
               <Button
@@ -1267,20 +1283,20 @@ export default function Tenants() {
                 <td className="px-6 py-4 font-mono-data text-[13px] text-muted-foreground group-hover:text-white transition-colors">{t.cnpj}</td>
                 <td className="px-6 py-4">
                   <div className="flex justify-center">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${
-                      t.subscription.status === 'active' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
-                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.1)]'
-                    }`}>
-                      {t.subscription.status === 'active' ? 'Ativo' : 'Suspenso'}
-                    </span>
+                    <StatusBadge status={t.subscription.status} />
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right font-mono-data text-[13px] font-bold text-white">R$ {t.subscription.monthlyFee.toLocaleString('pt-BR')}</td>
                 <td className="px-6 py-4 text-right">
                    <div className="flex flex-col items-end">
-                    <span className="text-[13px] font-bold text-white">{new Date(t.subscription.expiryDate).toLocaleDateString('pt-BR')}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">Vencimento</span>
+                    <span className="text-[13px] font-bold text-white">{new Date(t.subscription.expiryDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                    {(() => {
+                      const diff = new Date(t.subscription.expiryDate).getTime() - Date.now();
+                      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                      if (days <= 0) return <span className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">Vencido</span>;
+                      if (days <= 7) return <span className="text-[9px] text-amber-500 font-black uppercase tracking-tighter">Vence em {days} dias</span>;
+                      return <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">{days} dias restantes</span>;
+                    })()}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right">

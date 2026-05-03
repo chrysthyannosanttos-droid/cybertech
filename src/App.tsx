@@ -4,6 +4,8 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { useLicenseGuard } from "@/hooks/useLicenseGuard";
+import { LicenseBlockScreen } from "@/components/LicenseBlockScreen";
 import { BrandingStyles } from "@/components/BrandingStyles";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import Login from "@/pages/Login";
@@ -37,7 +39,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const isSuperadmin = user?.role === 'superadmin' || user?.email === 'cristiano';
+  
+  // ── CAMADA 2: Monitoramento de Licença em Tempo Real ──
+  const license = useLicenseGuard(user?.tenantId, isSuperadmin);
+
+  // Se a licença estiver bloqueada (suspensa ou offline expirado), mostramos a tela de bloqueio
+  const isBlocked = license.status === 'suspended' || license.status === 'offline_blocked';
+
+  if (isAuthenticated && isBlocked) {
+    return <LicenseBlockScreen licenseInfo={license} />;
+  }
 
   return (
     <Routes>

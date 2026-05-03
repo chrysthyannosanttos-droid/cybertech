@@ -13,9 +13,13 @@ export interface ManagedUser {
   user: User;
 }
 
+export type LoginResult = 
+  | { success: true; mustChangePassword: boolean }
+  | { success: false; reason: 'invalid_credentials' | 'suspended' | 'past_due' | 'error'; message?: string };
+
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   mustChangePassword: boolean;
@@ -134,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     try {
       // 1. Tentar buscar do banco de dados (Sincronizado)
       const { data: profile, error } = await supabase
@@ -147,11 +151,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profile) {
         let branding = undefined;
         let plan = 'BASIC';
+        let tenantSubscription: any = null;
+
         if (profile.tenant_id) {
-          const { data: tData } = await supabase.from('tenants').select('branding, plan').eq('id', profile.tenant_id).maybeSingle();
+          const { data: tData } = await supabase
+            .from('tenants')
+            .select('branding, plan, subscription, name')
+            .eq('id', profile.tenant_id)
+            .maybeSingle();
+
           if (tData) {
             plan = tData.plan || 'BASIC';
             branding = plan === 'ENTERPRISE' ? tData.branding : undefined;
+            tenantSubscription = tData.subscription;
+
+            // ── CAMADA 1: Verificação de Licença no Login ──
+            // Superadmin nunca é bloqueado
+            const isSuperadmin = profile.role === 'superadmin' || email === 'cristiano';
+            if (!isSuperadmin && tenantSubscription) {
+              const subStatus = tenantSubscription.status;
+              if (subStatus === 'suspended') {
+                return {
+                  success: false,
+                  reason: 'suspended',
+                  message: `O acesso da empresa "${tData.name}" está suspenso. Entre em contato com a CyberTech para regularizar.`
+                };
+              }
+              // past_due: permite login mas registra o estado
+              if (subStatus === 'past_due') {
+                localStorage.setItem('cybertech_license_warning', JSON.stringify({
+                  reason: 'past_due',
+                  tenantName: tData.name,
+                  expiryDate: tenantSubscription.expiryDate,
+                  monthlyFee: tenantSubscription.monthlyFee
+                }));
+              } else {
+                localStorage.removeItem('cybertech_license_warning');
+              }
+            }
           }
         }
 
@@ -182,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         sessionStorage.setItem('app_permissions', JSON.stringify(profile.app_permissions || { 'ponto': true }));
         
-        return true;
+        return { success: true, mustChangePassword: !!profile.must_change_password };
       }
 
       // 2. Fallback para localStorage (Legado)
@@ -198,12 +235,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentPermissions(perms);
         sessionStorage.setItem('user_permissions', JSON.stringify(perms ?? null));
         sessionStorage.setItem('app_permissions', JSON.stringify(found.appPermissions || { 'ponto': true }));
-        return true;
+        return { success: true, mustChangePassword: !!(found.mustChangePassword) };
       }
     } catch (err) {
       console.error('Erro no login:', err);
+      return { success: false, reason: 'error', message: 'Erro interno ao autenticar. Tente novamente.' };
     }
-    return false;
+    return { success: false, reason: 'invalid_credentials' };
   }, []);
 
   const logout = useCallback(async () => {

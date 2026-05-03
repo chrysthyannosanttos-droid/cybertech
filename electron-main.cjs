@@ -13,14 +13,24 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'), // Caso precise de preload no futuro
     },
-    backgroundColor: '#0a0f1d',
+    backgroundColor: '#0a0f1d', // Cor escura para combinar com a tela de bloqueio
+    show: false, // Inicia oculto para evitar flash branco
   });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.maximize();
+  });
+
+  // Flag para o React saber que está no Electron
+  mainWindow.webContents.executeJavaScript('window.isElectron = true;');
 
   // Em desenvolvimento, carrega o localhost. Em produção, carrega o index.html da pasta dist.
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
     mainWindow.setMenuBarVisibility(false);
