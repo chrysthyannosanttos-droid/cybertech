@@ -68,3 +68,18 @@ export function parseExcelDate(val: any) {
   }
   return null;
 }
+
+export function downloadPdf(doc: any, filename: string) {
+  const blob = doc.output('blob');
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
