@@ -703,6 +703,8 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
                        </tbody>
                     </table>
                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-10 no-print max-w-4xl mx-auto">
+                    <Button variant="outline" className="h-14 px-6 rounded-2xl gap-3 font-black text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all" onClick={() => generateClientGuidePDF(clientName || 'Cliente')}>
                       <Rocket className="w-5 h-5" /> 
                       Guia do Sistema
                     </Button>
