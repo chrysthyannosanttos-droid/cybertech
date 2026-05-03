@@ -205,6 +205,19 @@ export default function CommunicationSettings() {
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Nome do Remetente (Ex: RH Empresa)</Label>
+                      <Input value={emailSettings.from_name} onChange={e => setEmailSettings({...emailSettings, from_name: e.target.value})} className="h-11 bg-white/5 border-white/10 rounded-xl font-bold text-primary" placeholder="RH Digital" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">E-mail do Remetente</Label>
+                      <Input value={emailSettings.from_email} onChange={e => setEmailSettings({...emailSettings, from_email: e.target.value})} className="h-11 bg-white/5 border-white/10 rounded-xl" placeholder="rh@empresa.com" />
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-white/5 my-2" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
                       <Label className="text-[11px] font-bold uppercase text-muted-foreground">Host SMTP</Label>
                       <Input value={emailSettings.smtp_host} onChange={e => setEmailSettings({...emailSettings, smtp_host: e.target.value})} className="h-11 bg-white/5 border-white/10 rounded-xl" />
                     </div>
