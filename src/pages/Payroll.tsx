@@ -64,6 +64,7 @@ export default function Payroll() {
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [bulkPostOpen, setBulkPostOpen] = useState(false);
   const [existingPayrolls, setExistingPayrolls] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -149,6 +150,7 @@ export default function Payroll() {
   const payroll: PayrollEntry[] = useMemo(() => {
     return dbEmployees
       .filter(emp => storeFilter === 'all' || emp.storeId === storeFilter)
+      .filter(emp => emp.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .map(emp => {
         const empCerts = dbCertificates.filter(c => c.employeeId === emp.id);
         const certDays = empCerts.reduce((s, c) => s + c.days, 0);
@@ -518,6 +520,20 @@ export default function Payroll() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
+              <Loader2 className={cn("w-4 h-4 animate-spin", !isLoading && "hidden")} />
+              {!isLoading && <PlayCircle className="w-4 h-4" />}
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar colaborador..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-10 pl-10 pr-4 bg-white/5 border border-white/10 rounded-xl text-[12px] font-medium text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 w-full md:w-[250px] transition-all"
+            />
           </div>
 
           <Select value={storeFilter} onValueChange={setStoreFilter}>
