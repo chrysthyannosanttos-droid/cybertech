@@ -42,7 +42,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn, downloadPdf } from "@/lib/utils";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { generateServerComparisonPDF } from '@/services/ServerComparisonService';
@@ -341,7 +341,7 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
 
       addPageFooter('Página 3 de 3');
 
-      doc.save(`Proposta_CyberTech_${propNum}_${clientName.replace(/\s/g, '_')}.pdf`);
+      downloadPdf(doc, `Proposta_CyberTech_${propNum}_${clientName.replace(/\s/g, '_')}.pdf`);
       toast({ title: '✅ Proposta Gerada!', description: 'PDF profissional em 3 páginas exportado.' });
     } catch (error) {
       toast({ title: 'Erro ao gerar PDF', variant: 'destructive' });
@@ -538,7 +538,7 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
 
       addContractFooter(2, 2);
 
-      doc.save(`Contrato_CyberTech_${contractNum}_${clientName.replace(/\s/g, '_')}.pdf`);
+      downloadPdf(doc, `Contrato_CyberTech_${contractNum}_${clientName.replace(/\s/g, '_')}.pdf`);
       toast({ title: '✅ Contrato Jurídico Gerado!', description: `Documento oficial em 2 páginas exportado.` });
     } catch (error) {
       console.error(error);
