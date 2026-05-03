@@ -312,10 +312,26 @@ export default function Payroll() {
   const handleSendSingleWhatsApp = async (p: any, result: any) => {
     const emp = dbEmployees.find(e => e.id === p.employeeId);
     if (!emp?.phone) {
-      toast({ title: 'Telefone não cadastrado', description: `O funcionário ${p.employeeName} não possui celular cadastrado.`, variant: 'destructive' });
+      toast({ 
+        title: 'Telefone não cadastrado', 
+        description: `O funcionário ${p.employeeName} não possui celular cadastrado.`, 
+        variant: 'destructive' 
+      });
       return;
     }
-    window.open(generateWALink(emp.phone, emp.employeeName, result.pdfUrl), '_blank');
+
+    // Limpa o número (remove parênteses, traços, etc) e garante o código do país
+    let cleanPhone = emp.phone.replace(/\D/g, '');
+    if (cleanPhone.length === 11) cleanPhone = '55' + cleanPhone;
+    if (cleanPhone.length === 10) cleanPhone = '55' + cleanPhone;
+
+    const message = encodeURIComponent(`Olá ${emp.name}, seu holerite de ${refMonth.toString().padStart(2, '0')}/${refYear} já está disponível para consulta: ${result.pdfUrl}`);
+    const waLink = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${message}`;
+    
+    // Abre em uma nova aba
+    window.open(waLink, '_blank');
+    
+    toast({ title: 'WhatsApp Web aberto', description: 'Clique em enviar na nova aba.' });
   };
 
   const handleSendSingleEmail = async (p: any, result: any) => {

@@ -49,6 +49,7 @@ serve(async (req) => {
     
     try {
       if (port === 465) {
+        // Porta 465 é a recomendada para Gmail (SSL Direto)
         await client.connectTLS({
           hostname: settings.smtp_host,
           port: port,
@@ -56,6 +57,7 @@ serve(async (req) => {
           password: settings.smtp_pass,
         })
       } else {
+        // Outras portas (como 587) tentam conexão padrão
         await client.connect({
           hostname: settings.smtp_host,
           port: port,
@@ -64,7 +66,7 @@ serve(async (req) => {
         })
       }
     } catch (connErr) {
-      throw new Error(`Falha de conexão SMTP (${settings.smtp_host}): ${connErr.message}`)
+      throw new Error(`Erro no servidor de e-mail: ${connErr.message}. DICA: No Gmail, use a Porta 465 e uma Senha de App de 16 dígitos.`)
     }
 
     // 3. Enviar o E-mail
