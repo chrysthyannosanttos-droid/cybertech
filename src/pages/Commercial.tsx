@@ -42,7 +42,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { cn, downloadPdf } from "@/lib/utils";
+import { cn, downloadPdf, getBase64ImageFromUrl } from "@/lib/utils";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { generateServerComparisonPDF } from '@/services/ServerComparisonService';
@@ -118,18 +118,6 @@ export default function Commercial() {
     return perUserTotal + modulesBaseTotal + maintenanceTotal;
   };
 
-  const getBase64ImageFromUrl = async (url: string): Promise<string> => {
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.addEventListener("load", () => resolve(reader.result as string), false);
-        reader.addEventListener("error", () => reject());
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) { return ''; }
-  };
 
   const handleGeneratePdf = async () => {
     setIsGeneratingPdf(true);
@@ -704,7 +692,7 @@ Nossa solução integra todos os processos de RH em um único ecossistema — do
                     </table>
                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-10 no-print max-w-4xl mx-auto">
-                    <Button variant="outline" className="h-14 px-6 rounded-2xl gap-3 font-black text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all" onClick={() => generateClientGuidePDF(clientName || 'Cliente')}>
+                    <Button variant="outline" className="h-14 px-6 rounded-2xl gap-3 font-black text-primary border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all" onClick={async () => await generateClientGuidePDF(clientName || 'Cliente')}>
                       <Rocket className="w-5 h-5" /> 
                       Guia do Sistema
                     </Button>

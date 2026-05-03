@@ -1,12 +1,18 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-import { downloadPdf } from '@/lib/utils';
+import { downloadPdf, getBase64ImageFromUrl } from '@/lib/utils';
 
-export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
+export const generateClientGuidePDF = async (clientName: string = 'Cliente') => {
   const doc = new jsPDF();
   const primary = [10, 15, 29];
   const accent = [0, 163, 255];
+
+  // Carregar imagens reais
+  const imgDashboard = await getBase64ImageFromUrl('/print-dashboard.png');
+  const imgEmployees = await getBase64ImageFromUrl('/print-employees.png');
+  const imgAttendance = await getBase64ImageFromUrl('/print-attendance.png');
+  const imgGed = await getBase64ImageFromUrl('/print-ged.png');
 
   const addHeader = (title: string) => {
     doc.setFillColor(primary[0], primary[1], primary[2]);
@@ -26,33 +32,6 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(`CyberTech RH - Tecnologia White-Label  |  Página ${page}`, 105, 290, { align: 'center' });
-  };
-
-  const drawMockupBase = (y: number) => {
-    // Window Frame
-    doc.setFillColor(30, 35, 50);
-    doc.roundedRect(20, y, 170, 90, 2, 2, 'F');
-    // Inner Background
-    doc.setFillColor(15, 20, 35);
-    doc.rect(20, y + 5, 170, 85, 'F');
-    // Sidebar
-    doc.setFillColor(10, 15, 29);
-    doc.rect(20, y + 5, 30, 85, 'F');
-    // Logo in Sidebar
-    doc.setFillColor(0, 163, 255);
-    doc.circle(35, y + 15, 4, 'F');
-    // Sidebar items
-    doc.setFillColor(40, 45, 60);
-    for (let i = 0; i < 5; i++) {
-      doc.rect(25, y + 25 + (i * 8), 20, 3, 'F');
-    }
-    // Header
-    doc.setFillColor(20, 25, 40);
-    doc.rect(50, y + 5, 140, 12, 'F');
-    // User avatar in header
-    doc.setFillColor(40, 45, 60);
-    doc.circle(180, y + 11, 3, 'F');
-    doc.rect(160, y + 10, 15, 2, 'F');
   };
 
   // --- CAPA ---
@@ -94,33 +73,14 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   doc.text(dashDesc, 15, y);
   
   y += 50;
-  drawMockupBase(y);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Dashboard Estratégico', 55, y + 22);
-  
-  doc.setFillColor(25, 30, 45);
-  doc.roundedRect(55, y + 26, 42, 15, 1, 1, 'F');
-  doc.roundedRect(100, y + 26, 42, 15, 1, 1, 'F');
-  doc.roundedRect(145, y + 26, 42, 15, 1, 1, 'F');
-  
-  doc.setFillColor(40, 45, 60); doc.rect(58, y + 29, 20, 2, 'F'); 
-  doc.setFillColor(0, 163, 255); doc.rect(58, y + 33, 15, 4, 'F');
-  
-  doc.setFillColor(40, 45, 60); doc.rect(103, y + 29, 20, 2, 'F'); 
-  doc.setFillColor(34, 197, 94); doc.rect(103, y + 33, 15, 4, 'F');
-  
-  doc.setFillColor(40, 45, 60); doc.rect(148, y + 29, 20, 2, 'F'); 
-  doc.setFillColor(239, 68, 68); doc.rect(148, y + 33, 15, 4, 'F');
-  
-  doc.setFillColor(25, 30, 45);
-  doc.roundedRect(55, y + 45, 132, 40, 1, 1, 'F');
-  doc.setFillColor(0, 163, 255);
-  const barHeights = [10, 15, 8, 22, 18, 25, 30, 12, 16];
-  barHeights.forEach((h, i) => {
-    doc.rect(65 + (i * 12), y + 80, 6, -h, 'F');
-  });
+  if (imgDashboard) {
+    doc.addImage(imgDashboard, 'PNG', 15, y, 180, 100);
+  } else {
+    // Fallback if image fails
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.rect(15, y, 180, 100);
+    doc.text('Visualização do Painel Administrativo', 105, y + 50, { align: 'center' });
+  }
   addFooter(1);
 
   // --- PÁG 2: FUNCIONÁRIOS ---
@@ -144,37 +104,13 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   doc.text(empDesc, 15, y);
   
   y += 50;
-  drawMockupBase(y);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.text('Gestão de Colaboradores', 55, y + 22);
-  
-  doc.setFillColor(20, 25, 40);
-  doc.rect(55, y + 26, 90, 6, 'F');
-  for(let i=0; i<6; i++) {
-    doc.setFillColor(25, 30, 45);
-    doc.rect(55, y + 34 + (i * 8), 90, 6, 'F');
-    doc.setFillColor(100, 100, 120);
-    doc.circle(60, y + 37 + (i * 8), 2, 'F');
-    doc.setFillColor(200, 200, 200);
-    doc.rect(65, y + 36 + (i * 8), 20, 2, 'F');
-    doc.setFillColor(100, 100, 120);
-    doc.rect(95, y + 36 + (i * 8), 15, 2, 'F');
-    doc.setFillColor(34, 197, 94);
-    doc.rect(130, y + 36 + (i * 8), 10, 2, 'F');
+  if (imgEmployees) {
+    doc.addImage(imgEmployees, 'PNG', 15, y, 180, 100);
+  } else {
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.rect(15, y, 180, 100);
+    doc.text('Visualização da Gestão de Colaboradores', 105, y + 50, { align: 'center' });
   }
-  
-  doc.setFillColor(25, 30, 45);
-  doc.roundedRect(148, y + 26, 39, 56, 1, 1, 'F');
-  doc.setFillColor(100, 100, 120);
-  doc.circle(167, y + 36, 6, 'F'); 
-  doc.setFillColor(200, 200, 200);
-  doc.rect(157, y + 46, 20, 3, 'F'); 
-  doc.setFillColor(100, 100, 120);
-  doc.rect(162, y + 51, 10, 2, 'F'); 
-  doc.rect(152, y + 58, 30, 2, 'F');
-  doc.rect(152, y + 62, 25, 2, 'F');
-  doc.rect(152, y + 66, 28, 2, 'F');
   addFooter(2);
 
   // --- PÁG 3: PONTO ELETRÔNICO ---
@@ -198,29 +134,12 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   doc.text(pointDesc, 15, y);
   
   y += 50;
-  drawMockupBase(y);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.text('Espelho de Ponto', 55, y + 22);
-  
-  doc.setFillColor(25, 30, 45);
-  doc.roundedRect(55, y + 26, 60, 12, 1, 1, 'F');
-  doc.roundedRect(120, y + 26, 67, 12, 1, 1, 'F');
-  
-  doc.setFillColor(20, 25, 40);
-  doc.rect(55, y + 42, 132, 6, 'F');
-  for(let i=0; i<5; i++) {
-    doc.setFillColor(25, 30, 45);
-    doc.rect(55, y + 50 + (i * 7), 132, 5, 'F');
-    doc.setFillColor(150, 150, 150);
-    doc.rect(58, y + 51.5 + (i * 7), 10, 2, 'F');
-    doc.setFillColor(0, 163, 255);
-    doc.rect(80, y + 51.5 + (i * 7), 8, 2, 'F');
-    doc.rect(95, y + 51.5 + (i * 7), 8, 2, 'F');
-    doc.rect(110, y + 51.5 + (i * 7), 8, 2, 'F');
-    doc.rect(125, y + 51.5 + (i * 7), 8, 2, 'F');
-    doc.setFillColor(i % 3 === 0 ? 239 : 34, i % 3 === 0 ? 68 : 197, i % 3 === 0 ? 68 : 94);
-    doc.rect(170, y + 51.5 + (i * 7), 12, 2, 'F');
+  if (imgAttendance) {
+    doc.addImage(imgAttendance, 'PNG', 15, y, 180, 100);
+  } else {
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.rect(15, y, 180, 100);
+    doc.text('Visualização do Controle de Ponto', 105, y + 50, { align: 'center' });
   }
   addFooter(3);
 
@@ -245,31 +164,12 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   doc.text(healthDesc, 15, y);
   
   y += 50;
-  drawMockupBase(y);
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
-  doc.text('Arquivo Digital', 55, y + 22);
-
-  for(let i=0; i<4; i++) {
-    doc.setFillColor(25, 30, 45);
-    doc.roundedRect(55 + (i * 34), y + 28, 30, 25, 1, 1, 'F');
-    doc.setFillColor(0, 163, 255);
-    doc.rect(65 + (i * 34), y + 33, 10, 8, 'F');
-    doc.setFillColor(150, 150, 150);
-    doc.rect(60 + (i * 34), y + 46, 20, 2, 'F');
-  }
-
-  doc.setTextColor(255, 255, 255);
-  doc.text('Documentos Recentes', 55, y + 62);
-  for(let i=0; i<3; i++) {
-    doc.setFillColor(25, 30, 45);
-    doc.rect(55, y + 66 + (i * 8), 132, 6, 'F');
-    doc.setFillColor(239, 68, 68); 
-    doc.rect(58, y + 68 + (i * 8), 3, 3, 'F');
-    doc.setFillColor(200, 200, 200);
-    doc.rect(65, y + 68.5 + (i * 8), 30, 2, 'F');
-    doc.setFillColor(100, 100, 100);
-    doc.rect(160, y + 68.5 + (i * 8), 15, 2, 'F');
+  if (imgGed) {
+    doc.addImage(imgGed, 'PNG', 15, y, 180, 100);
+  } else {
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.rect(15, y, 180, 100);
+    doc.text('Visualização do Arquivo Digital', 105, y + 50, { align: 'center' });
   }
   addFooter(4);
 
@@ -289,4 +189,5 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
 
   downloadPdf(doc, `Guia_Demonstracao_CyberTech_${clientName.replace(/\s+/g, '_')}.pdf`);
 };
+
 

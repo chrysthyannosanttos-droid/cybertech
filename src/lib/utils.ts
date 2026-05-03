@@ -75,3 +75,16 @@ export function downloadPdf(doc: any, filename: string) {
   const finalName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
   saveAs(blob, finalName);
 }
+
+export const getBase64ImageFromUrl = async (url: string): Promise<string> => {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => resolve(reader.result as string), false);
+      reader.addEventListener("error", () => reject());
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) { return ''; }
+};
