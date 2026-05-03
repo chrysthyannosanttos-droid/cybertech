@@ -13,6 +13,10 @@ export const generateClientGuidePDF = async (clientName: string = 'Cliente') => 
   const imgEmployees = await getBase64ImageFromUrl('/print-employees.png');
   const imgAttendance = await getBase64ImageFromUrl('/print-attendance.png');
   const imgGed = await getBase64ImageFromUrl('/print-ged.png');
+  const imgPayroll = await getBase64ImageFromUrl('/print-payroll.png');
+  const imgRescissions = await getBase64ImageFromUrl('/print-rescissions.png');
+  const imgVacations = await getBase64ImageFromUrl('/print-vacations.png');
+  const imgPj = await getBase64ImageFromUrl('/print-pj.png');
 
   const addHeader = (title: string) => {
     doc.setFillColor(primary[0], primary[1], primary[2]);
@@ -75,11 +79,6 @@ export const generateClientGuidePDF = async (clientName: string = 'Cliente') => 
   y += 50;
   if (imgDashboard) {
     doc.addImage(imgDashboard, 'PNG', 15, y, 180, 100);
-  } else {
-    // Fallback if image fails
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.rect(15, y, 180, 100);
-    doc.text('Visualização do Painel Administrativo', 105, y + 50, { align: 'center' });
   }
   addFooter(1);
 
@@ -106,10 +105,6 @@ export const generateClientGuidePDF = async (clientName: string = 'Cliente') => 
   y += 50;
   if (imgEmployees) {
     doc.addImage(imgEmployees, 'PNG', 15, y, 180, 100);
-  } else {
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.rect(15, y, 180, 100);
-    doc.text('Visualização da Gestão de Colaboradores', 105, y + 50, { align: 'center' });
   }
   addFooter(2);
 
@@ -136,20 +131,97 @@ export const generateClientGuidePDF = async (clientName: string = 'Cliente') => 
   y += 50;
   if (imgAttendance) {
     doc.addImage(imgAttendance, 'PNG', 15, y, 180, 100);
-  } else {
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.rect(15, y, 180, 100);
-    doc.text('Visualização do Controle de Ponto', 105, y + 50, { align: 'center' });
   }
   addFooter(3);
 
-  // --- PÁG 4: ARQUIVO E SAÚDE ---
+  // --- PÁG 4: FOLHA DE PAGAMENTO ---
+  doc.addPage();
+  addHeader('Financeiro & Folha');
+  y = 50;
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
+  doc.text('4. Folha de Pagamento Automatizada', 15, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  const payrollDesc = [
+    'Gestão completa de proventos, descontos e tributos. Geração de arquivos para bancos e governo em segundos.',
+    '',
+    '• Cálculo Automático: Integração direta com ponto e benefícios.',
+    '• Holerites Digitais: Envio automático para o app do colaborador.',
+    '• Exportação Bancária: Geração de arquivos CNAB para pagamento.',
+    '• Dashboards de Custo: Visão clara do impacto financeiro por setor.'
+  ];
+  doc.text(payrollDesc, 15, y);
+  
+  y += 50;
+  if (imgPayroll) {
+    doc.addImage(imgPayroll, 'PNG', 15, y, 180, 100);
+  }
+  addFooter(4);
+
+  // --- PÁG 5: RESCISÕES E FÉRIAS ---
+  doc.addPage();
+  addHeader('Calculos Técnicos');
+  y = 50;
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
+  doc.text('5. Rescisões e Férias CLT', 15, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  const calcDesc = [
+    'Módulo especializado para cálculos complexos de desligamento e períodos de descanso.',
+    '',
+    '• Motor de Rescisão: Simulação e cálculo exato de verbas rescisórias.',
+    '• Gestão de Férias: Controle de períodos aquisitivos e alertas de vencimento.',
+    '• Termos e Documentos: Geração automática de TRCT e avisos de férias.',
+    '• Integração eSocial: Preparação dos dados para envio ao governo.'
+  ];
+  doc.text(calcDesc, 15, y);
+  
+  y += 50;
+  if (imgRescissions) {
+    doc.addImage(imgRescissions, 'PNG', 15, y, 85, 90);
+  }
+  if (imgVacations) {
+    doc.addImage(imgVacations, 'PNG', 110, y, 85, 90);
+  }
+  addFooter(5);
+
+  // --- PÁG 6: GESTÃO DE PJ ---
+  doc.addPage();
+  addHeader('Terceiros e B2B');
+  y = 50;
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.setFontSize(18);
+  doc.text('6. Gestão de Prestadores (PJ)', 15, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  const pjDesc = [
+    'Controle total sobre prestadores de serviço e empresas parceiras (B2B).',
+    '',
+    '• Prontuário PJ: Gestão de contratos e documentos de empresas.',
+    '• Medição de Serviços: Controle de entregas e pagamentos.',
+    '• Dashboards de Terceiros: Visão consolidada da força de trabalho externa.',
+    '• Compliance: Garantia de que todos os prestadores estão em dia.'
+  ];
+  doc.text(pjDesc, 15, y);
+  
+  y += 50;
+  if (imgPj) {
+    doc.addImage(imgPj, 'PNG', 15, y, 180, 100);
+  }
+  addFooter(6);
+
+  // --- PÁG 7: GED E SAÚDE ---
   doc.addPage();
   addHeader('GED e Saúde Ocupacional');
   y = 50;
   doc.setTextColor(primary[0], primary[1], primary[2]);
   doc.setFontSize(18);
-  doc.text('4. Arquivo Digital e Atestados', 15, y);
+  doc.text('7. Arquivo Digital e Atestados', 15, y);
   y += 10;
   doc.setFontSize(10);
   doc.setTextColor(80, 80, 80);
@@ -166,12 +238,8 @@ export const generateClientGuidePDF = async (clientName: string = 'Cliente') => 
   y += 50;
   if (imgGed) {
     doc.addImage(imgGed, 'PNG', 15, y, 180, 100);
-  } else {
-    doc.setDrawColor(accent[0], accent[1], accent[2]);
-    doc.rect(15, y, 180, 100);
-    doc.text('Visualização do Arquivo Digital', 105, y + 50, { align: 'center' });
   }
-  addFooter(4);
+  addFooter(7);
 
   // --- PÁG FINAL ---
   doc.addPage();

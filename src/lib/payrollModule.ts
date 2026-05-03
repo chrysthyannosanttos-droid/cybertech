@@ -21,12 +21,14 @@ async function ensureBucket() {
     const { data: buckets } = await supabase.storage.listBuckets();
     const exists = buckets?.some(b => b.name === 'documents');
     if (!exists) {
-      const { error } = await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
-      if (error) throw new Error(`Não foi possível criar o bucket 'documents': ${error.message}`);
+      try {
+        await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
+      } catch (e) {
+        console.warn("Could not create bucket 'documents'. It may already exist or require higher permissions.");
+      }
     }
   } catch (err: any) {
     console.error('Error ensuring bucket:', err);
-    throw err;
   }
 }
 

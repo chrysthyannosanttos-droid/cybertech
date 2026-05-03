@@ -216,12 +216,15 @@ export default function EmployeeDocuments() {
     if (file) validateAndSetFile(file);
   };
 
-  // Garante que o bucket 'documents' existe no Supabase Storage
   const ensureBucket = async () => {
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const exists = buckets?.some(b => b.name === 'documents');
-    if (!exists) {
-      await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const exists = buckets?.some(b => b.name === 'documents');
+      if (!exists) {
+        await supabase.storage.createBucket('documents', { public: true, fileSizeLimit: 10485760 });
+      }
+    } catch (e) {
+      console.warn("Could not ensure bucket 'documents'. Continuing anyway...");
     }
   };
 
