@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+import { downloadPdf } from '@/lib/utils';
+
 export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   const doc = new jsPDF();
   const primary = [10, 15, 29];
@@ -163,5 +165,5 @@ export const generateClientGuidePDF = (clientName: string = 'Cliente') => {
   doc.setTextColor(150, 150, 150);
   doc.text('Entre em contato para agendar uma demonstração guiada.', 105, 150, { align: 'center' });
 
-  doc.save(`Guia_Demonstracao_CyberTech_${clientName.replace(/\s+/g, '_')}.pdf`);
+  downloadPdf(doc, `Guia_Demonstracao_CyberTech_${clientName.replace(/\s+/g, '_')}.pdf`);
 };
