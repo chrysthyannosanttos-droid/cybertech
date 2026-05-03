@@ -1,6 +1,8 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+import { downloadPdf } from '@/lib/utils';
+
 export const generateServerComparisonPDF = (clientName: string = 'Cliente') => {
   const doc = new jsPDF();
   const primaryColor = [10, 15, 29]; // Dark Blue CyberTech
@@ -95,6 +97,5 @@ export const generateServerComparisonPDF = (clientName: string = 'Cliente') => {
   doc.text('Documento gerado automaticamente pelo Sistema Comercial CyberTech RH', 105, pageHeight - 15, { align: 'center' });
   doc.text('© 2026 CyberTech RH - Todos os direitos reservados.', 105, pageHeight - 10, { align: 'center' });
 
-  // SALVAR
-  doc.save(`CyberTech_Comparativo_Infraestrutura_${clientName.replace(/\s+/g, '_')}.pdf`);
+  downloadPdf(doc, `CyberTech_Comparativo_Infraestrutura_${clientName.replace(/\s+/g, '_')}.pdf`);
 };
