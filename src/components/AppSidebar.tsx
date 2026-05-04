@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentType<{ className?: string }>; label: string; superadminOnly?: boolean }> = [
   { to: '/dashboard',         module: 'dashboard',         icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/attendance',        module: 'attendance',        icon: Clock,           label: 'Ponto Eletrônico' },
+  { to: '/terminal',          module: 'attendance',        icon: Smartphone,      label: 'Terminal de Ponto' },
   { to: '/tenants',           module: 'tenants',           icon: Building2,       label: 'Empresas',     superadminOnly: true, cristianoOnly: true },
   { to: '/settings/company',   module: 'dashboard',         icon: Building2,       label: 'Minha Empresa' },
   { to: '/stores',            module: 'stores',            icon: Store,           label: 'Lojas' },
@@ -41,7 +42,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
   { to: '/vacations',          module: 'rescissions',       icon: TreePalm,        label: 'Férias' },
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
-  { to: '/portal',            module: 'dashboard',         icon: Smartphone,      label: 'Portal do Colaborador' },
+  { to: '/portal',            module: 'dashboard',         icon: UserCog,         label: 'Portal do Colaborador' },
   { to: '/commercial',        module: 'dashboard',         icon: FileText,        label: 'Proposta Comercial', superadminOnly: true, cristianoOnly: true },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
   { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
