@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle2, MessageSquare, Mail, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
+import { CheckCircle2, MessageSquare, Mail, Loader2, AlertCircle, ExternalLink, ShieldCheck, Zap, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -49,7 +49,7 @@ export function BulkPostModal({
 
   const generateWALink = (phone: string, name: string, pdfUrl: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = encodeURIComponent(`Olá ${name}, segue seu holerite referente a ${referenceMonth}/${referenceYear}: ${pdfUrl}`);
+    const message = encodeURIComponent(`Olá ${name}, seu holerite digital de ${referenceMonth}/${referenceYear} está disponível: ${pdfUrl}`);
     return `https://wa.me/55${cleanPhone}?text=${message}`;
   };
 
@@ -58,15 +58,13 @@ export function BulkPostModal({
     const result = batchResults.find(r => r.employeeId === emp.id);
 
     if (!emp.phone) {
-      setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Telefone não cadastrado' }]);
+      setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Falta Telefone' }]);
     } else if (!result?.pdfUrl) {
-      setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
+      setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Sem PDF' }]);
     } else {
-      // Busca se tem API configurada
       const { data: waSettings } = await supabase.from('tenant_whatsapp_settings').select('*').limit(1).maybeSingle();
       
       if (waSettings && waSettings.api_type !== 'none') {
-        // Disparo via API Automática
         const cleanPhone = emp.phone.replace(/\D/g, '');
         const message = `Olá ${emp.name}, seu holerite de ${referenceMonth}/${referenceYear} está disponível: ${result.pdfUrl}`;
         
@@ -78,17 +76,15 @@ export function BulkPostModal({
               body: JSON.stringify({ number: cleanPhone, text: message })
             });
           }
-          setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Enviado via API' }]);
+          setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'API Success' }]);
         } catch (e) {
-          setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Erro na API' }]);
+          setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Erro API' }]);
         }
       } else {
-        // Fallback Manual (Abre Aba)
         window.open(generateWALink(emp.phone, emp.name, result.pdfUrl), '_blank');
-        setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Link aberto' }]);
+        setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'Link OK' }]);
       }
       
-      // Update DB status
       await supabase.from('payrolls').update({ 
         status: 'SENT',
         sent_whatsapp_at: new Date().toISOString() 
@@ -100,7 +96,7 @@ export function BulkPostModal({
       setProgress(((currentIndex + 1) / total) * 100);
     } else {
       setProgress(100);
-      toast({ title: 'Envio concluído!' });
+      toast({ title: 'Disparo concluído!' });
     }
   };
 
@@ -111,18 +107,12 @@ export function BulkPostModal({
         const result = batchResults.find(r => r.employeeId === emp.id);
 
         if (!emp.email) {
-            setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'E-mail não cadastrado' }]);
+            setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Falta E-mail' }]);
         } else if (!result?.pdfUrl) {
-            setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Holerite não gerado' }]);
+            setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Sem PDF' }]);
         } else {
-            // Chamada Real para a Edge Function de E-mail
             try {
               let tenantId = (emp as any).tenant_id || (emp as any).tenantId;
-              if (!tenantId) {
-                const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
-                tenantId = tData?.id;
-              }
-
               const { data: fData, error: fError } = await supabase.functions.invoke('send-payroll-email', {
                   body: {
                     tenant_id: tenantId,
@@ -135,22 +125,20 @@ export function BulkPostModal({
               });
 
               if (!fError && fData?.success) {
-                  setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail enviado' }]);
+                  setLog(prev => [...prev, { name: emp.name, status: 'success', message: 'E-mail OK' }]);
                   await supabase.from('payrolls').update({ 
                       status: 'SENT',
                       sent_email_at: new Date().toISOString() 
                   }).eq('employee_id', emp.id).eq('reference_month', referenceMonth).eq('reference_year', referenceYear);
               } else {
-                  const errorMsg = fError?.message || fData?.error || 'Erro no servidor';
-                  setLog(prev => [...prev, { name: emp.name, status: 'error', message: `Falha: ${errorMsg}` }]);
+                  setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Falha Cloud' }]);
               }
             } catch (err: any) {
-              setLog(prev => [...prev, { name: emp.name, status: 'error', message: err.message }]);
+              setLog(prev => [...prev, { name: emp.name, status: 'error', message: 'Erro Sistema' }]);
             }
         }
         setProgress(((i + 1) / total) * 100);
     }
-    toast({ title: 'Disparo de e-mails concluído!' });
   };
 
   useEffect(() => {
@@ -161,82 +149,106 @@ export function BulkPostModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Disparo de Holerites em Massa
-          </DialogTitle>
-        </DialogHeader>
-
-        {currentStep === 'selection' ? (
-          <div className="space-y-6 py-4">
-            <div className="bg-muted/30 p-4 rounded-xl border border-border">
-              <p className="text-[13px] font-medium text-center">
-                Você selecionou <span className="text-primary font-black">{total}</span> colaboradores para envio de holerite.
-              </p>
+      <DialogContent className="max-w-xl p-0 overflow-hidden bg-[#0a0f1e] border-white/5 shadow-2xl rounded-[2.5rem]">
+        <div className="p-8">
+          <DialogHeader className="mb-6">
+            <div className="flex items-center gap-4">
+               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Send className="w-6 h-6 text-primary" />
+               </div>
+               <div>
+                  <DialogTitle className="text-xl font-black text-white uppercase italic tracking-tight">Disparo de Holerites</DialogTitle>
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+                     <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Protocolo Digital Seguro
+                  </p>
+               </div>
             </div>
+          </DialogHeader>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Button 
-                onClick={() => startSending('whatsapp')}
-                className="h-24 rounded-2xl flex flex-col gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
-              >
-                <MessageSquare className="w-8 h-8" />
-                <span className="font-black text-[11px] uppercase tracking-widest">WhatsApp</span>
-                <span className="text-[9px] opacity-50 font-bold uppercase tracking-tight">
-                  Disparo via API ou Manual
-                </span>
-              </Button>
-
-              <Button 
-                onClick={() => startSending('email')}
-                className="h-24 rounded-2xl flex flex-col gap-2 bg-blue-500 hover:bg-blue-600 text-white"
-              >
-                <Mail className="w-8 h-8" />
-                <span className="font-black text-[11px] uppercase tracking-widest">E-mail</span>
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6 py-4">
-            <div className="space-y-2">
-                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-                    <span>{method === 'whatsapp' ? 'Enviando WhatsApp' : 'Disparando E-mails'}</span>
-                    <span>{currentIndex + 1} / {total}</span>
+          {currentStep === 'selection' ? (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Carga Selecionada</p>
+                   <p className="text-2xl font-black text-white italic tracking-tighter">{total} Colaboradores</p>
                 </div>
-                <Progress value={progress} className="h-2" />
-            </div>
-
-            <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {log.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                        <span className="text-[12px] font-bold truncate max-w-[150px]">{item.name}</span>
-                        <div className="flex items-center gap-2">
-                            <span className={cn("text-[10px] font-black uppercase", item.status === 'success' ? "text-emerald-500" : "text-rose-500")}>
-                                {item.message}
-                            </span>
-                            {item.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-rose-500" />}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {method === 'whatsapp' && progress < 100 && (
-                <div className="bg-primary/10 p-4 rounded-xl border border-primary/20 space-y-3">
-                    <p className="text-[12px] font-medium text-center">
-                        Para o WhatsApp, o navegador abrirá uma nova aba para cada envio.
-                    </p>
-                    <Button onClick={handleNextWhatsApp} className="w-full h-12 bg-primary text-white rounded-xl font-black uppercase gap-2">
-                        <ExternalLink className="w-4 h-4" /> Enviar para {selectedEmployees[currentIndex]?.name}
-                    </Button>
+                <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                   <Zap className="w-6 h-6 text-emerald-500" />
                 </div>
-            )}
-          </div>
-        )}
+              </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl h-10 px-6 font-black uppercase text-[11px]">
-            {progress === 100 ? 'Fechar' : 'Cancelar'}
+              <div className="grid grid-cols-2 gap-6">
+                <Button 
+                  onClick={() => startSending('whatsapp')}
+                  className="h-32 rounded-[2rem] flex flex-col gap-3 bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/10 active:scale-[0.98] transition-all border-b-4 border-emerald-700"
+                >
+                  <MessageSquare className="w-10 h-10" />
+                  <div className="text-center">
+                     <span className="font-black text-[12px] uppercase tracking-widest block">WhatsApp</span>
+                     <span className="text-[9px] opacity-60 font-bold uppercase tracking-tight">API / Manual</span>
+                  </div>
+                </Button>
+
+                <Button 
+                  onClick={() => startSending('email')}
+                  className="h-32 rounded-[2rem] flex flex-col gap-3 bg-blue-500 hover:bg-blue-600 text-white shadow-xl shadow-blue-500/10 active:scale-[0.98] transition-all border-b-4 border-blue-700"
+                >
+                  <Mail className="w-10 h-10" />
+                  <div className="text-center">
+                     <span className="font-black text-[12px] uppercase tracking-widest block">E-mail</span>
+                     <span className="text-[9px] opacity-60 font-bold uppercase tracking-tight">Servidor Cloud</span>
+                  </div>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                      <div>
+                         <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">{method === 'whatsapp' ? 'Canal WhatsApp' : 'Canal E-mail'}</p>
+                         <p className="text-xl font-black text-white italic tracking-tighter">Processando Lote...</p>
+                      </div>
+                      <span className="text-2xl font-black text-primary tabular-nums">{Math.round(progress)}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                     <div className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_15px_rgba(var(--primary),0.5)]" style={{ width: `${progress}%` }} />
+                  </div>
+              </div>
+
+              <div className="max-h-[250px] overflow-y-auto space-y-2 pr-3 custom-scrollbar border-y border-white/5 py-4">
+                  {log.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+                          <div>
+                             <p className="text-[12px] font-black text-white">{item.name}</p>
+                             <p className="text-[9px] font-bold text-muted-foreground uppercase">{referenceMonth}/{referenceYear}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md", item.status === 'success' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border border-rose-500/20")}>
+                                  {item.message}
+                              </span>
+                              {item.status === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-rose-500" />}
+                          </div>
+                      </div>
+                  ))}
+                  {log.length === 0 && <div className="py-12 text-center text-[11px] font-black text-muted-foreground uppercase tracking-widest animate-pulse">Iniciando Handshake...</div>}
+              </div>
+
+              {method === 'whatsapp' && progress < 100 && (
+                  <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/20 space-y-4 shadow-2xl">
+                      <p className="text-[11px] font-black text-center text-primary uppercase tracking-widest">Ação Manual Requerida</p>
+                      <Button onClick={handleNextWhatsApp} className="w-full h-16 bg-primary text-white rounded-2xl font-black uppercase text-[12px] tracking-widest gap-3 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
+                          <ExternalLink className="w-5 h-5" /> Autorizar envio para {selectedEmployees[currentIndex]?.name}
+                      </Button>
+                  </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="p-8 bg-white/[0.01] border-t border-white/5">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-2xl h-14 px-10 font-black uppercase text-[11px] tracking-widest text-muted-foreground hover:text-white transition-colors">
+            {progress === 100 ? 'Finalizar Processo' : 'Interromper'}
           </Button>
         </DialogFooter>
       </DialogContent>

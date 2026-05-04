@@ -189,6 +189,10 @@
     transform: scaleX(-1);
   }
 
+  .animate-scan-line {
+    animation: scan 2s linear infinite;
+  }
+
   /* Browser Scrollbar Overrides */
   ::-webkit-scrollbar {
     width: 6px;

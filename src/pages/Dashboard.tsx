@@ -13,28 +13,39 @@ import { MOCK_MRR_DATA } from '@/data/mockData';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { UserMinus, Calculator } from 'lucide-react';
+import { UserMinus, Calculator, Trophy, Medal, Zap, LayoutDashboard, Search } from 'lucide-react';
 
 
-function KpiCard({ icon: Icon, label, value, sub, delay, onClick }: { icon: any; label: string; value: string; sub?: string; delay: number; onClick?: () => void }) {
+function KpiCard({ icon: Icon, label, value, sub, delay, onClick, trend }: { icon: any; label: string; value: string; sub?: string; delay: number; onClick?: () => void; trend?: string }) {
   return (
     <div 
       onClick={onClick}
       className={cn(
-        `glass-card rounded-2xl p-5 animate-fade-in-up stagger-${delay} border border-white/5 hover:border-primary/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(31,180,243,0.1)] group`,
+        `glass-card rounded-[2rem] p-6 animate-fade-in-up stagger-${delay} border border-white/5 hover:border-primary/40 transition-all duration-500 hover:shadow-[0_20px_40px_rgba(31,180,243,0.1)] group relative overflow-hidden`,
         onClick && 'cursor-pointer hover:bg-white/[0.03]'
       )}
     >
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
-          <Icon className="w-5 h-5 text-primary" />
+      <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 blur-3xl -mr-12 -mt-12 group-hover:bg-primary/10 transition-colors" />
+      
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+          <Icon className="w-6 h-6 text-primary" />
         </div>
-        <div>
-          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{label}</span>
-          {sub && <p className="text-[10px] text-primary/70 font-medium">{sub}</p>}
-        </div>
+        {trend && (
+          <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {trend}
+          </span>
+        )}
       </div>
-      <p className="text-3xl font-bold tabular-nums tracking-tight text-white">{value}</p>
+      
+      <div className="relative z-10">
+        <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.15em]">{label}</span>
+        <p className="text-3xl font-black tabular-nums tracking-tighter text-white mt-1 group-hover:text-primary transition-colors">{value}</p>
+        {sub && <p className="text-[10px] text-muted-foreground/70 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+          <div className="w-1 h-1 rounded-full bg-primary/50" />
+          {sub}
+        </p>}
+      </div>
     </div>
   );
 }
@@ -366,10 +377,25 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">{isSuperAdmin ? 'Painel Administrativo' : 'Dashboard'}</h1>
-          <p className="text-[13px] text-muted-foreground">Visão geral e indicadores de desempenho</p>
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 relative group overflow-hidden">
+            <div className="absolute inset-0 bg-primary/5 animate-pulse" />
+            <LayoutDashboard className="w-7 h-7 text-primary relative z-10 group-hover:scale-110 transition-transform" />
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-black text-white tracking-tighter uppercase italic">{isSuperAdmin ? 'Gestão CyberTech' : 'Dashboard Hub'}</h1>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Live Sync</span>
+              </div>
+            </div>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+              <Zap className="w-3 h-3 text-primary" /> Inteligência de Dados RH Plus
+            </p>
+          </div>
         </div>
+
         
         <div className="flex flex-wrap items-center gap-3">
           {/* Admin Tools */}
@@ -457,11 +483,11 @@ export default function Dashboard() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {isSuperAdmin && (
           <>
-            <KpiCard icon={Building2} label="Clientes Ativos" value={`${activeClients}/${tenants.length}`} sub={`${tenants.length - activeClients} inativos`} delay={1} />
-            <KpiCard icon={DollarSign} label="Receita Mensal" value={`R$ ${totalMRR.toLocaleString('pt-BR')}`} delay={2} />
+            <KpiCard icon={Building2} label="Clientes Ativos" value={`${activeClients}/${tenants.length}`} sub={`${tenants.length - activeClients} inativos`} delay={1} trend="+12%" />
+            <KpiCard icon={DollarSign} label="Receita Mensal" value={`R$ ${totalMRR.toLocaleString('pt-BR')}`} delay={2} trend="SaaS" />
           </>
         )}
         <KpiCard 
@@ -470,39 +496,43 @@ export default function Dashboard() {
           value={String(totalEmployees)} 
           sub={newAdmissions > 0 ? `${newAdmissions} novas admissões` : 'Nenhuma admissão'} 
           delay={isSuperAdmin ? 3 : 1} 
+          trend="Escalável"
         />
         <KpiCard 
           icon={FileHeart} 
-          label="Atestados" 
-          value={String(totalCertificates)} 
-          sub={`Absenteísmo: ${absenteeism}%`} 
+          label="Absenteísmo" 
+          value={`${absenteeism}%`} 
+          sub={`${totalCertificates} atestados ativos`} 
           delay={isSuperAdmin ? 4 : 2} 
           onClick={() => setShowCertificatesDetail(true)}
+          trend="Alerta"
         />
         
         <KpiCard 
           icon={DollarSign} 
-          label="Salário Líquido" 
+          label="Folha Líquida" 
           value={`R$ ${processedPayrollTotal.toLocaleString('pt-BR')}`} 
           sub="Competência Atual" 
           delay={5} 
           onClick={() => setShowPayrollList(true)}
+          trend="CLT"
         />
         <KpiCard 
-          icon={UserMinus} 
-          label="Rescisões Pagas" 
-          value={`R$ ${totalRescissionsValue.toLocaleString('pt-BR')}`} 
-          sub={`${rescissions.length} processos`} 
+          icon={Zap} 
+          label="Economia Mensal" 
+          value={`R$ ${(totalEmployees * 45).toLocaleString('pt-BR')}`} 
+          sub="Tempo Economizado" 
           delay={6} 
-          onClick={() => setShowRescissionsList(true)}
+          trend="ROI"
         />
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Chart Area */}
-        <div className="lg:col-span-12 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Lado Esquerdo: Gráficos Principais */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="grid grid-cols-1 gap-6">
+
              {/* MRR or Store Distribution */}
             {isSuperAdmin ? (
               <div className="glass-card rounded-2xl border border-white/5 p-6 animate-fade-in-up stagger-5 relative overflow-hidden">
@@ -551,40 +581,77 @@ export default function Dashboard() {
             )}
 
             {/* Overall Gender Pie Chart */}
-            <div className="glass-card rounded-2xl border border-white/5 p-6 animate-fade-in-up stagger-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16" />
-              <h3 className="text-sm font-semibold mb-6 flex items-center gap-2 text-white">
-                <Users className="w-4 h-4 text-primary" /> Distribuição Geral por Gênero
-              </h3>
-              <div className="flex flex-col items-center justify-center h-[240px]">
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie
-                      data={overallGenderData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {overallGenderData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(210, 40%, 70%)'} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex gap-6 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up stagger-6 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <Users className="w-4 h-4 text-primary" />
+                  </div>
+                  Distribuição por Gênero
+                </h3>
+                <div className="flex flex-col items-center justify-center h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={overallGenderData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={85}
+                        paddingAngle={8}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {overallGenderData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : '#8b5cf6'} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute flex flex-col items-center pointer-events-none">
+                    <span className="text-2xl font-black text-white">{totalEmployees}</span>
+                    <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Total</span>
+                  </div>
+                </div>
+                <div className="flex justify-center gap-8 mt-6">
                   {overallGenderData.map((d, i) => (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: i === 0 ? 'hsl(var(--primary))' : 'hsl(210, 40%, 70%)' }} />
-                      <span className="text-[11px] font-medium">{d.name}: <span className="text-muted-foreground">{d.value}</span></span>
+                    <div key={d.name} className="flex items-center gap-2.5">
+                      <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: i === 0 ? 'hsl(var(--primary))' : '#8b5cf6', color: i === 0 ? 'hsl(var(--primary))' : '#8b5cf6' }} />
+                      <span className="text-[11px] font-black text-white/80 uppercase">{d.name}: <span className="text-white">{d.value}</span></span>
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* CID Frequency Chart */}
+              <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up stagger-7 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-rose-500/10 transition-colors" />
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                    <FileHeart className="w-4 h-4 text-rose-500" />
+                  </div>
+                  Frequência de CIDs
+                </h3>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={cidDistribution}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="cid" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)', fontWeight: 'bold' }} allowDecimals={false} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.03)' }} contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Bar dataKey="count" name="Qtd" fill="url(#colorRose)" radius={[6, 6, 0, 0]} barSize={24} />
+                    <defs>
+                      <linearGradient id="colorRose" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={1}/>
+                        <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.4}/>
+                      </linearGradient>
+                    </defs>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
 
             {/* Gender by Role Lateral Chart */}
             <div className="glass-card rounded-2xl border border-white/5 p-6 animate-fade-in-up stagger-6 relative overflow-hidden">
@@ -618,69 +685,68 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-            {/* CID Frequency Chart */}
-            <div className="glass-card rounded-2xl border border-white/5 p-6 animate-fade-in-up stagger-7 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16" />
-              <h3 className="text-sm font-semibold mb-6 flex items-center gap-2 text-white">
-                <FileHeart className="w-4 h-4 text-primary" /> Frequência de CIDs (Atestados)
-              </h3>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={cidDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="cid" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.6)' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.6)' }} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} />
-                  <Bar dataKey="count" name="Qtd Atestados" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={32} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Service Provider Costs Chart (Candlestick Style) */}
-            <div className="glass-card rounded-2xl border border-white/5 p-6 animate-fade-in-up stagger-8 lg:col-span-2 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl -mr-32 -mt-32" />
-              <h3 className="text-sm font-semibold mb-6 flex items-center gap-2 text-white">
-                <DollarSign className="w-4 h-4 text-primary" /> Distribuição de Custos por Prestador (Vela)
-              </h3>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={providerCosts} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" angle={-15} textAnchor="end" interval={0} tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.6)' }} axisLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.6)' }} axisLine={false} tickFormatter={v => `R$${v}`} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }} 
-                    formatter={(v: any, name: string) => {
-                      if (name === 'Variação (Extras)') return `R$ ${v[1] - v[0]}`;
-                      return `R$ ${v.toLocaleString('pt-BR')}`;
-                    }}
-                  />
-                  <Legend verticalAlign="top" height={36} wrapperStyle={{ color: 'rgba(255,255,255,0.8)' }}/>
-                  <Bar 
-                    dataKey={(d) => [d.base, d.total]} 
-                    name="Variação (Extras)" 
-                    fill="#f59e0b" 
-                    radius={[4, 4, 4, 4]}
-                    barSize={20}
-                  />
-                  <Bar 
-                    dataKey="base" 
-                    name="Custo Base (Contrato)" 
-                    fill="hsl(var(--primary))" 
-                    radius={[4, 4, 0, 0]}
-                    barSize={8}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-              <p className="text-[10px] text-muted-foreground mt-2 text-center italic">
-                A barra larga (Vela) representa o acréscimo de custos extras sobre o valor base do contrato.
-              </p>
-            </div>
           </div>
         </div>
-      </div>
 
-      {/* Detailed Costs View */}
+        {/* Lado Direito: Leaderboard de Absenteísmo */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up stagger-9 relative overflow-hidden h-full">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 blur-3xl -mr-16 -mt-16" />
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20">
+                  <Trophy className="w-4 h-4 text-rose-500" />
+                </div>
+                Ranking Absenteísmo
+              </h3>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={() => setShowCertificatesDetail(true)}>
+                <Search className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {certRanking.slice(0, 5).map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs relative",
+                      idx === 0 ? "bg-amber-500/20 text-amber-500" : 
+                      idx === 1 ? "bg-slate-300/20 text-slate-300" : 
+                      idx === 2 ? "bg-amber-700/20 text-amber-700" : "bg-white/5 text-muted-foreground"
+                    )}>
+                      {idx === 0 ? <Medal className="w-5 h-5" /> : idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-black text-white group-hover:text-primary transition-colors">{item.name}</p>
+                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{item.count} atestados registrados</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[14px] font-black text-rose-500">{item.days}d</p>
+                    <div className="w-12 h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+                       <div className="h-full bg-rose-500" style={{ width: `${(item.days / certRanking[0].days) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {certRanking.length === 0 && (
+                <div className="py-20 text-center">
+                  <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Sem dados críticos</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+               <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">Dica de Gestão</p>
+               <p className="text-[11px] text-muted-foreground leading-relaxed">
+                 O Top 3 acima representa os colaboradores com maior impacto operacional por afastamento médico nos últimos 180 dias.
+               </p>
+            </div>
+      </div>
+    </div>
+    </div>
+
+    {/* Detailed Costs View */}
       {!isSuperAdmin && (
         <div className="glass-card rounded-2xl border border-white/5 p-8 animate-fade-in-up stagger-7 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-3xl -mr-32 -mt-32" />

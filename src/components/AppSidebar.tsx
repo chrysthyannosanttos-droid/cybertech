@@ -21,7 +21,8 @@ import {
   FileText,
   Mail,
   FolderOpen,
-  TreePalm
+  TreePalm,
+  Smartphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +41,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/rescissions',       module: 'rescissions',       icon: UserMinus,       label: 'Rescisões' },
   { to: '/vacations',          module: 'rescissions',       icon: TreePalm,        label: 'Férias' },
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
-  { to: '/holerites',         module: 'dashboard',         icon: FileText,        label: 'Meus Holerites' },
+  { to: '/portal',            module: 'dashboard',         icon: Smartphone,      label: 'Portal do Colaborador' },
   { to: '/commercial',        module: 'dashboard',         icon: FileText,        label: 'Proposta Comercial', superadminOnly: true, cristianoOnly: true },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
   { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },

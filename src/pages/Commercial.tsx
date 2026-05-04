@@ -102,18 +102,24 @@ export default function Commercial() {
 
   const calculateMonthlyTotal = (type: 'cloud' | 'local') => {
     const current = pricing[type];
-    const actualEmployeeCount = Math.max(1, Number(employeeCount) || 0); // Mínimo real de 1
+    const actualEmployeeCount = Math.max(1, Number(employeeCount) || 0);
     const perUserTotal = (Number(current.perUser) || 0) * actualEmployeeCount;
     const maintenanceTotal = Number(current.maintenance) || 0;
     
-    const modulesBaseTotal = AVAILABLE_MODULES
+    // O Total Mensal do Card agora é apenas o Plano Base + Escala de Usuários
+    return perUserTotal + maintenanceTotal;
+  };
+
+  const calculateFullTotal = (type: 'cloud' | 'local') => {
+    const baseTotal = calculateMonthlyTotal(type);
+    const modulesTotal = AVAILABLE_MODULES
       .filter(m => selectedModules.includes(m.id))
       .reduce((acc, curr) => {
         if (curr.id === 'whitelabel') return acc + (Number(whiteLabelPrice) || 0);
         return acc + curr.suggestedPrice;
       }, 0);
 
-    return perUserTotal + modulesBaseTotal + maintenanceTotal;
+    return baseTotal + modulesTotal;
   };
 
 
@@ -590,28 +596,71 @@ Com o novo Motor de Folha Automatizado e o Sistema de Envios Omnichannel, sua em
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             {/* SERVIDOR NUVEM */}
              <div className="glass-card p-8 rounded-[2rem] border border-primary/20 bg-primary/5 space-y-6">
-                <div className="flex items-center gap-4"><Cloud className="w-8 h-8 text-primary" /><h3 className="text-xl font-black text-white uppercase italic">Servidor Nuvem</h3></div>
+                <div className="flex items-center gap-4">
+                  <Cloud className="w-8 h-8 text-primary" />
+                  <h3 className="text-xl font-black text-white uppercase italic">Servidor Nuvem</h3>
+                </div>
+                
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1"><Label className="text-[10px] uppercase">Setup</Label><Input value={pricing.cloud.setup} onChange={e => setPricing(p => ({ ...p, cloud: { ...p.cloud, setup: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                   <div className="space-y-1"><Label className="text-[10px] uppercase">Mensal</Label><Input value={pricing.cloud.maintenance} onChange={e => setPricing(p => ({ ...p, cloud: { ...p.cloud, maintenance: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                   <div className="space-y-1"><Label className="text-[10px] uppercase">P/ Usuário</Label><Input value={pricing.cloud.perUser} onChange={e => setPricing(p => ({ ...p, cloud: { ...p.cloud, perUser: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                 </div>
-                <div className="p-4 bg-primary/10 rounded-xl flex justify-between items-center">
-                  <span className="text-[10px] font-black uppercase">Total Mensal</span>
-                  <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</span>
+
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/10 rounded-xl flex justify-between items-center border border-primary/20">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-black uppercase text-primary">Investimento Setup</span>
+                      <p className="text-[9px] text-muted-foreground uppercase">Pago apenas uma vez</p>
+                    </div>
+                    <span className="text-xl font-black text-white">R$ {Number(pricing.cloud.setup).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-xl flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Mensalidade Base</span>
+                    <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('cloud').toLocaleString('pt-BR')}</span>
+                  </div>
+                  {selectedModules.length > 0 && (
+                    <div className="px-4 py-2 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Total com Módulos:</span>
+                      <span className="text-sm font-black text-primary">R$ {calculateFullTotal('cloud').toLocaleString('pt-BR')}</span>
+                    </div>
+                  )}
                 </div>
              </div>
+
+             {/* SERVIDOR FÍSICO */}
              <div className="glass-card p-8 rounded-[2rem] border border-white/10 bg-white/[0.02] space-y-6">
-                <div className="flex items-center gap-4"><HardDrive className="w-8 h-8 text-muted-foreground" /><h3 className="text-xl font-black text-white uppercase italic">Servidor Físico</h3></div>
+                <div className="flex items-center gap-4">
+                  <HardDrive className="w-8 h-8 text-muted-foreground" />
+                  <h3 className="text-xl font-black text-white uppercase italic">Servidor Físico</h3>
+                </div>
+
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1"><Label className="text-[10px] uppercase">Setup</Label><Input value={pricing.local.setup} onChange={e => setPricing(p => ({ ...p, local: { ...p.local, setup: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                   <div className="space-y-1"><Label className="text-[10px] uppercase">Mensal</Label><Input value={pricing.local.maintenance} onChange={e => setPricing(p => ({ ...p, local: { ...p.local, maintenance: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                   <div className="space-y-1"><Label className="text-[10px] uppercase">P/ Usuário</Label><Input value={pricing.local.perUser} onChange={e => setPricing(p => ({ ...p, local: { ...p.local, perUser: e.target.value } }))} className="bg-black/40 h-10 font-bold" /></div>
                 </div>
-                <div className="p-4 bg-white/5 rounded-xl flex justify-between items-center">
-                  <span className="text-[10px] font-black uppercase">Total Mensal</span>
-                  <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR')}</span>
+
+                <div className="space-y-4">
+                  <div className="p-4 bg-white/10 rounded-xl flex justify-between items-center border border-white/20">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-black uppercase text-white">Investimento Setup</span>
+                      <p className="text-[9px] text-muted-foreground uppercase">Pago apenas uma vez</p>
+                    </div>
+                    <span className="text-xl font-black text-white">R$ {Number(pricing.local.setup).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-xl flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">Mensalidade Base</span>
+                    <span className="text-xl font-black text-white">R$ {calculateMonthlyTotal('local').toLocaleString('pt-BR')}</span>
+                  </div>
+                  {selectedModules.length > 0 && (
+                    <div className="px-4 py-2 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Total com Módulos:</span>
+                      <span className="text-sm font-black text-primary">R$ {calculateFullTotal('local').toLocaleString('pt-BR')}</span>
+                    </div>
+                  )}
                 </div>
              </div>
           </div>
@@ -637,7 +686,12 @@ Com o novo Motor de Folha Automatizado e o Sistema de Envios Omnichannel, sua em
                         <Icon className="w-7 h-7" />
                       </div>
                       <div className="space-y-1">
-                        <h4 className={cn("text-[15px] font-black uppercase", isSelected ? 'text-white' : 'text-zinc-400')}>{mod.label}</h4>
+                        <div className="flex justify-between items-center">
+                          <h4 className={cn("text-[15px] font-black uppercase", isSelected ? 'text-white' : 'text-zinc-400')}>{mod.label}</h4>
+                          <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border", isSelected ? 'bg-primary/20 border-primary/40 text-white' : 'bg-white/5 border-white/10 text-muted-foreground')}>
+                            {mod.id === 'whitelabel' ? `R$ ${whiteLabelPrice}` : mod.suggestedPrice > 0 ? `R$ ${mod.suggestedPrice}` : 'GRÁTIS'}
+                          </span>
+                        </div>
                         <p className="text-[11px] text-muted-foreground line-clamp-2">{mod.description}</p>
                       </div>
                     </div>

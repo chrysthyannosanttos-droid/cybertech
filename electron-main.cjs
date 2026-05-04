@@ -28,11 +28,27 @@ function createWindow() {
   mainWindow.webContents.executeJavaScript('window.isElectron = true;');
 
   // Em desenvolvimento, carrega o localhost. Em produção, carrega o index.html da pasta dist.
+  // Determina a rota inicial
+  const isTerminalMode = process.argv.includes('--terminal');
+  const startUrl = isDev 
+    ? (isTerminalMode ? 'http://localhost:5173/terminal' : 'http://localhost:5173')
+    : `file://${path.join(__dirname, 'dist/index.html')}${isTerminalMode ? '#/terminal' : ''}`;
+
+  if (isTerminalMode) {
+    mainWindow.setFullScreen(true);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setMenuBarVisibility(false);
+  }
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    // mainWindow.webContents.openDevTools();
+    mainWindow.loadURL(startUrl);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    // Para React Router com HashHistory ou ajuste de rota no loadFile
+    if (isTerminalMode) {
+      mainWindow.loadFile(path.join(__dirname, 'dist/index.html'), { hash: '/terminal' });
+    } else {
+      mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    }
     mainWindow.setMenuBarVisibility(false);
   }
 }

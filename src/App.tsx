@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Sync Trigger: 2026-05-01 17:10 - Final Production Refinement
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { HashRouter, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -29,6 +29,9 @@ import NotFound from "@/pages/NotFound";
 import Attendance from "@/pages/Attendance";
 import Vacations from "@/pages/Vacations";
 import Commercial from "@/pages/Commercial";
+import EmployeePortal from "@/pages/EmployeePortal";
+import EmployeeLogin from "@/pages/EmployeeLogin";
+import TerminalPonto from "@/pages/TerminalPonto";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +42,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isEmployeeView } = useAuth();
   const isSuperadmin = user?.role === 'superadmin' || user?.email === 'cristiano';
   
   // ── CAMADA 2: Monitoramento de Licença em Tempo Real ──
@@ -52,10 +55,25 @@ function AppRoutes() {
     return <LicenseBlockScreen licenseInfo={license} />;
   }
 
+  // Define a landing page baseada no cargo
+  const landingPage = (isEmployeeView || user?.role === 'employee') ? "/portal" : "/dashboard";
+
+  const isNativeApp = !!(window as any).Capacitor;
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isNativeApp && location.pathname === '/') {
+      navigate('/terminal', { replace: true });
+    }
+  }, [isNativeApp, location.pathname]);
+
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={isNativeApp ? <Navigate to="/terminal" replace /> : (isAuthenticated ? <Navigate to={landingPage} replace /> : <Navigate to="/login" replace />)} />
+      <Route path="/colaborador" element={<EmployeeLogin />} />
+      <Route path="/terminal" element={<TerminalPonto />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to={landingPage} replace /> : <Login />} />
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/tenants" element={<Tenants />} />
@@ -77,6 +95,7 @@ function AppRoutes() {
         <Route path="/vacations" element={<Vacations />} />
         <Route path="/commercial" element={<Commercial />} />
       </Route>
+      <Route path="/portal" element={<ProtectedRoute><EmployeePortal /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -88,9 +107,9 @@ const App = () => (
       <Toaster />
       <AuthProvider>
         <BrandingStyles />
-        <BrowserRouter>
+        <HashRouter>
           <AppRoutes />
-        </BrowserRouter>
+        </HashRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
