@@ -58,7 +58,7 @@ function AppRoutes() {
   }
 
   // Define a landing page baseada no cargo
-  const landingPage = (isEmployeeView || user?.role === 'employee') ? "/portal" : "/dashboard";
+  const landingPage = (isEmployeeView || user?.role === 'employee') ? "/portal" : (user?.role === 'terminal' ? "/terminal" : "/dashboard");
 
   const isNativeApp = !!(window as any).Capacitor;
   const navigate = useNavigate();
@@ -72,7 +72,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={isNativeApp ? <Navigate to="/terminal" replace /> : (isAuthenticated ? <Navigate to={landingPage} replace /> : <Navigate to="/login" replace />)} />
+      <Route path="/" element={(isNativeApp || user?.role === 'terminal') ? <Navigate to="/terminal" replace /> : (isAuthenticated ? <Navigate to={landingPage} replace /> : <Navigate to="/login" replace />)} />
       <Route path="/colaborador" element={<EmployeeLogin />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to={landingPage} replace /> : <Login />} />
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
