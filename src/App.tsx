@@ -74,9 +74,9 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={isNativeApp ? <Navigate to="/terminal" replace /> : (isAuthenticated ? <Navigate to={landingPage} replace /> : <Navigate to="/login" replace />)} />
       <Route path="/colaborador" element={<EmployeeLogin />} />
-      <Route path="/terminal" element={(isNativeApp || isAuthenticated) ? <TerminalPonto /> : <Navigate to="/login" replace />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to={landingPage} replace /> : <Login />} />
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+        <Route path="/terminal" element={<TerminalPonto />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/tenants" element={<Tenants />} />
         <Route path="/stores" element={<Stores />} />
