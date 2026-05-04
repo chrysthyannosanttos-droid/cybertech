@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Sync Trigger: 2026-05-01 17:10 - Final Production Refinement
 import { HashRouter, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
@@ -32,6 +33,7 @@ import Commercial from "@/pages/Commercial";
 import EmployeePortal from "@/pages/EmployeePortal";
 import EmployeeLogin from "@/pages/EmployeeLogin";
 import TerminalPonto from "@/pages/TerminalPonto";
+
 
 const queryClient = new QueryClient();
 

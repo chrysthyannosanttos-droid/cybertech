@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   ShieldCheck, 
@@ -10,17 +10,32 @@ import {
   AlertCircle,
   MapPin,
   Clock as ClockIcon,
-  UserPlus
+  UserPlus,
+  Search,
+  Building2,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogTrigger 
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 
 import { offlineSync } from '@/services/OfflineSyncService';
 
 import { Camera as CapCamera } from '@capacitor/camera';
+
+// Tenant ID padrão do Terminal (fora do componente para uso em useState)
+const TERMINAL_TENANT_ID = 't1774631821158';
 
 export default function TerminalPonto() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -32,12 +47,31 @@ export default function TerminalPonto() {
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminAuth, setIsAdminAuth] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [selectedEmpName, setSelectedEmpName] = useState('');
   const [employees, setEmployees] = useState<any[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Busca de Empresa e Funcionário
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState(TERMINAL_TENANT_ID);
+  const [selectedTenantName, setSelectedTenantName] = useState('');
+  const [tenantSearch, setTenantSearch] = useState('');
+  const [empSearch, setEmpSearch] = useState('');
+  const [showTenantDropdown, setShowTenantDropdown] = useState(false);
+  const [showEmpDropdown, setShowEmpDropdown] = useState(false);
+  const [isLoadingTenants, setIsLoadingTenants] = useState(false);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const tenantInputRef = useRef<HTMLInputElement>(null);
+  const empInputRef = useRef<HTMLInputElement>(null);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  // Tenant ID Fixo para este Terminal (Super Atacado)
-  const TERMINAL_TENANT_ID = 't1774631821158';
 
   // Relógio e Monitor de Rede
   useEffect(() => {
@@ -64,18 +98,62 @@ export default function TerminalPonto() {
     setPendingCount(pending.length);
   };
 
-  // Iniciar Câmera, Cache e Loop de Scan
+  // Registro e Monitoramento do Dispositivo
+  const registerDevice = async () => {
+    if (!navigator.onLine) return; // Não tenta se offline
+    try {
+      // Obter IP Público (opcional, para auditoria)
+      let ip = 'Offline';
+      try {
+        const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+        const ipData = await ipRes.json();
+        ip = ipData.ip;
+      } catch (e) {
+        console.warn('IP público indisponível');
+      }
+
+      const deviceName = `Terminal ${TERMINAL_TENANT_ID === 't1774631821158' ? 'Super Atacado' : 'Global'}`;
+      const deviceData = {
+        name: deviceName,
+        ip_address: ip,
+        model: navigator.userAgent.includes('Android') ? 'Tablet Android' : 'Desktop/Browser',
+        status: 'ACTIVE',
+        last_sync: new Date().toISOString(),
+        tenant_id: TERMINAL_TENANT_ID
+      };
+
+      // Tenta upsert — ignora silenciosamente se a tabela não existir
+      const { error } = await supabase
+        .from('attendance_devices')
+        .upsert([deviceData], { onConflict: 'name' });
+
+      if (error) console.warn('Registro de dispositivo ignorado:', error.message);
+
+    } catch (err) {
+      console.warn('Erro ao registrar dispositivo (ignorado):', err);
+    }
+  };
+
+  // Iniciar Câmera, Cache e Monitoramento
   useEffect(() => {
     startCamera();
     initializeCache();
     updatePendingCount();
+    registerDevice();
 
-    // Loop de Identificação Automática (Tenta a cada 4 segundos)
+    // Heartbeat a cada 5 minutos
+    const heartBeat = setInterval(registerDevice, 300000);
+
+    /* 
+       LOOP DE IDENTIFICAÇÃO DESATIVADO TEMPORARIAMENTE
+       Para evitar registros automáticos indesejados (Mock).
+       Em produção, aqui entraria a lógica de detecção facial real.
     scanIntervalRef.current = setInterval(() => {
       if (status === 'idle' && !isRegistering) {
         handleAutoScan();
       }
     }, 4000);
+    */
 
     return () => {
       stopCamera();
@@ -83,19 +161,53 @@ export default function TerminalPonto() {
     };
   }, [status, isRegistering]);
 
-  const initializeCache = async () => {
+  const initializeCache = async (tenantId?: string) => {
+    const tid = tenantId || selectedTenantId;
+    console.log('Iniciando busca de colaboradores para tenant:', tid);
     try {
-      const { data } = await supabase
+      setIsLoadingEmployees(true);
+      const { data, error } = await supabase
         .from('employees')
-        .select('id, name, photo_url, tenant_id, cpf')
-        .eq('tenant_id', TERMINAL_TENANT_ID);
+        .select('id, name, photo_reference_url, tenant_id, cpf')
+        .eq('tenant_id', tid)
+        .order('name');
         
+      if (error) throw error;
+      
       if (data) {
+        console.log(`Sucesso: ${data.length} colaboradores encontrados.`);
         setEmployees(data);
         if (navigator.onLine) await offlineSync.cacheEmployees(data);
+        
+        if (tenantId) {
+          toast({ 
+            title: "Lista Carregada", 
+            description: `${data.length} colaboradores encontrados.`,
+            className: "bg-emerald-500 text-white"
+          });
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Falha ao inicializar cache:', err);
+      toast({ title: "Erro ao carregar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  const fetchTenants = async () => {
+    try {
+      setIsLoadingTenants(true);
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      if (data) setTenants(data);
+    } catch (err) {
+      console.warn('Não foi possível carregar empresas:', err);
+    } finally {
+      setIsLoadingTenants(false);
     }
   };
 
@@ -105,7 +217,20 @@ export default function TerminalPonto() {
       return;
     }
 
+    // Inicia Contagem Regressiva
+    for (let i = 3; i > 0; i--) {
+      setCountdown(i);
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'); // Bip curto
+      audio.play().catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    setCountdown(null);
+    const flashAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Som de obturador
+    flashAudio.play().catch(() => {});
+
     try {
+      setIsUploadingPhoto(true);
       const canvas = canvasRef.current;
       const video = videoRef.current;
       canvas.width = video.videoWidth;
@@ -119,19 +244,19 @@ export default function TerminalPonto() {
       // Upload para o Storage
       const fileName = `${selectedEmpId}_base.jpg`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('time-entries-photos')
-        .upload(`base-profiles/${fileName}`, blob, { upsert: true });
+        .from('employee-photos')
+        .upload(fileName, blob, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('time-entries-photos')
-        .getPublicUrl(`base-profiles/${fileName}`);
+        .from('employee-photos')
+        .getPublicUrl(fileName);
 
       // Atualiza o perfil do funcionário
       const { error: updateError } = await supabase
         .from('employees')
-        .update({ photo_url: publicUrl })
+        .update({ photo_reference_url: publicUrl })
         .eq('id', selectedEmpId);
 
       if (updateError) throw updateError;
@@ -143,7 +268,41 @@ export default function TerminalPonto() {
 
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploadingPhoto(false);
     }
+  };
+
+  const handleClearAllData = async () => {
+    if (!confirm("Isso apagará TODAS as fotos de biometria e histórico de batidas. Confirma?")) return;
+    
+    try {
+      toast({ title: "Limpando dados..." });
+      
+      // Limpa fotos dos funcionários
+      await supabase.from('employees').update({ photo_reference_url: null }).neq('id', '0');
+      
+      // Limpa batidas
+      await supabase.from('time_entries').delete().neq('id', '0');
+      
+      await initializeCache();
+      toast({ title: "Sistema resetado", description: "Fotos e batidas removidas.", className: "bg-emerald-500 text-white" });
+    } catch (err: any) {
+      toast({ title: "Erro ao limpar", description: err.message, variant: "destructive" });
+    }
+  };
+  
+  const handleRefreshEmployees = async () => {
+    toast({ title: "Atualizando lista...", description: "Buscando colaboradores no servidor." });
+    await initializeCache(selectedTenantId);
+    toast({ title: "Lista atualizada", className: "bg-emerald-500 text-white" });
+  };
+
+  const handleManualSync = async () => {
+    toast({ title: "Iniciando sincronização...", description: "Enviando batidas pendentes." });
+    await offlineSync.syncWithServer();
+    await updatePendingCount();
+    toast({ title: "Sincronização concluída", className: "bg-emerald-500 text-white" });
   };
 
   const handleAutoScan = () => {
@@ -152,11 +311,15 @@ export default function TerminalPonto() {
 
   const startCamera = async () => {
     try {
-      // Pedir permissões nativas explicitamente (Capacitor)
-      if (window.hasOwnProperty('Capacitor')) {
-        // Câmera e Armazenamento
-        await CapCamera.requestPermissions();
-        
+      // Pedir permissões nativas APENAS no Capacitor (Android/iOS)
+      const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+      if (isNative) {
+        try {
+          await CapCamera.requestPermissions();
+        } catch (permErr) {
+          console.warn('Permissão de câmera negada ou não disponível:', permErr);
+        }
+
         // Localização (Para o Ponto)
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(() => {}, () => {});
@@ -171,9 +334,9 @@ export default function TerminalPonto() {
         videoRef.current.srcObject = stream;
       }
     } catch (err: any) {
-      console.error(err);
-      setStatus('error');
-      setErrorMsg(err.message || 'Falha ao acessar câmera.');
+      console.error('Câmera:', err);
+      // Não bloqueia o terminal — apenas avisa
+      setErrorMsg(err.name === 'NotAllowedError' ? 'Permissão de câmera negada.' : err.message || 'Falha ao acessar câmera.');
     }
   };
 
@@ -296,12 +459,21 @@ export default function TerminalPonto() {
               <div className="absolute inset-x-0 h-[4px] bg-primary/60 animate-scan-line shadow-[0_0_20px_#1fb4f3] z-20" />
             )}
 
+            {/* Countdown Overlay */}
+            {countdown !== null && (
+              <div className="absolute inset-0 bg-primary/10 backdrop-blur-[2px] flex items-center justify-center z-50">
+                <div className="text-[180px] font-black italic text-white animate-in zoom-in duration-300 drop-shadow-[0_0_30px_rgba(31,180,243,0.8)]">
+                  {countdown}
+                </div>
+              </div>
+            )}
+
             {/* Overlay de Sucesso */}
             {status === 'success' && identifiedUser && (
               <div className="absolute inset-0 bg-[#020408]/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-500 px-8 text-center">
                 <div className="w-32 h-32 rounded-[3rem] border-4 border-emerald-500 overflow-hidden mb-6 shadow-2xl">
-                  {identifiedUser.photo_url ? (
-                    <img src={identifiedUser.photo_url} className="w-full h-full object-cover" />
+                  {identifiedUser.photo_reference_url ? (
+                    <img src={identifiedUser.photo_reference_url} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-emerald-500 flex items-center justify-center text-white font-black text-5xl">
                       {identifiedUser.name[0]}
@@ -388,6 +560,18 @@ export default function TerminalPonto() {
                        type="password" 
                        value={adminPassword}
                        onChange={(e) => setAdminPassword(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter') {
+                           if (adminPassword === '123') {
+                             setIsAdminAuth(true);
+                             setAdminPassword('');
+                             fetchTenants();
+                             initializeCache();
+                           } else {
+                             toast({ title: "Acesso Negado", variant: "destructive" });
+                           }
+                         }
+                       }}
                        placeholder="Senha do Terminal"
                        className="bg-white/5 border-white/10 h-14 rounded-2xl"
                     />
@@ -397,6 +581,8 @@ export default function TerminalPonto() {
                           if (adminPassword === '123') {
                              setIsAdminAuth(true);
                              setAdminPassword('');
+                             fetchTenants();
+                             initializeCache();
                           } else {
                              toast({ title: "Acesso Negado", variant: "destructive" });
                           }
@@ -406,28 +592,204 @@ export default function TerminalPonto() {
                     </Button>
                  </div>
                ) : (
-                 <div className="space-y-6 py-4">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Colaborador</label>
-                       <select 
-                          className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-4 text-white appearance-none"
-                          value={selectedEmpId}
-                          onChange={(e) => setSelectedEmpId(e.target.value)}
-                       >
-                          <option value="" className="bg-[#0a0f1d]">Selecionar na lista...</option>
-                          {employees.map(emp => (
-                            <option key={emp.id} value={emp.id} className="bg-[#0a0f1d]">{emp.name}</option>
-                          ))}
-                       </select>
-                    </div>
-                    <Button 
-                       className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase rounded-2xl gap-2"
-                       onClick={handleCaptureBasePhoto}
-                    >
-                       <Camera className="w-5 h-5" />
-                       Salvar Biometria
-                    </Button>
-                    <Button variant="ghost" className="w-full text-white/40" onClick={() => setIsAdminAuth(false)}>Sair</Button>
+                 <div className="space-y-5 py-2">
+
+                   {/* ── BUSCA DE EMPRESA ── */}
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1 flex items-center gap-1.5">
+                       <Building2 className="w-3 h-3" /> Empresa
+                     </label>
+                     <div className="relative">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                       <input
+                         ref={tenantInputRef}
+                         type="text"
+                         className="w-full h-12 bg-white/5 border border-white/10 rounded-2xl pl-10 pr-10 text-white text-sm placeholder:text-white/30 outline-none focus:border-primary/50 transition-colors"
+                         placeholder="Buscar empresa..."
+                         value={tenantSearch}
+                         onChange={(e) => {
+                           setTenantSearch(e.target.value);
+                           setShowTenantDropdown(true);
+                         }}
+                         onFocus={() => setShowTenantDropdown(true)}
+                         onBlur={() => setTimeout(() => setShowTenantDropdown(false), 150)}
+                       />
+                       {selectedTenantName && (
+                         <button
+                           className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70"
+                           onClick={() => {
+                             setSelectedTenantId(TERMINAL_TENANT_ID);
+                             setSelectedTenantName('');
+                             setTenantSearch('');
+                             setEmployees([]);
+                             setSelectedEmpId('');
+                             setSelectedEmpName('');
+                             setEmpSearch('');
+                           }}
+                         ><X className="w-4 h-4" /></button>
+                       )}
+                        {showTenantDropdown && (
+                          <div className="absolute top-full mt-1 w-full bg-[#0d1526] border border-white/10 rounded-2xl shadow-2xl z-50 max-h-52 overflow-y-auto">
+                            {isLoadingTenants ? (
+                              <div className="flex items-center justify-center gap-2 px-4 py-4 text-white/40">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Buscando empresas...</span>
+                              </div>
+                            ) : (
+                              <>
+                                {tenants
+                                  .filter(t => t.name.toLowerCase().includes(tenantSearch.toLowerCase()))
+                                  .map(t => (
+                                    <button
+                                      key={t.id}
+                                      className="w-full text-left px-4 py-3 text-sm text-white/80 hover:bg-white/5 hover:text-white transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                                      onMouseDown={() => {
+                                        setSelectedTenantId(t.id);
+                                        setSelectedTenantName(t.name);
+                                        setTenantSearch(t.name);
+                                        setShowTenantDropdown(false);
+                                        setSelectedEmpId('');
+                                        setSelectedEmpName('');
+                                        setEmpSearch('');
+                                        initializeCache(t.id);
+                                      }}
+                                    >
+                                      <span className="font-bold">{t.name}</span>
+                                      <span className="text-white/30 text-[10px] ml-2 font-mono">{t.id}</span>
+                                    </button>
+                                  ))}
+                                {tenants.filter(t => t.name.toLowerCase().includes(tenantSearch.toLowerCase())).length === 0 && (
+                                  <div className="px-4 py-3 text-sm text-white/30 italic">Nenhuma empresa encontrada</div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                     </div>
+                   </div>
+
+                   {/* ── BUSCA DE FUNCIONÁRIO ── */}
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1 flex items-center gap-1.5">
+                       <User className="w-3 h-3" /> Colaborador
+                     </label>
+                     <div className="relative">
+                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                       <input
+                         ref={empInputRef}
+                         type="text"
+                         className="w-full h-12 bg-white/5 border border-white/10 rounded-2xl pl-10 pr-10 text-white text-sm placeholder:text-white/30 outline-none focus:border-primary/50 transition-colors"
+                         placeholder="Buscar por nome ou CPF..."
+                         value={empSearch}
+                         onChange={(e) => {
+                           setEmpSearch(e.target.value);
+                           setShowEmpDropdown(true);
+                           if (!e.target.value) { setSelectedEmpId(''); setSelectedEmpName(''); }
+                         }}
+                         onFocus={() => setShowEmpDropdown(true)}
+                         onBlur={() => setTimeout(() => setShowEmpDropdown(false), 150)}
+                       />
+                       {selectedEmpName && (
+                         <button
+                           className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70"
+                           onClick={() => { setSelectedEmpId(''); setSelectedEmpName(''); setEmpSearch(''); }}
+                         ><X className="w-4 h-4" /></button>
+                       )}
+                          {showEmpDropdown && (
+                          <div className="absolute top-full mt-1 w-full bg-[#0d1526] border border-white/10 rounded-2xl shadow-2xl z-50 max-h-52 overflow-y-auto">
+                            {isLoadingEmployees ? (
+                              <div className="flex items-center justify-center gap-2 px-4 py-4 text-white/40">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Buscando colaboradores...</span>
+                              </div>
+                            ) : (
+                              <>
+                                {employees
+                                  .filter(e => 
+                                    e.name.toLowerCase().includes(empSearch.toLowerCase()) || 
+                                    (e.cpf && e.cpf.replace(/\D/g, '').includes(empSearch.replace(/\D/g, '')))
+                                  )
+                                  .map(emp => (
+                                    <button
+                                      key={emp.id}
+                                      className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition-colors first:rounded-t-2xl last:rounded-b-2xl flex items-center gap-3"
+                                      onMouseDown={() => {
+                                        setSelectedEmpId(emp.id);
+                                        setSelectedEmpName(emp.name);
+                                        setEmpSearch(emp.name);
+                                        setShowEmpDropdown(false);
+                                      }}
+                                    >
+                                      {emp.photo_reference_url ? (
+                                        <img src={emp.photo_reference_url} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                          <span className="text-primary font-black text-sm">{emp.name[0]}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-white/80">{emp.name}</span>
+                                        {emp.cpf && <span className="text-[10px] text-white/30 uppercase tracking-tighter">CPF: {emp.cpf}</span>}
+                                      </div>
+                                    </button>
+                                  ))}
+                                {employees.filter(e => 
+                                  e.name.toLowerCase().includes(empSearch.toLowerCase()) || 
+                                  (e.cpf && e.cpf.replace(/\D/g, '').includes(empSearch.replace(/\D/g, '')))
+                                ).length === 0 && (
+                                  <div className="px-4 py-3 text-sm text-white/30 italic">
+                                    {employees.length === 0 ? (
+                                      <div className="flex flex-col gap-1">
+                                        <span>🏢 Nenhum colaborador encontrado para esta empresa.</span>
+                                        <span className="text-[9px] opacity-50 font-mono">ID: {selectedTenantId}</span>
+                                      </div>
+                                    ) : (
+                                      'Nenhum colaborador encontrado com este nome/CPF'
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                     </div>
+                     {selectedEmpName && (
+                       <p className="text-[10px] text-emerald-500 font-bold ml-1 uppercase tracking-wider">✓ {selectedEmpName} selecionado</p>
+                     )}
+                   </div>
+                      <Button 
+                         className={cn(
+                           "w-full h-14 font-black uppercase rounded-2xl gap-2 transition-all duration-300",
+                           countdown !== null ? "bg-amber-500 scale-[0.98]" : "bg-emerald-500 hover:bg-emerald-600",
+                           "text-white disabled:opacity-50"
+                         )}
+                         onClick={handleCaptureBasePhoto}
+                         disabled={isUploadingPhoto || !selectedEmpId || countdown !== null}
+                      >
+                         {isUploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                          countdown !== null ? <ClockIcon className="w-5 h-5 animate-bounce" /> : <Camera className="w-5 h-5" />}
+                         {isUploadingPhoto ? 'Salvando...' : 
+                          countdown !== null ? `Preparar (${countdown}s)` : 'Salvar Biometria'}
+                      </Button>
+
+                     <div className="grid grid-cols-2 gap-4">
+                        <Button 
+                           variant="outline" 
+                           className="border-white/10 text-white/60 hover:text-white"
+                           onClick={handleRefreshEmployees}
+                        >
+                           Atualizar Lista
+                        </Button>
+                        <Button 
+                           variant="outline" 
+                           className="border-white/10 text-white/60 hover:text-white"
+                           onClick={handleManualSync}
+                        >
+                           Sincronizar Batidas
+                        </Button>
+                     </div>
+
+                     <Button variant="ghost" className="w-full text-white/40" onClick={() => setIsAdminAuth(false)}>Sair</Button>
                  </div>
                )}
             </DialogContent>
