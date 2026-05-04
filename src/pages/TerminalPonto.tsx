@@ -470,19 +470,33 @@ export default function TerminalPonto() {
 
             {/* Overlay de Sucesso */}
             {status === 'success' && identifiedUser && (
-              <div className="absolute inset-0 bg-[#020408]/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-500 px-8 text-center">
-                <div className="w-32 h-32 rounded-[3rem] border-4 border-emerald-500 overflow-hidden mb-6 shadow-2xl">
-                  {identifiedUser.photo_reference_url ? (
-                    <img src={identifiedUser.photo_reference_url} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-emerald-500 flex items-center justify-center text-white font-black text-5xl">
-                      {identifiedUser.name[0]}
-                    </div>
-                  )}
+              <div className="absolute inset-0 bg-[#020408]/90 backdrop-blur-2xl flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-500 px-8 text-center z-[100]">
+                {/* Glow de Fundo */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-emerald-500/20 blur-[80px] rounded-full animate-pulse" />
+                
+                <div className="relative">
+                  <div className="w-40 h-40 rounded-[3.5rem] border-4 border-emerald-500 overflow-hidden mb-8 shadow-[0_0_50px_rgba(16,185,129,0.4)] animate-in slide-in-from-bottom-8 duration-700">
+                    {identifiedUser.photo_reference_url ? (
+                      <img src={identifiedUser.photo_reference_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-black text-6xl">
+                        {identifiedUser.name[0]}
+                      </div>
+                    )}
+                  </div>
+                  {/* Ícone de Check Flutuante */}
+                  <div className="absolute -right-2 -bottom-2 w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-xl border-4 border-[#020408] animate-in zoom-in duration-500 delay-300">
+                    <ShieldCheck className="w-6 h-6 text-white" />
+                  </div>
                 </div>
-                <p className="text-emerald-500 font-black uppercase text-xs tracking-[0.4em] mb-2">Ponto Registrado!</p>
-                <h3 className="text-4xl font-black uppercase tracking-tighter italic">{identifiedUser.name.split(' ')[0]}</h3>
-                <p className="text-white/40 text-sm font-bold uppercase tracking-widest mt-4">Bom trabalho!</p>
+
+                <div className="space-y-1 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+                  <p className="text-emerald-500 font-black uppercase text-xs tracking-[0.5em] mb-3">Ponto Registrado!</p>
+                  <h3 className="text-5xl font-black uppercase tracking-tighter italic text-white drop-shadow-md">
+                    {identifiedUser.name.split(' ')[0]}
+                  </h3>
+                  <p className="text-white/40 text-[11px] font-bold uppercase tracking-[0.3em] mt-6">Bom trabalho e ótima jornada!</p>
+                </div>
               </div>
             )}
           </div>
@@ -772,22 +786,39 @@ export default function TerminalPonto() {
                           countdown !== null ? `Preparar (${countdown}s)` : 'Salvar Biometria'}
                       </Button>
 
-                     <div className="grid grid-cols-2 gap-4">
-                        <Button 
-                           variant="outline" 
-                           className="border-white/10 text-white/60 hover:text-white"
-                           onClick={handleRefreshEmployees}
-                        >
-                           Atualizar Lista
-                        </Button>
-                        <Button 
-                           variant="outline" 
-                           className="border-white/10 text-white/60 hover:text-white"
-                           onClick={handleManualSync}
-                        >
-                           Sincronizar Batidas
-                        </Button>
-                     </div>
+                      <div className="grid grid-cols-3 gap-3">
+                         <Button 
+                            variant="outline" 
+                            className="border-white/10 text-white/60 hover:text-white text-[10px] px-1"
+                            onClick={handleRefreshEmployees}
+                         >
+                            Atualizar
+                         </Button>
+                         <Button 
+                            variant="outline" 
+                            className="border-white/10 text-white/60 hover:text-white text-[10px] px-1"
+                            onClick={handleManualSync}
+                         >
+                            Sincronizar
+                         </Button>
+                         <Button 
+                            variant="outline" 
+                            className="border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 text-[10px] px-1"
+                            onClick={() => {
+                              if (!selectedEmpId) return toast({ title: "Selecione um funcionário", variant: "destructive" });
+                              const emp = employees.find(e => e.id === selectedEmpId);
+                              if (emp) {
+                                setIdentifiedUser(emp);
+                                setStatus('success');
+                                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                                audio.play().catch(() => {});
+                                setTimeout(() => { setStatus('idle'); setIdentifiedUser(null); setIsAdminAuth(false); setIsRegistering(false); }, 4000);
+                              }
+                            }}
+                         >
+                            Testar Batida
+                         </Button>
+                      </div>
 
                      <Button variant="ghost" className="w-full text-white/40" onClick={() => setIsAdminAuth(false)}>Sair</Button>
                  </div>
