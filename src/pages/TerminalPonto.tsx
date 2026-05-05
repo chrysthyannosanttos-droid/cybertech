@@ -144,16 +144,13 @@ export default function TerminalPonto() {
     // Heartbeat a cada 5 minutos
     const heartBeat = setInterval(registerDevice, 300000);
 
-    /* 
-       LOOP DE IDENTIFICAÇÃO DESATIVADO TEMPORARIAMENTE
-       Para evitar registros automáticos indesejados (Mock).
-       Em produção, aqui entraria a lógica de detecção facial real.
+    // LOOP DE IDENTIFICAÇÃO REATIVADO
+    // Em produção, aqui entra a lógica de detecção facial real.
     scanIntervalRef.current = setInterval(() => {
-      if (status === 'idle' && !isRegistering) {
+      if (status === 'idle' && !isRegistering && !isAdminAuth) {
         handleAutoScan();
       }
-    }, 4000);
-    */
+    }, 5000); // Tenta identificar a cada 5 segundos
 
     return () => {
       stopCamera();
@@ -446,13 +443,14 @@ export default function TerminalPonto() {
             status === 'success' && "border-emerald-500 shadow-emerald-500/30 scale-105",
             status === 'error' && "border-rose-500 shadow-rose-500/30"
           )}>
-            <video 
-               ref={videoRef}
-               autoPlay 
-               playsInline 
-               muted
-               className="w-full h-full object-cover scale-x-[-1]"
-            />
+             <video 
+                ref={videoRef}
+                autoPlay 
+                playsInline 
+                muted
+                className="w-full h-full object-cover scale-x-[-1] cursor-pointer"
+                onClick={handleManualIdentification}
+             />
 
             {/* Scanner Line */}
             {status === 'scanning' && (
