@@ -159,31 +159,51 @@ export function EmployeePhotoCapture({
               <div className="flex flex-col items-center gap-3 text-muted-foreground">
                 <Camera className="w-12 h-12 opacity-20" />
                 <p className="text-[11px] font-bold uppercase tracking-widest opacity-50">
-                  Câmera desativada
-                </p>
+              <div className="relative w-full h-full">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute inset-0 border-[40px] border-black/40" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] border-2 border-white/20 rounded-[2rem]" />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-0.5 bg-primary/40 shadow-[0_0_15px_rgba(31,180,243,0.5)] animate-scan" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-white/20">
+                <div className="w-24 h-24 rounded-[2rem] bg-white/5 flex items-center justify-center border border-white/5">
+                  <Camera className="w-12 h-12" />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Câmera Desativada</p>
               </div>
             )}
           </div>
 
           <canvas ref={canvasRef} className="hidden" />
 
-          <p className="text-[12px] text-muted-foreground text-center leading-relaxed">
-            Posicione o rosto do funcionário no centro da câmera ou faça o upload de uma foto nítida para o reconhecimento facial.
+          <p className="text-[11px] font-medium text-white/40 text-center leading-relaxed uppercase tracking-wider px-4">
+            Posicione o rosto do colaborador no centro para uma captura nítida. Esta foto será a base da biometria.
           </p>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3 pt-2">
             {!capture ? (
               !cameraActive ? (
                 <>
-                  <Button className="flex-1 h-10 gap-2" onClick={startCamera}>
-                    <Camera className="w-4 h-4" /> Ativar Câmera
+                  <Button 
+                    className="flex-1 h-14 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-tighter italic text-sm gap-3 shadow-lg shadow-primary/20" 
+                    onClick={startCamera}
+                  >
+                    <Camera className="w-5 h-5" /> Ativar Câmera
                   </Button>
                   <Button
                     variant="outline"
-                    className="flex-1 h-10 gap-2"
+                    className="w-14 h-14 rounded-2xl border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <Upload className="w-4 h-4" /> Enviar Arquivo
+                    <Upload className="w-5 h-5" />
                   </Button>
                   <input
                     type="file"
@@ -195,35 +215,40 @@ export function EmployeePhotoCapture({
                 </>
               ) : (
                 <Button
-                  className="flex-1 h-10 gap-2 bg-white text-black hover:bg-white/90"
+                  className="flex-1 h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-black uppercase tracking-tighter italic text-sm gap-3 animate-in fade-in slide-in-from-bottom-2"
                   onClick={capturePhoto}
                 >
-                  <div className="w-4 h-4 rounded-full border-2 border-black" />
-                  Tirar Foto
+                  <div className="w-5 h-5 rounded-full border-4 border-black/20 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                  </div>
+                  Capturar Foto
                 </Button>
               )
             ) : (
               <>
                 <Button
                   variant="outline"
-                  className="flex-1 h-10"
+                  className="flex-1 h-14 rounded-2xl border-white/10 bg-white/5 text-white font-black uppercase tracking-tighter italic text-sm"
                   onClick={() => {
                     setCapture(null);
                     startCamera();
                   }}
                 >
-                  Repetir
+                  Tentar Novamente
                 </Button>
                 <Button
-                  className="flex-1 h-10 gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  className="flex-1 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-tighter italic text-sm gap-3 shadow-lg shadow-emerald-500/20"
                   onClick={savePhoto}
                   disabled={uploading}
                 >
                   {uploading ? (
-                    'Salvando...'
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      Salvando...
+                    </div>
                   ) : (
                     <>
-                      <CheckCircle2 className="w-4 h-4" /> Salvar
+                      <CheckCircle2 className="w-5 h-5" /> Confirmar
                     </>
                   )}
                 </Button>
