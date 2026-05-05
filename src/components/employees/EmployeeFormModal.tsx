@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,12 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Check, 
-  ChevronsUpDown, 
   User, 
   Briefcase, 
   Wallet, 
@@ -40,7 +35,8 @@ import {
   CreditCard,
   Zap,
   Star,
-  TrendingUp
+  TrendingUp,
+  X
 } from 'lucide-react';
 
 interface EmployeeFormModalProps {
@@ -176,297 +172,175 @@ export function EmployeeFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-[#0a0f1e] border-white/5 shadow-2xl rounded-[2.5rem]">
-        <div className="flex flex-col h-[85vh]">
-          {/* Header Superior com Identidade 360 */}
-          <div className="relative p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border-b border-white/5">
-             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl -mr-32 -mt-32" />
-             <div className="flex items-center gap-8 relative z-10">
-                <div className="relative group">
-                  <div className="w-24 h-24 rounded-3xl bg-white/5 border-2 border-primary/20 flex items-center justify-center overflow-hidden group-hover:border-primary/50 transition-all duration-500 shadow-2xl">
-                     {form.photo_url ? (
-                       <img src={form.photo_url} alt="Foto" className="w-full h-full object-cover" />
-                     ) : (
-                       <User className="w-10 h-10 text-primary/40 group-hover:scale-110 transition-transform" />
-                     )}
-                  </div>
-                  <div className={cn(
-                    "absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-xl",
-                    form.status === 'ACTIVE' ? "bg-emerald-500 text-white border-emerald-400" : "bg-rose-500 text-white border-rose-400"
-                  )}>
-                    {form.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
-                  </div>
-                </div>
+      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-[#020408] border-white/5 shadow-2xl rounded-[2rem] flex flex-col max-h-[90vh]">
+        {/* Header Fixo */}
+        <div className="p-6 bg-gradient-to-br from-primary/10 to-transparent border-b border-white/5 flex items-center justify-between">
+           <div className="flex items-center gap-6">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-primary/20 flex items-center justify-center overflow-hidden shadow-xl">
+                 {form.photo_reference_url ? (
+                   <img src={form.photo_reference_url} className="w-full h-full object-cover" />
+                 ) : (
+                   <User className="w-8 h-8 text-primary/30" />
+                 )}
+              </div>
+              <div>
+                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight">{form.name || 'Novo Cadastro'}</h2>
+                 <p className="text-[10px] font-bold text-primary uppercase tracking-[0.3em]">{form.role || 'Cargo não definido'}</p>
+              </div>
+           </div>
+           <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl hover:bg-white/5 text-white/40">
+             <X className="w-5 h-5" />
+           </Button>
+        </div>
 
-                <div className="flex-1 space-y-1">
-                   <div className="flex items-center gap-3">
-                     <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">{form.name || 'Novo Colaborador'}</h2>
-                     {form.flexivelSelo && <Star className="w-5 h-5 text-amber-400 fill-amber-400 animate-pulse" />}
-                   </div>
-                   <div className="flex flex-wrap items-center gap-4 text-muted-foreground font-bold text-[11px] uppercase tracking-widest">
-                      <span className="flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5 text-primary" /> {form.role || 'Cargo não definido'}</span>
-                      <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-primary" /> {dbStores.find(s => s.id === form.storeId)?.name || 'Sem Loja'}</span>
-                      <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> R$ {totalCost.toLocaleString('pt-BR')} (Custo Total)</span>
-                   </div>
-                </div>
-             </div>
-          </div>
-
-          {/* Abas de Navegação */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <div className="px-8 bg-white/[0.02]">
-              <TabsList className="h-14 bg-transparent gap-8 p-0">
-                <TabsTrigger value="perfil" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[11px] font-black uppercase tracking-widest gap-2">
-                  <User className="w-3.5 h-3.5" /> Perfil & Bio
-                </TabsTrigger>
-                <TabsTrigger value="contratual" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[11px] font-black uppercase tracking-widest gap-2">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Contratual
-                </TabsTrigger>
-                <TabsTrigger value="beneficios" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[11px] font-black uppercase tracking-widest gap-2">
-                  <Wallet className="w-3.5 h-3.5" /> Benefícios
-                </TabsTrigger>
-                <TabsTrigger value="jornada" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[11px] font-black uppercase tracking-widest gap-2">
-                  <Clock className="w-3.5 h-3.5" /> Jornada & Ponto
-                </TabsTrigger>
+        {/* Área de Conteúdo Rolável */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="px-6 sticky top-0 bg-[#020408] z-20 border-b border-white/5">
+              <TabsList className="h-12 bg-transparent gap-6 p-0">
+                <TabsTrigger value="perfil" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Perfil</TabsTrigger>
+                <TabsTrigger value="contratual" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Contrato</TabsTrigger>
+                <TabsTrigger value="beneficios" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Benefícios</TabsTrigger>
+                <TabsTrigger value="jornada" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Ponto</TabsTrigger>
               </TabsList>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              {/* ABA PERFIL */}
+            <div className="p-8">
               <TabsContent value="perfil" className="mt-0 space-y-8 animate-in fade-in duration-300">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Dados de Identidade</h3>
-                       <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nome Completo *</Label>
-                            <Input value={form.name || ''} onChange={e => {
-                               const name = e.target.value.toUpperCase();
-                               setForm(f => ({ ...f, name, gender: guessGender(name) }));
-                            }} className="h-12 bg-white/5 border-white/10 rounded-xl font-bold" />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">CPF *</Label>
-                                <Input value={form.cpf || ''} onChange={e => {
-                                  let v = e.target.value.replace(/\D/g, '');
-                                  if (v.length > 11) v = v.slice(0, 11);
-                                  v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-                                  setForm(f => ({ ...f, cpf: v }));
-                                }} placeholder="000.000.000-00" className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                             </div>
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Sexo</Label>
-                                <Select value={form.gender} onValueChange={(v: any) => setForm(f => ({ ...f, gender: v }))}>
-                                  <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent className="glass-card border-white/10">
-                                    <SelectItem value="M">MASCULINO</SelectItem>
-                                    <SelectItem value="F">FEMININO</SelectItem>
-                                    <SelectItem value="OTHER">OUTRO</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                             </div>
-                          </div>
-                       </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Nome Completo *</Label>
+                      <Input value={form.name || ''} onChange={e => {
+                        const name = e.target.value.toUpperCase();
+                        setForm(f => ({ ...f, name, gender: guessGender(name) }));
+                      }} className="h-12 bg-white/5 border-white/10 rounded-xl font-bold" />
                     </div>
-
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Canais de Contato</h3>
-                       <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">E-mail Corporativo</Label>
-                            <div className="relative">
-                               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-                               <Input type="email" value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value.toLowerCase() }))} placeholder="empresa@email.com" className="h-12 pl-12 bg-white/5 border-white/10 rounded-xl" />
-                            </div>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">WhatsApp (Celular)</Label>
-                            <div className="relative">
-                               <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-                               <Input value={form.phone || ''} onChange={e => {
-                                  let v = e.target.value.replace(/\D/g, '');
-                                  if (v.length > 11) v = v.slice(0, 11);
-                                  v = v.replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
-                                  setForm(f => ({ ...f, phone: v }));
-                               }} placeholder="(00) 00000-0000" className="h-12 pl-12 bg-white/5 border-white/10 rounded-xl" />
-                            </div>
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </TabsContent>
-
-              {/* ABA CONTRATUAL */}
-              <TabsContent value="contratual" className="mt-0 space-y-8 animate-in fade-in duration-300">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Alocação Operacional</h3>
-                       <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Unidade / Loja *</Label>
-                            <Select value={form.storeId} onValueChange={v => setForm(f => ({ ...f, storeId: v }))}>
-                              <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
-                                <SelectValue placeholder="Selecione a loja..." />
-                              </SelectTrigger>
-                              <SelectContent className="glass-card border-white/10">
-                                {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Setor</Label>
-                                <Input value={form.department || ''} onChange={e => setForm(f => ({ ...f, department: e.target.value.toUpperCase() }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                             </div>
-                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">CBO</Label>
-                                <Input value={form.cbo || ''} onChange={e => setForm(f => ({ ...f, cbo: e.target.value.toUpperCase() }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                             </div>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Cargo Oficial</Label>
-                            <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-                              <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
-                                <SelectValue placeholder="Selecione o cargo..." />
-                              </SelectTrigger>
-                              <SelectContent className="glass-card border-white/10 h-64">
-                                {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                       </div>
-                    </div>
-
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Dados Financeiros</h3>
-                       <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Salário Base (CLT)</Label>
-                            <div className="relative">
-                               <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500/40" />
-                               <Input type="number" value={form.salary || ''} onChange={e => setForm(f => ({ ...f, salary: Number(e.target.value) }))} className="h-12 pl-12 bg-emerald-500/5 border-emerald-500/20 rounded-xl font-black text-emerald-400" />
-                            </div>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Conta para Pagamento (Itaú)</Label>
-                            <Input value={form.contaItau || ''} onChange={e => setForm(f => ({ ...f, contaItau: e.target.value.toUpperCase() }))} placeholder="AG / CONTA" className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Data de Admissão</Label>
-                            <Input type="date" value={form.admissionDate || ''} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </TabsContent>
-
-              {/* ABA BENEFÍCIOS */}
-              <TabsContent value="beneficios" className="mt-0 space-y-8 animate-in fade-in duration-300">
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                      { id: 'valeTransporte', label: 'Vale Transporte', icon: MapPin },
-                      { id: 'valeRefeicao', label: 'Vale Refeição', icon: Wallet },
-                      { id: 'insalubridade', label: 'Insalubridade', icon: ShieldCheck },
-                      { id: 'periculosidade', label: 'Periculosidade', icon: Zap },
-                      { id: 'flexivel', label: 'Ajuda de Custo', icon: Star },
-                      { id: 'gratificacao', label: 'Gratificação', icon: TrendingUp },
-                      { id: 'valeFlexivel', label: 'Vale Flexível', icon: CreditCard },
-                      { id: 'mobilidade', label: 'Mobilidade', icon: MapPin },
-                      { id: 'adicionalNoturno', label: 'Adicional Noturno', icon: Clock },
-                    ].map(item => (
-                      <div key={item.id} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3 group hover:border-primary/30 transition-all">
-                        <div className="flex items-center justify-between">
-                           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-                             <item.icon className="w-4 h-4 text-primary" />
-                           </div>
-                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">{item.label}</span>
-                        </div>
-                        <Input 
-                          type="number" 
-                          value={form[item.id as keyof Employee] as number || ''} 
-                          onChange={e => setForm(f => ({ ...f, [item.id]: Number(e.target.value) }))} 
-                          className="h-10 bg-black/20 border-white/5 rounded-xl text-xs font-bold" 
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">CPF *</Label>
+                        <Input value={form.cpf || ''} onChange={e => {
+                          let v = e.target.value.replace(/\D/g, '');
+                          if (v.length > 11) v = v.slice(0, 11);
+                          v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                          setForm(f => ({ ...f, cpf: v }));
+                        }} className="h-12 bg-white/5 border-white/10 rounded-xl" />
                       </div>
-                    ))}
-                 </div>
-
-                 <div className="p-6 rounded-[2rem] bg-amber-500/5 border border-amber-500/20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
-                          <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
-                       </div>
-                       <div>
-                          <p className="text-[13px] font-black text-white uppercase tracking-widest">Selo de Premiação Virtual</p>
-                          <p className="text-[11px] text-muted-foreground">Exibir badge de colaborador destaque no perfil digital.</p>
-                       </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Sexo</Label>
+                        <Select value={form.gender} onValueChange={(v: any) => setForm(f => ({ ...f, gender: v }))}>
+                          <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#0a0f1e] border-white/10">
+                            <SelectItem value="M">MASCULINO</SelectItem>
+                            <SelectItem value="F">FEMININO</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <Switch checked={!!form.flexivelSelo} onCheckedChange={c => setForm(f => ({ ...f, flexivelSelo: c }))} />
-                 </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">E-mail Corporativo</Label>
+                      <Input type="email" value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value.toLowerCase() }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">WhatsApp</Label>
+                      <Input value={form.phone || ''} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                    </div>
+                  </div>
+                </div>
               </TabsContent>
 
-              {/* ABA JORNADA */}
-              <TabsContent value="jornada" className="mt-0 space-y-8 animate-in fade-in duration-300">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Horários da Grade</h3>
-                       <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Entrada</Label>
-                             <Input type="time" value={form.jornadaEntrada || '08:00'} onChange={e => setForm(f => ({ ...f, jornadaEntrada: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Saída Almoço</Label>
-                             <Input type="time" value={form.jornadaSaidaAlmoco || '12:00'} onChange={e => setForm(f => ({ ...f, jornadaSaidaAlmoco: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Retorno Almoço</Label>
-                             <Input type="time" value={form.jornadaRetornoAlmoco || '13:00'} onChange={e => setForm(f => ({ ...f, jornadaRetornoAlmoco: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Saída Final</Label>
-                             <Input type="time" value={form.jornadaSaida || '17:00'} onChange={e => setForm(f => ({ ...f, jornadaSaida: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                          </div>
-                       </div>
+              <TabsContent value="contratual" className="mt-0 space-y-8 animate-in fade-in duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Unidade / Loja *</Label>
+                      <Select value={form.storeId} onValueChange={v => setForm(f => ({ ...f, storeId: v }))}>
+                        <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f1e] border-white/10">
+                          {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Cargo Oficial</Label>
+                      <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
+                        <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f1e] border-white/10">
+                          {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Salário Base (CLT)</Label>
+                      <Input type="number" value={form.salary || ''} onChange={e => setForm(f => ({ ...f, salary: Number(e.target.value) }))} className="h-12 bg-emerald-500/5 border-emerald-500/20 rounded-xl font-black text-emerald-400" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Data de Admissão</Label>
+                      <Input type="date" value={form.admissionDate || ''} onChange={e => setForm(f => ({ ...f, admissionDate: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
 
-                    <div className="space-y-6">
-                       <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Controle de Campo</h3>
-                       <div className="space-y-4">
-                          <div className="space-y-1.5">
-                             <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Raio Geofence (Metros)</Label>
-                             <Input type="number" value={form.geofenceRadius || 0} onChange={e => setForm(f => ({ ...f, geofenceRadius: Number(e.target.value) }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
-                             <p className="text-[9px] text-muted-foreground">Distância máxima permitida da loja para registro de ponto. (0 = Sem limite)</p>
-                          </div>
-                       </div>
+              <TabsContent value="beneficios" className="mt-0 space-y-6 animate-in fade-in duration-300">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { id: 'valeTransporte', label: 'Vale Transporte' },
+                    { id: 'valeRefeicao', label: 'Vale Refeição' },
+                    { id: 'insalubridade', label: 'Insalubridade' },
+                    { id: 'periculosidade', label: 'Periculosidade' },
+                    { id: 'flexivel', label: 'Ajuda de Custo' },
+                    { id: 'gratificacao', label: 'Gratificação' },
+                  ].map(item => (
+                    <div key={item.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+                      <Label className="text-[9px] font-black uppercase text-white/40 tracking-widest">{item.label}</Label>
+                      <Input type="number" value={form[item.id as keyof Employee] as number || ''} onChange={e => setForm(f => ({ ...f, [item.id]: Number(e.target.value) }))} className="h-10 bg-black/20 border-white/5 rounded-lg text-xs" />
                     </div>
-                 </div>
+                  ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="jornada" className="mt-0 space-y-6 animate-in fade-in duration-300">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[
+                    { id: 'jornadaEntrada', label: 'Entrada' },
+                    { id: 'jornadaSaidaAlmoco', label: 'Saída Almoço' },
+                    { id: 'jornadaRetornoAlmoco', label: 'Volta Almoço' },
+                    { id: 'jornadaSaida', label: 'Saída Final' },
+                  ].map(item => (
+                    <div key={item.id} className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">{item.label}</Label>
+                      <Input type="time" value={form[item.id as keyof Employee] as string || ''} onChange={e => setForm(f => ({ ...f, [item.id]: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
               </TabsContent>
             </div>
           </Tabs>
+        </div>
 
-          {/* Footer com Resumo de Custo */}
-          <DialogFooter className="p-8 border-t border-white/5 bg-white/[0.01] items-center">
-             <div className="flex-1 flex items-center gap-6">
-                <div className="flex flex-col">
-                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Investimento Mensal</span>
-                   <span className="text-xl font-black text-emerald-400 tabular-nums">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="h-8 w-px bg-white/10" />
-                <p className="text-[11px] text-muted-foreground/60 leading-tight max-w-xs font-medium">
-                  Custo total projetado incluindo Salário Base e todos os benefícios e encargos adicionais habilitados.
-                </p>
-             </div>
-             <div className="flex gap-4">
-                <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-14 px-8 rounded-2xl font-black uppercase text-[11px] tracking-widest text-muted-foreground">Cancelar</Button>
-                <Button onClick={handleSave} className="h-14 px-10 rounded-2xl bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all">
-                  {editingId ? 'Salvar Alterações' : 'Finalizar Cadastro'}
-                </Button>
-             </div>
-          </DialogFooter>
+        {/* Footer Fixo */}
+        <div className="p-8 border-t border-white/5 bg-white/[0.01] flex flex-col sm:flex-row items-center gap-6">
+          <div className="flex-1">
+             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Custo Total Estimado</p>
+             <p className="text-2xl font-black text-emerald-400">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          </div>
+          <div className="flex gap-4 w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none h-14 px-8 rounded-2xl font-black uppercase text-[11px] tracking-widest text-white/40">Cancelar</Button>
+            <Button onClick={handleSave} className="flex-1 sm:flex-none h-14 px-10 rounded-2xl bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 italic hover:scale-105 transition-all">
+              {editingId ? 'Salvar Alterações' : 'Finalizar Cadastro'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
