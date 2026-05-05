@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface EmployeePhotoCaptureProps {
   open: boolean;
@@ -54,7 +55,7 @@ export function EmployeePhotoCapture({
     } catch {
       toast({
         title: 'Erro na câmera',
-        description: 'Não foi possível acessar a câmera.',
+        description: 'Não foi possível acessar a câmera. Verifique as permissões do navegador.',
         variant: 'destructive',
       });
     }
@@ -128,37 +129,28 @@ export function EmployeePhotoCapture({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[15px]">
-            <Camera className="w-5 h-5 text-primary" />
+      <DialogContent className="max-w-md bg-[#020408]/95 border-white/5 backdrop-blur-2xl p-0 overflow-hidden rounded-[2.5rem] shadow-[0_0_50px_rgba(31,180,243,0.1)]">
+        <DialogHeader className="p-6 pb-2">
+          <DialogTitle className="flex items-center gap-3 text-lg font-black uppercase italic tracking-tighter text-white">
+            <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30">
+              <Camera className="w-5 h-5 text-primary" />
+            </div>
             Cadastro de Biometria Facial
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="relative aspect-square rounded-2xl overflow-hidden bg-black border-2 border-white/10 flex items-center justify-center">
+        <div className="px-6 pb-8 space-y-6">
+          <div className="relative aspect-square rounded-[3rem] overflow-hidden bg-black/40 border-4 border-white/5 shadow-2xl group transition-all duration-500 hover:border-primary/30">
             {capture ? (
-              <>
+              <div className="relative w-full h-full animate-in zoom-in duration-500">
                 <img src={capture} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 border-4 border-emerald-500 flex items-center justify-center bg-emerald-500/10">
-                  <div className="glass p-3 rounded-full bg-emerald-500/20">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                <div className="absolute inset-0 bg-emerald-500/10 border-8 border-emerald-500/40 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-emerald-500/20 backdrop-blur-xl flex items-center justify-center border-4 border-emerald-500 animate-in zoom-in duration-700">
+                    <CheckCircle2 className="w-10 h-10 text-white" />
                   </div>
                 </div>
-              </>
+              </div>
             ) : cameraActive ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-                style={{ transform: 'scaleX(-1)' }}
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                <Camera className="w-12 h-12 opacity-20" />
-                <p className="text-[11px] font-bold uppercase tracking-widest opacity-50">
               <div className="relative w-full h-full">
                 <video
                   ref={videoRef}
