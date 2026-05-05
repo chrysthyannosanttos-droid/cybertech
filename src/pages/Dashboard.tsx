@@ -90,7 +90,6 @@ export default function Dashboard() {
       let qPayrolls = supabase.from('payrolls').select('*');
       let qRescissions = supabase.from('rescissions').select('*').order('termination_date', { ascending: false });
 
-      // Se não for superadmin (ou estiver emulando), filtrar por tenant_id
       if (!isSuperAdmin && user?.tenantId) {
         qEmployees = qEmployees.eq('tenant_id', user.tenantId);
         qCertificates = qCertificates.eq('tenant_id', user.tenantId);
@@ -148,8 +147,19 @@ export default function Dashboard() {
       
       setIsLoading(false);
     };
+
     fetchData();
-  }, []);
+
+    // Sincronização em Tempo Real (Certificados e Funcionários)
+    const channel = supabase.channel('dashboard_sync')
+      .on('postgres_changes', { event: '*', table: 'certificates', schema: 'public' }, () => fetchData())
+      .on('postgres_changes', { event: '*', table: 'employees', schema: 'public' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSuperAdmin, user?.tenantId]);
 
   const handleFixAllData = async () => {
     if (!window.confirm('Deseja executar a manutenção global? Isso irá:\n1. Ativar todos os funcionários\n2. Corrigir salários > 30.000 (dividir por 100)\n3. Identificar gênero pelo nome')) return;

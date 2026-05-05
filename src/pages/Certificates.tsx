@@ -32,9 +32,9 @@ export default function Certificates() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch real tenant_id
-      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
-      if (tData?.id) setTenantId(tData.id);
+      // Use the current user's tenantId
+      const currentTenantId = currentUser?.tenantId || null;
+      setTenantId(currentTenantId);
 
       // Fetch Certificates
       const { data: certData } = await supabase.from('certificates').select('*').order('date', { ascending: false });
