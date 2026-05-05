@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { offlineSync } from '@/services/OfflineSyncService';
 
 import { Camera as CapCamera } from '@capacitor/camera';
+import { faceService } from '@/services/FaceRecognitionService';
 
 // Tenant ID padrão do Terminal (fora do componente para uso em useState)
 const TERMINAL_TENANT_ID = 't1774631821158';
@@ -64,6 +65,7 @@ export default function TerminalPonto() {
   const [showEmpDropdown, setShowEmpDropdown] = useState(false);
   const [isLoadingTenants, setIsLoadingTenants] = useState(false);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [isTrainingAI, setIsTrainingAI] = useState(false);
   const tenantInputRef = useRef<HTMLInputElement>(null);
   const empInputRef = useRef<HTMLInputElement>(null);
   
@@ -136,6 +138,20 @@ export default function TerminalPonto() {
 
   // Iniciar Câmera, Cache e Monitoramento
   useEffect(() => {
+    const initIA = async () => {
+      try {
+        await faceService.loadModels();
+        if (employees.length > 0) {
+          setIsTrainingAI(true);
+          await faceService.train(employees);
+          setIsTrainingAI(false);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar IA:', err);
+      }
+    };
+    initIA();
+
     startCamera();
     initializeCache();
     updatePendingCount();
@@ -174,6 +190,11 @@ export default function TerminalPonto() {
       if (data) {
         console.log(`Sucesso: ${data.length} colaboradores encontrados.`);
         setEmployees(data);
+        
+        // Treina a IA com os novos dados
+        setIsTrainingAI(true);
+        faceService.train(data).finally(() => setIsTrainingAI(false));
+        
         if (navigator.onLine) await offlineSync.cacheEmployees(data);
         
         if (tenantId) {
@@ -358,16 +379,15 @@ export default function TerminalPonto() {
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(video, 0, 0);
 
-      // BUSCA OFFLINE: Usamos o cache local do IndexedDB
-      await new Promise(r => setTimeout(r, 1500));
-      const cachedEmployees = await offlineSync.getCachedEmployees();
+      // BUSCA REAL: Usamos a IA para identificar o rosto
+      const identifiedId = await faceService.identify(videoRef.current);
       
-      if (cachedEmployees.length === 0) {
-        throw new Error("Banco de dados offline vazio. Conecte-se uma vez para sincronizar.");
+      if (!identifiedId) {
+        throw new Error("Rosto não reconhecido. Certifique-se de estar em um local iluminado.");
       }
 
-      // Mock: Pega o primeiro (em produção seria o match da IA)
-      const emp = cachedEmployees[0];
+      const emp = employees.find(e => e.id === identifiedId);
+      if (!emp) throw new Error("Colaborador identificado não encontrado no sistema.");
 
       // SALVAR OFFLINE: Primeiro no IndexedDB
       await offlineSync.saveEntry({
@@ -511,7 +531,8 @@ export default function TerminalPonto() {
                 {status === 'scanning' ? <Loader2 className="w-5 h-5 animate-spin" /> : 
                  status === 'success' ? <ShieldCheck className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
                 <span className="text-[11px] font-black uppercase tracking-[0.2em]">
-                  {status === 'idle' ? 'Posicione o Rosto' : 
+                  {isTrainingAI ? 'Sincronizando Biometria...' :
+                   status === 'idle' ? 'Posicione o Rosto' : 
                    status === 'scanning' ? 'Identificando...' : 
                    status === 'success' ? 'Identificado' : 'Tentar Novamente'}
                 </span>
