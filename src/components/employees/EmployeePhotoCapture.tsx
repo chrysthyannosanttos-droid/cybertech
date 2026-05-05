@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Upload, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -27,16 +27,26 @@ export function EmployeePhotoCapture({
   const [cameraActive, setCameraActive] = useState(false);
   const [capture, setCapture] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Efeito para anexar o stream ao vídeo quando a câmera for ativada
+  useEffect(() => {
+    if (cameraActive && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [cameraActive, stream]);
+
   const handleClose = (v: boolean) => {
     if (!v) {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream)?.getTracks().forEach((t) => t.stop());
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
       }
+      setStream(null);
       setCameraActive(false);
       setCapture(null);
     }
@@ -45,26 +55,16 @@ export function EmployeePhotoCapture({
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(e => console.error('Erro ao dar play no vídeo:', e));
-        };
-        setCameraActive(true);
-      }
+      setStream(mediaStream);
+      setCameraActive(true);
     } catch (err: any) {
-      console.error('Erro detalhado da câmera:', err);
-      let msg = 'Não foi possível acessar a câmera.';
-      if (err.name === 'NotAllowedError') msg = 'Acesso negado. Por favor, libere a câmera no cadeado do navegador.';
-      if (err.name === 'NotFoundError') msg = 'Nenhuma câmera encontrada no seu computador.';
-      
+      console.error('Erro na câmera:', err);
       toast({
         title: 'Aviso da Câmera',
-        description: msg,
+        description: 'Não foi possível acessar a câmera. Verifique as permissões.',
         variant: 'destructive',
       });
     }
@@ -78,10 +78,13 @@ export function EmployeePhotoCapture({
     canvasRef.current.height = videoRef.current.videoHeight;
     ctx.drawImage(videoRef.current, 0, 0);
     setCapture(canvasRef.current.toDataURL('image/jpeg', 0.9));
-    const stream = videoRef.current.srcObject as MediaStream;
-    stream?.getTracks().forEach((t) => t.stop());
+    
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    setStream(null);
     setCameraActive(false);
-  }, []);
+  }, [stream]);
 
   const savePhoto = useCallback(async () => {
     if (!capture || !employeeId) return;
@@ -98,7 +101,6 @@ export function EmployeePhotoCapture({
       let photoUrl: string;
 
       if (storageError) {
-        console.warn('Storage upload failed, using base64 fallback:', storageError.message);
         photoUrl = capture;
       } else {
         const { data: publicData } = supabase.storage.from('employee-photos').getPublicUrl(fileName);
@@ -113,13 +115,13 @@ export function EmployeePhotoCapture({
       if (dbError) throw dbError;
 
       toast({
-        title: '✅ Foto de referência cadastrada!',
-        description: 'Biometria facial registrada com sucesso.',
+        title: '✅ Sucesso!',
+        description: 'Biometria facial registrada.',
       });
       onCaptureSuccess(photoUrl);
       handleClose(false);
     } catch (e: any) {
-      toast({ title: 'Erro ao salvar foto', description: e.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar', description: e.message, variant: 'destructive' });
     } finally {
       setUploading(false);
     }
