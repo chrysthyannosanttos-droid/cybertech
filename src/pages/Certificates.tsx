@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +25,8 @@ export default function Certificates() {
   const [form, setForm] = useState({ employeeId: '', date: '', cid: '', days: '' });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [empSearch, setEmpSearch] = useState('');
+  const [empOpen, setEmpOpen] = useState(false);
   
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'tenant';
 
@@ -42,9 +47,9 @@ export default function Certificates() {
         days: c.days
       } as unknown as Certificate)));
 
-      // Fetch Active Employees for the dropdown
-      const { data: empData } = await supabase.from('employees').select('id, name').eq('status', 'ACTIVE');
-      if (empData) setDbEmployees(empData);
+      // Fetch Active Employees for the dropdown (including CPF)
+      const { data: empData } = await supabase.from('employees').select('id, name, cpf').eq('status', 'ACTIVE').order('name');
+      if (empData) setDbEmployees(empData.map(e => ({ ...e, cpf: e.cpf })));
     };
 
     fetchData();
@@ -167,12 +172,53 @@ export default function Certificates() {
             <div className="space-y-3 mt-4">
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground block mb-1">Funcionário</label>
-                <Select value={form.employeeId} onValueChange={v => setForm(f => ({ ...f, employeeId: v }))}>
-                  <SelectTrigger className="h-9 text-[13px]"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {dbEmployees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={empOpen} onOpenChange={setEmpOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={empOpen}
+                      className="w-full h-11 justify-between bg-white/5 border-white/10 rounded-xl px-4 text-[13px] font-bold text-white hover:bg-white/10"
+                    >
+                      {form.employeeId
+                        ? dbEmployees.find((e) => e.id === form.employeeId)?.name
+                        : "Pesquisar por nome ou CPF..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[332px] p-0 bg-[#0a0f1e] border-white/10 shadow-2xl">
+                    <Command className="bg-transparent">
+                      <CommandInput placeholder="Digite nome ou CPF..." className="h-11 border-none bg-transparent focus:ring-0 text-[13px] font-bold" />
+                      <CommandList className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                        <CommandEmpty className="py-6 text-center text-[12px] text-muted-foreground uppercase font-bold tracking-widest">Nenhum funcionário encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {dbEmployees.map((e) => (
+                            <CommandItem
+                              key={e.id}
+                              value={`${e.name} ${e.cpf}`}
+                              onSelect={() => {
+                                setForm(f => ({ ...f, employeeId: e.id }));
+                                setEmpOpen(false);
+                              }}
+                              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors aria-selected:bg-primary/20"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-black text-white uppercase italic truncate tracking-tight">{e.name}</p>
+                                <p className="text-[10px] text-primary font-mono-data font-bold">{e.cpf}</p>
+                              </div>
+                              <Check
+                                className={cn(
+                                  "h-4 w-4 text-primary",
+                                  form.employeeId === e.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground block mb-1">Data</label>
