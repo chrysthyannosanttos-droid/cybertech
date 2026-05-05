@@ -46,16 +46,25 @@ export function EmployeePhotoCapture({
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(e => console.error('Erro ao dar play no vídeo:', e));
+        };
         setCameraActive(true);
       }
-    } catch {
+    } catch (err: any) {
+      console.error('Erro detalhado da câmera:', err);
+      let msg = 'Não foi possível acessar a câmera.';
+      if (err.name === 'NotAllowedError') msg = 'Acesso negado. Por favor, libere a câmera no cadeado do navegador.';
+      if (err.name === 'NotFoundError') msg = 'Nenhuma câmera encontrada no seu computador.';
+      
       toast({
-        title: 'Erro na câmera',
-        description: 'Não foi possível acessar a câmera. Verifique as permissões do navegador.',
+        title: 'Aviso da Câmera',
+        description: msg,
         variant: 'destructive',
       });
     }
