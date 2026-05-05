@@ -126,9 +126,15 @@ export function EmployeeTable({
                         className="flex items-center gap-2 cursor-pointer group/name"
                         onClick={() => onEdit(emp)}
                       >
-                        <div className="w-7 h-7 rounded bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-[9px] group-hover/name:scale-110 transition-transform flex-shrink-0">
-                          {emp.name.charAt(0)}
-                          {emp.name.split(' ')[1]?.charAt(0)}
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 text-primary font-black text-[9px] group-hover/name:scale-110 transition-transform flex-shrink-0 overflow-hidden">
+                          {emp.photo_reference_url ? (
+                            <img src={emp.photo_reference_url} className="w-full h-full object-cover" />
+                          ) : (
+                            <>
+                              {emp.name.charAt(0)}
+                              {emp.name.split(' ')[1]?.charAt(0)}
+                            </>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-[11px] font-black text-white group-hover/name:text-primary transition-colors truncate max-w-[140px] flex items-center gap-1.5">
