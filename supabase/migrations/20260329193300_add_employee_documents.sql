@@ -13,7 +13,16 @@ CREATE TABLE IF NOT EXISTS public.employee_documents (
 ALTER TABLE public.employee_documents ENABLE ROW LEVEL SECURITY;
 
 -- Política de acesso
+DROP POLICY IF EXISTS "Allow all for now" ON public.employee_documents;
 CREATE POLICY "Allow all for now" ON public.employee_documents FOR ALL USING (true);
 
--- Ativar Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE employee_documents;
+-- Ativar Realtime (safely)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'employee_documents'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE employee_documents;
+  END IF;
+END $$;

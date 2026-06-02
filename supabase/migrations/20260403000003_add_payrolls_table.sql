@@ -21,14 +21,18 @@ CREATE TABLE IF NOT EXISTS public.payrolls (
 -- RLS
 ALTER TABLE public.payrolls ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view payrolls from their tenant" ON public.payrolls;
 CREATE POLICY "Users can view payrolls from their tenant" 
     ON public.payrolls FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can insert payrolls into their tenant" ON public.payrolls;
 CREATE POLICY "Users can insert payrolls into their tenant" 
     ON public.payrolls FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can update their payrolls" ON public.payrolls;
 CREATE POLICY "Users can update their payrolls" 
     ON public.payrolls FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Users can delete their payrolls" ON public.payrolls;
 CREATE POLICY "Users can delete their payrolls" 
     ON public.payrolls FOR DELETE USING (true);

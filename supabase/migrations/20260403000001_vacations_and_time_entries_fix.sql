@@ -90,6 +90,20 @@ ALTER TABLE public.rescissions ADD COLUMN IF NOT EXISTS last_salary NUMERIC DEFA
 ALTER TABLE public.rescissions ADD COLUMN IF NOT EXISTS hazard_pay NUMERIC DEFAULT 0;
 ALTER TABLE public.rescissions ADD COLUMN IF NOT EXISTS unhealthy_pay NUMERIC DEFAULT 0;
 
--- 5. Habilita Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_devices;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.vacations;
+-- 5. Habilita Realtime (safely)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'attendance_devices'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_devices;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'vacations'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.vacations;
+  END IF;
+END $$;

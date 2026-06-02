@@ -20,25 +20,13 @@ export default function Login() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const tenantParam = searchParams.get('t');
-  const [branding, setBranding] = useState<any>(() => {
-    if (tenantParam) {
-      const cached = localStorage.getItem(`branding_${tenantParam}`);
-      return cached ? JSON.parse(cached) : null;
-    }
-    return null;
-  });
-  const [isBrandingLoading, setIsBrandingLoading] = useState(() => {
-    if (!tenantParam) return false;
-    const cached = localStorage.getItem(`branding_${tenantParam}`);
-    return !cached; // Only load if not cached
-  });
+  const [branding, setBranding] = useState<any>(null);
+  const [isBrandingLoading, setIsBrandingLoading] = useState(!!tenantParam);
 
   useEffect(() => {
     if (tenantParam) {
       const fetchBranding = async () => {
-        // If we don't have cached branding, show loading
-        const cached = localStorage.getItem(`branding_${tenantParam}`);
-        if (!cached) setIsBrandingLoading(true);
+        setIsBrandingLoading(true);
 
         try {
           // Try to fetch by slug first
@@ -62,7 +50,6 @@ export default function Login() {
 
           if (fetchedBranding) {
             setBranding(fetchedBranding);
-            localStorage.setItem(`branding_${tenantParam}`, JSON.stringify(fetchedBranding));
           }
         } catch (err) {
           console.error('Error fetching branding:', err);
