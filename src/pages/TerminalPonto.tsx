@@ -380,8 +380,14 @@ export default function TerminalPonto() {
       ctx?.drawImage(video, 0, 0);
 
       // BUSCA REAL: Usamos a IA para identificar o rosto
-      const identifiedId = await faceService.identify(videoRef.current);
+      let identifiedId = await faceService.identify(videoRef.current);
       
+      // MOCK PARA TREINAMENTO/LOCAL: Se falhar, tenta forçar como Cristiano
+      if (import.meta.env.DEV && !identifiedId) {
+        const cristiano = employees.find(e => e.name.toLowerCase().includes('cristiano'));
+        if (cristiano) identifiedId = cristiano.id;
+      }
+
       if (!identifiedId) {
         throw new Error("Rosto não reconhecido. Certifique-se de estar em um local iluminado.");
       }
