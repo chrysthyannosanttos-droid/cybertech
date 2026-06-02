@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Tenant } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +50,9 @@ interface BirthdaySettings {
 
 
 export default function CommunicationSettings() {
+  const { user, isImpersonating } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin' && !isImpersonating;
+
   const { toast } = useToast();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
@@ -88,6 +92,14 @@ export default function CommunicationSettings() {
 
   useEffect(() => {
     async function fetchTenants() {
+      if (!isSuperAdmin) {
+        if (user?.tenantId) {
+          setSelectedTenantId(user.tenantId);
+          setTenants([{ id: user.tenantId, name: user.tenantName || 'Sua Empresa' } as any]);
+        }
+        return;
+      }
+
       const { data } = await supabase.from('tenants').select('*').order('name');
       if (data) {
         setTenants(data as Tenant[]);
@@ -97,7 +109,7 @@ export default function CommunicationSettings() {
       }
     }
     fetchTenants();
-  }, []);
+  }, [isSuperAdmin, user?.tenantId]);
 
   useEffect(() => {
     if (selectedTenantId) {
@@ -196,25 +208,27 @@ export default function CommunicationSettings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1 space-y-4">
-          <Card className="glass-card border-white/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xs font-black uppercase tracking-tighter flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-primary" /> Unidade / Empresa
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
-                <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent className="glass-card border-white/10">
-                  {tenants.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name.toUpperCase()}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          {isSuperAdmin && (
+            <Card className="glass-card border-white/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xs font-black uppercase tracking-tighter flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" /> Unidade / Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                  <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent className="glass-card border-white/10">
+                    {tenants.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name.toUpperCase()}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="p-5 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/20 space-y-3">
              <div className="flex items-center gap-2 text-emerald-500">

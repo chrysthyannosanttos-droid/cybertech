@@ -45,7 +45,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/portal',            module: 'dashboard',         icon: UserCog,         label: 'Portal do Colaborador' },
   { to: '/commercial',        module: 'dashboard',         icon: FileText,        label: 'Proposta Comercial', superadminOnly: true, cristianoOnly: true },
   { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
-  { to: '/settings/email',    module: 'settings',          icon: Mail,            label: 'Config. Email', superadminOnly: true },
+  { to: '/settings/email',    module: 'dashboard',         icon: Mail,            label: 'Automações' },
   { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
 ];
 
