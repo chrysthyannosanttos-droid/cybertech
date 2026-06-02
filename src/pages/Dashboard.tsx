@@ -14,6 +14,7 @@ import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserMinus, Calculator, Trophy, Medal, Zap, LayoutDashboard, Search } from 'lucide-react';
+import { BirthdaysWidget } from '@/components/dashboard/BirthdaysWidget';
 
 
 function KpiCard({ icon: Icon, label, value, sub, delay, onClick, trend }: { icon: any; label: string; value: string; sub?: string; delay: number; onClick?: () => void; trend?: string }) {
@@ -698,8 +699,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Lado Direito: Leaderboard de Absenteísmo */}
+        {/* Lado Direito: Leaderboard de Absenteísmo & Aniversariantes */}
         <div className="lg:col-span-4 space-y-6">
+          <BirthdaysWidget />
+          
           <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up stagger-9 relative overflow-hidden h-full">
             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 blur-3xl -mr-16 -mt-16" />
             <div className="flex items-center justify-between mb-8">

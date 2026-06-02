@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Cake, Clock } from 'lucide-react';
+
 
 interface EmailSettings {
   id?: string;
@@ -32,6 +35,18 @@ interface WhatsAppSettings {
   token: string;
   auto_send_payroll?: boolean;
 }
+
+interface BirthdaySettings {
+  id?: string;
+  tenant_id: string;
+  is_active: boolean;
+  send_time: string;
+  channels: { email: boolean; whatsapp: boolean };
+  template_email_subject: string;
+  template_email_body: string;
+  template_whatsapp: string;
+}
+
 
 export default function CommunicationSettings() {
   const { toast } = useToast();
@@ -59,6 +74,17 @@ export default function CommunicationSettings() {
     token: '',
     auto_send_payroll: true
   });
+
+  const [birthdaySettings, setBirthdaySettings] = useState<BirthdaySettings>({
+    tenant_id: '',
+    is_active: false,
+    send_time: '09:00:00',
+    channels: { email: true, whatsapp: true },
+    template_email_subject: 'Feliz Aniversário, {{nome}}! 🎉',
+    template_email_body: '<p>Olá <strong>{{nome}}</strong>,</p><p>Toda a equipe da <strong>{{company}}</strong> deseja a você um feliz aniversário! 🎉 Que este dia seja especial e repleto de alegria.</p><p>Com carinho,<br>Equipe de RH</p>',
+    template_whatsapp: 'Feliz Aniversário, {{nome}}! 🎉 Toda a equipe da {{company}} deseja a você um dia incrível e cheio de alegria! 🥳'
+  });
+
 
   useEffect(() => {
     async function fetchTenants() {
@@ -101,6 +127,24 @@ export default function CommunicationSettings() {
 
       if (wData) setWaSettings(wData);
       else setWaSettings({ tenant_id: tenantId, api_type: 'none', base_url: '', instance_id: '', token: '', auto_send_payroll: true });
+
+      // Fetch Birthday
+      const { data: bData } = await supabase
+        .from('tenant_birthday_settings')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (bData) setBirthdaySettings(bData);
+      else setBirthdaySettings({
+        tenant_id: tenantId,
+        is_active: false,
+        send_time: '09:00:00',
+        channels: { email: true, whatsapp: true },
+        template_email_subject: 'Feliz Aniversário, {{nome}}! 🎉',
+        template_email_body: '<p>Olá <strong>{{nome}}</strong>,</p><p>Toda a equipe da <strong>{{company}}</strong> deseja a você um feliz aniversário! 🎉 Que este dia seja especial e repleto de alegria.</p><p>Com carinho,<br>Equipe de RH</p>',
+        template_whatsapp: 'Feliz Aniversário, {{nome}}! 🎉 Toda a equipe da {{company}} deseja a você um dia incrível e cheio de alegria! 🥳'
+      });
 
     } catch (e) {
       console.error(e);
@@ -191,6 +235,9 @@ export default function CommunicationSettings() {
               </TabsTrigger>
               <TabsTrigger value="whatsapp" className="rounded-xl px-8 font-black uppercase text-[11px] data-[state=active]:bg-emerald-500">
                 <MessageSquare className="w-4 h-4 mr-2" /> WhatsApp API
+              </TabsTrigger>
+              <TabsTrigger value="birthdays" className="rounded-xl px-8 font-black uppercase text-[11px] data-[state=active]:bg-amber-500">
+                <Cake className="w-4 h-4 mr-2" /> Aniversários
               </TabsTrigger>
             </TabsList>
 
@@ -304,6 +351,79 @@ export default function CommunicationSettings() {
 
                   <Button onClick={handleSaveWhatsApp} disabled={saving} className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-[11px] rounded-xl gap-2">
                     <Save className="w-4 h-4" /> {saving ? 'Salvando...' : 'Salvar Configurações de WhatsApp'}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="birthdays">
+              <Card className="glass-card border-white/5 overflow-hidden">
+                <div className="h-1.5 bg-amber-500 w-full" />
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-white/90">
+                    <Cake className="w-4 h-4 text-amber-500" /> Automação de Aniversariantes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                    <div>
+                      <Label className="text-sm font-bold text-white">Ativar Módulo de Aniversariantes</Label>
+                      <p className="text-[11px] text-muted-foreground">Envia mensagens automáticas de felicitação no dia do aniversário</p>
+                    </div>
+                    <Switch checked={birthdaySettings.is_active} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, is_active: v})} />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground flex items-center gap-2">
+                        <Clock className="w-3 h-3" /> Horário de Envio
+                      </Label>
+                      <Input type="time" value={birthdaySettings.send_time} onChange={e => setBirthdaySettings({...birthdaySettings, send_time: e.target.value})} className="h-11 bg-white/5 border-white/10 rounded-xl" />
+                      
+                      <div className="space-y-3 mt-4">
+                        <Label className="text-[11px] font-bold uppercase text-muted-foreground">Canais de Envio</Label>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                          <span className="text-[12px] font-bold">E-mail</span>
+                          <Switch checked={birthdaySettings.channels.email} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...birthdaySettings.channels, email: v}})} />
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                          <span className="text-[12px] font-bold">WhatsApp</span>
+                          <Switch checked={birthdaySettings.channels.whatsapp} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...birthdaySettings.channels, whatsapp: v}})} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="text-[11px] font-bold uppercase text-amber-500">Variáveis Disponíveis</Label>
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-200/80">
+                        <p>{'{{nome}}'} = Nome do Colaborador</p>
+                        <p>{'{{company}}'} = Nome da Empresa</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label className="text-[12px] font-bold text-white border-b border-white/10 pb-2 block">Templates de Mensagem</Label>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Assunto do E-mail</Label>
+                      <Input value={birthdaySettings.template_email_subject} onChange={e => setBirthdaySettings({...birthdaySettings, template_email_subject: e.target.value})} className="h-11 bg-white/5 border-white/10 rounded-xl" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Corpo do E-mail (Suporta HTML simples)</Label>
+                      <Textarea value={birthdaySettings.template_email_body} onChange={e => setBirthdaySettings({...birthdaySettings, template_email_body: e.target.value})} className="min-h-[120px] bg-white/5 border-white/10 rounded-xl font-mono text-[12px]" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase text-muted-foreground">Mensagem de WhatsApp</Label>
+                      <Textarea value={birthdaySettings.template_whatsapp} onChange={e => setBirthdaySettings({...birthdaySettings, template_whatsapp: e.target.value})} className="min-h-[100px] bg-white/5 border-white/10 rounded-xl font-mono text-[12px]" />
+                    </div>
+                  </div>
+
+                  <Button onClick={handleSaveBirthday} disabled={saving} className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase text-[11px] rounded-xl gap-2">
+                    <Save className="w-4 h-4" /> {saving ? 'Salvando...' : 'Salvar Configurações de Aniversários'}
                   </Button>
                 </CardContent>
               </Card>
