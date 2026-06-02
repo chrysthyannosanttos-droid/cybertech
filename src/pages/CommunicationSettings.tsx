@@ -147,7 +147,12 @@ export default function CommunicationSettings() {
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
-      if (bData) setBirthdaySettings(bData);
+      if (bData) {
+        setBirthdaySettings({
+          ...bData,
+          channels: bData.channels || { email: true, whatsapp: true }
+        });
+      }
       else setBirthdaySettings({
         tenant_id: tenantId,
         is_active: false,
@@ -157,6 +162,7 @@ export default function CommunicationSettings() {
         template_email_body: '<p>Olá <strong>{{nome}}</strong>,</p><p>Toda a equipe da <strong>{{company}}</strong> deseja a você um feliz aniversário! 🎉 Que este dia seja especial e repleto de alegria.</p><p>Com carinho,<br>Equipe de RH</p>',
         template_whatsapp: 'Feliz Aniversário, {{nome}}! 🎉 Toda a equipe da {{company}} deseja a você um dia incrível e cheio de alegria! 🥳'
       });
+
 
     } catch (e) {
       console.error(e);
@@ -301,7 +307,8 @@ export default function CommunicationSettings() {
                       <Label className="text-sm font-bold text-white">Envio Automático</Label>
                       <p className="text-[11px] text-muted-foreground">Disparar e-mail imediatamente após a geração do holerite</p>
                     </div>
-                    <Switch checked={emailSettings.auto_send_payroll} onCheckedChange={v => setEmailSettings({...emailSettings, auto_send_payroll: v})} />
+                    <Switch checked={emailSettings.auto_send_payroll ?? false} onCheckedChange={v => setEmailSettings({...emailSettings, auto_send_payroll: v})} />
+
                   </div>
 
                   <Button onClick={handleSaveEmail} disabled={saving} className="w-full h-12 bg-primary hover:bg-primary/90 font-black uppercase text-[11px] rounded-xl gap-2">
@@ -360,7 +367,8 @@ export default function CommunicationSettings() {
                       <Label className="text-sm font-bold text-white">Disparo Automático</Label>
                       <p className="text-[11px] text-muted-foreground">Enviar holerite via WhatsApp assim que gerado</p>
                     </div>
-                    <Switch checked={waSettings.auto_send_payroll} onCheckedChange={v => setWaSettings({...waSettings, auto_send_payroll: v})} />
+                    <Switch checked={waSettings.auto_send_payroll ?? false} onCheckedChange={v => setWaSettings({...waSettings, auto_send_payroll: v})} />
+
                   </div>
 
                   <Button onClick={handleSaveWhatsApp} disabled={saving} className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase text-[11px] rounded-xl gap-2">
@@ -385,7 +393,8 @@ export default function CommunicationSettings() {
                       <Label className="text-sm font-bold text-white">Ativar Módulo de Aniversariantes</Label>
                       <p className="text-[11px] text-muted-foreground">Envia mensagens automáticas de felicitação no dia do aniversário</p>
                     </div>
-                    <Switch checked={birthdaySettings.is_active} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, is_active: v})} />
+                    <Switch checked={birthdaySettings.is_active ?? false} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, is_active: v})} />
+
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -399,12 +408,13 @@ export default function CommunicationSettings() {
                         <Label className="text-[11px] font-bold uppercase text-muted-foreground">Canais de Envio</Label>
                         <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
                           <span className="text-[12px] font-bold">E-mail</span>
-                          <Switch checked={birthdaySettings.channels.email} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...birthdaySettings.channels, email: v}})} />
+                          <Switch checked={birthdaySettings.channels?.email ?? false} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...(birthdaySettings.channels || { email: true, whatsapp: true }), email: v}})} />
                         </div>
                         <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
                           <span className="text-[12px] font-bold">WhatsApp</span>
-                          <Switch checked={birthdaySettings.channels.whatsapp} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...birthdaySettings.channels, whatsapp: v}})} />
+                          <Switch checked={birthdaySettings.channels?.whatsapp ?? false} onCheckedChange={v => setBirthdaySettings({...birthdaySettings, channels: {...(birthdaySettings.channels || { email: true, whatsapp: true }), whatsapp: v}})} />
                         </div>
+
                       </div>
                     </div>
 
