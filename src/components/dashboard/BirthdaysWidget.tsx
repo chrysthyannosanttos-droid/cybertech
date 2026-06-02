@@ -64,6 +64,39 @@ export function BirthdaysWidget() {
         });
       }
 
+      if (import.meta.env.DEV && results.length === 0) {
+        const fakeToday = new Date();
+        const fakeTomorrow = addDays(fakeToday, 1);
+        const fakeNext = addDays(fakeToday, 2);
+        
+        results = [
+          {
+            id: 'fake-1',
+            name: 'João Silva (Demo)',
+            role: 'Desenvolvedor Pleno',
+            phone: '5511999999999',
+            birth_date: format(new Date(1992, fakeToday.getMonth(), fakeToday.getDate()), 'yyyy-MM-dd'),
+            daysUntil: 0
+          },
+          {
+            id: 'fake-2',
+            name: 'Maria Oliveira (Demo)',
+            role: 'Analista de RH',
+            phone: '5511888888888',
+            birth_date: format(new Date(1995, fakeTomorrow.getMonth(), fakeTomorrow.getDate()), 'yyyy-MM-dd'),
+            daysUntil: 1
+          },
+          {
+            id: 'fake-3',
+            name: 'Carlos Souza (Demo)',
+            role: 'Gerente Comercial',
+            phone: '5511777777777',
+            birth_date: format(new Date(1988, fakeNext.getMonth(), fakeNext.getDate()), 'yyyy-MM-dd'),
+            daysUntil: 2
+          }
+        ];
+      }
+
       setBirthdays(results.sort((a, b) => a.daysUntil - b.daysUntil));
     } catch (e) {
       console.error('Error fetching birthdays:', e);
