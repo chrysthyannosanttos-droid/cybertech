@@ -166,8 +166,31 @@ export function BirthdaysWidget() {
     );
   }
 
-  if (birthdays.length === 0) return null;
-
+  if (birthdays.length === 0) {
+    return (
+      <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up relative overflow-hidden">
+        <div className="flex items-center justify-between mb-6 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+              <Cake className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest">Aniversariantes</h3>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl mb-3">
+            📅
+          </div>
+          <p className="text-sm font-bold text-white">Nenhum Aniversariante</p>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Não há aniversariantes previstos para hoje ou para os próximos 3 dias.
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="glass-card rounded-[2rem] border border-white/5 p-8 animate-fade-in-up relative overflow-hidden">
       {/* Decoração */}
