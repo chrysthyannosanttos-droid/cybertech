@@ -2,11 +2,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 
 export function BrandingStyles() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isEnterprise = user?.plan === 'ENTERPRISE';
   const branding = isEnterprise ? user?.tenantBranding : undefined;
 
   useEffect(() => {
+    // Let the Login page handle its own branding when not authenticated
+    if (!isAuthenticated) return;
+
     if (branding?.primary_color) {
       const hexToHsl = (hex: string) => {
         let r = 0, g = 0, b = 0;
@@ -86,7 +89,7 @@ export function BrandingStyles() {
     } else {
       document.documentElement.style.removeProperty('--tenant-bg');
     }
-  }, [branding]);
+  }, [branding, isAuthenticated]);
 
   return null;
 }
