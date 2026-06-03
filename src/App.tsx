@@ -33,6 +33,7 @@ import Commercial from "@/pages/Commercial";
 import EmployeePortal from "@/pages/EmployeePortal";
 import EmployeeLogin from "@/pages/EmployeeLogin";
 import TerminalPonto from "@/pages/TerminalPonto";
+import Birthdays from "@/pages/Birthdays";
 
 
 const queryClient = new QueryClient();
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/vacations" element={<Vacations />} />
         <Route path="/commercial" element={<Commercial />} />
+        <Route path="/birthdays" element={<Birthdays />} />
       </Route>
       <Route path="/portal" element={<ProtectedRoute><EmployeePortal /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />

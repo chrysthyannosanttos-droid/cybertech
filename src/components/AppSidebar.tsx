@@ -22,7 +22,8 @@ import {
   Mail,
   FolderOpen,
   TreePalm,
-  Smartphone
+  Smartphone,
+  Cake
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/employees',         module: 'employees',         icon: Users,           label: 'Funcionários' },
   { to: '/documents',         module: 'employees',         icon: FolderOpen,      label: 'Arquivo Digital' },
   { to: '/certificates',      module: 'certificates',      icon: FileHeart,       label: 'Atestados' },
+  { to: '/birthdays',         module: 'dashboard',         icon: Cake,            label: 'Aniversariantes' },
   { to: '/payroll',           module: 'payroll',           icon: DollarSign,      label: 'Folha' },
   { to: '/reports',           module: 'reports',           icon: BarChart3,       label: 'Relatórios' },
   { to: '/service-providers', module: 'service-providers', icon: Briefcase,       label: 'Prestadores' },
