@@ -280,9 +280,15 @@ export function EmployeeFormModal({
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Salário Base (CLT)</Label>
-                      <Input type="number" value={form.salary || ''} onChange={e => setForm(f => ({ ...f, salary: Number(e.target.value) }))} className="h-12 bg-emerald-500/5 border-emerald-500/20 rounded-xl font-black text-emerald-400" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Salário Base (CLT)</Label>
+                        <Input type="number" value={form.salary || ''} onChange={e => setForm(f => ({ ...f, salary: Number(e.target.value) }))} className="h-12 bg-emerald-500/5 border-emerald-500/20 rounded-xl font-black text-emerald-400" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Data Nasc.</Label>
+                        <Input type="date" value={form.birthDate || ''} onChange={e => setForm(f => ({ ...f, birthDate: e.target.value }))} className="h-12 bg-white/5 border-white/10 rounded-xl" />
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Data de Admissão</Label>
