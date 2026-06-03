@@ -25,62 +25,63 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole }: Birthday
       canvas.width = 1080;
       canvas.height = 1080;
 
-      // Fundo
-      const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-      gradient.addColorStop(0, '#0f172a');
-      gradient.addColorStop(0.5, '#1e3a8a');
-      gradient.addColorStop(1, '#0f172a');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 1080, 1080);
+      const drawContent = () => {
+        // Textos centrais
+        ctx.textAlign = 'center';
+        
+        ctx.font = 'bold 90px "Inter", sans-serif';
+        ctx.fillStyle = '#fcd34d';
+        ctx.fillText('FELIZ', 540, 320);
+        ctx.fillText('ANIVERSÁRIO!', 540, 430);
 
-      // Efeito Bokeh / Luzes
-      for (let i = 0; i < 30; i++) {
-        ctx.beginPath();
-        const x = Math.random() * 1080;
-        const y = Math.random() * 1080;
-        const radius = Math.random() * 80 + 20;
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(251, 191, 36, ${Math.random() * 0.15})`;
-        ctx.fill();
-      }
+        ctx.font = '900 130px "Inter", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        
+        // Efeito de sombra no texto
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 5;
+        ctx.fillText(firstName.toUpperCase(), 540, 620);
+        
+        // Reset sombra
+        ctx.shadowColor = 'transparent';
 
-      // Moldura interna dourada
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 10;
-      ctx.strokeRect(60, 60, 960, 960);
+        ctx.font = '600 45px "Inter", sans-serif';
+        ctx.fillStyle = '#9ca3af';
+        ctx.fillText(employeeRole.toUpperCase(), 540, 710);
 
-      // Textos centrais
-      ctx.textAlign = 'center';
-      
-      ctx.font = 'bold 90px "Inter", sans-serif';
-      ctx.fillStyle = '#fcd34d';
-      ctx.fillText('FELIZ', 540, 320);
-      ctx.fillText('ANIVERSÁRIO!', 540, 430);
+        ctx.font = 'italic 40px "Inter", sans-serif';
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillText('Desejamos muito sucesso, paz e alegria!', 540, 860);
+        
+        ctx.font = 'bold 35px "Inter", sans-serif';
+        ctx.fillStyle = '#60a5fa';
+        ctx.fillText('Equipe CyberTech RH', 540, 930);
+      };
 
-      ctx.font = '900 130px "Inter", sans-serif';
-      ctx.fillStyle = '#ffffff';
-      
-      // Efeito de sombra no texto
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetX = 5;
-      ctx.shadowOffsetY = 5;
-      ctx.fillText(firstName.toUpperCase(), 540, 620);
-      
-      // Reset sombra
-      ctx.shadowColor = 'transparent';
+      const bgImage = new Image();
+      bgImage.crossOrigin = 'anonymous';
 
-      ctx.font = '600 45px "Inter", sans-serif';
-      ctx.fillStyle = '#9ca3af';
-      ctx.fillText(employeeRole.toUpperCase(), 540, 710);
+      bgImage.onload = () => {
+        ctx.drawImage(bgImage, 0, 0, 1080, 1080);
+        drawContent();
+      };
 
-      ctx.font = 'italic 40px "Inter", sans-serif';
-      ctx.fillStyle = '#e5e7eb';
-      ctx.fillText('Desejamos muito sucesso, paz e alegria!', 540, 860);
-      
-      ctx.font = 'bold 35px "Inter", sans-serif';
-      ctx.fillStyle = '#60a5fa';
-      ctx.fillText('Equipe CyberTech RH', 540, 930);
+      bgImage.onerror = () => {
+        console.error("Failed to load /bg-birthday.png.png");
+        // Fundo fallback
+        const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+        gradient.addColorStop(0, '#0f172a');
+        gradient.addColorStop(0.5, '#1e3a8a');
+        gradient.addColorStop(1, '#0f172a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 1080, 1080);
+        
+        drawContent();
+      };
+
+      bgImage.src = '/bg-birthday.png.png';
     }
   }, [isOpen, firstName, employeeRole]);
 
