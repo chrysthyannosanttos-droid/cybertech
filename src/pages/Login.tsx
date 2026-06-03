@@ -154,27 +154,23 @@ export default function Login() {
       </div>
 
       <div className="w-full max-w-[360px] relative z-10">
-        <div className="flex flex-col items-center justify-center gap-6 mb-12">
-          <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(31,180,243,0.3)] border border-white/10 transform -rotate-3 hover:rotate-0 transition-all duration-500 hover:scale-105 bg-black/40 p-2 flex items-center justify-center">
-            {branding?.logo_url ? (
-              <img src={branding.logo_url} alt="Logo" className="max-w-full max-h-full object-contain" />
-            ) : !tenantParam ? (
-              <img src="/logo-cybertech.png" alt="Logo" className="max-w-full max-h-full object-contain" />
-            ) : null}
-          </div>
-          <div className="text-center">
-            <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic drop-shadow-2xl min-h-[1.2em]">
-              {branding?.system_name ? (
-                branding.system_name
-              ) : !tenantParam ? (
-                <>CyberTech <span className="text-primary">RH</span></>
+        {tenantParam && (
+          <div className="flex flex-col items-center justify-center gap-6 mb-12">
+            <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(31,180,243,0.3)] border border-white/10 transform -rotate-3 hover:rotate-0 transition-all duration-500 hover:scale-105 bg-black/40 p-2 flex items-center justify-center">
+              {branding?.logo_url ? (
+                <img src={branding.logo_url} alt="Logo" className="max-w-full max-h-full object-contain" />
               ) : null}
-            </h1>
-            <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">
-              {branding?.system_name ? 'Portal de Gestão Exclusivo' : 'Inteligência para Recursos Humanos'}
-            </p>
+            </div>
+            <div className="text-center">
+              <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic drop-shadow-2xl min-h-[1.2em]">
+                {branding?.system_name || 'Portal de Gestão'}
+              </h1>
+              <p className="text-[10px] text-primary/60 font-black tracking-[0.3em] uppercase mt-2">
+                {branding?.system_name ? 'Portal de Gestão Exclusivo' : 'Acesso Seguro'}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="glass border border-white/10 shadow-2xl rounded-3xl p-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
