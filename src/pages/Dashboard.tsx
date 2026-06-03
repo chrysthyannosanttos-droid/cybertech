@@ -293,6 +293,25 @@ export default function Dashboard() {
     });
   }, [providers]);
 
+  const expiringEmployeeContracts = useMemo(() => {
+    return filteredEmployees.filter(e => {
+      if (!e.admissionDate || e.status !== 'ACTIVE') return false;
+      const days = Math.floor((new Date().getTime() - new Date(e.admissionDate).getTime()) / (1000 * 60 * 60 * 24));
+      // First period: 45 days. Alert between 30 and 45 days.
+      // Second period: 90 days. Alert between 75 and 90 days.
+      return (days >= 30 && days <= 45) || (days >= 75 && days <= 90);
+    }).map(e => {
+      const days = Math.floor((new Date().getTime() - new Date(e.admissionDate).getTime()) / (1000 * 60 * 60 * 24));
+      const targetDays = days <= 45 ? 45 : 90;
+      const daysLeft = targetDays - days;
+      return {
+        ...e,
+        daysLeft,
+        targetDays
+      };
+    }).sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [filteredEmployees]);
+
   const providerCosts = useMemo(() => {
     return providers
       .filter(p => {
@@ -464,8 +483,8 @@ export default function Dashboard() {
       </div>
 
       {/* Alertas Críticos */}
-      {expiringContracts.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+      {(expiringContracts.length > 0 || expiringEmployeeContracts.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           {expiringContracts.map(p => (
             <div key={p.id} className="glass-card rounded-2xl p-4 border border-rose-500/20 bg-rose-500/5 flex items-center justify-between group overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-full bg-rose-500/5 -skew-x-12 translate-x-16 group-hover:translate-x-8 transition-transform" />
@@ -487,6 +506,31 @@ export default function Dashboard() {
                 onClick={() => window.location.href = '/service-providers'}
               >
                 Gerenciar
+              </Button>
+            </div>
+          ))}
+
+          {expiringEmployeeContracts.map(e => (
+            <div key={e.id} className="glass-card rounded-2xl p-4 border border-amber-500/20 bg-amber-500/5 flex items-center justify-between group overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-full bg-amber-500/5 -skew-x-12 translate-x-16 group-hover:translate-x-8 transition-transform" />
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-400 animate-pulse">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-black text-white uppercase tracking-tighter">Fim de Experiência: {e.name.split(' ')[0]}</h4>
+                  <p className="text-[11px] text-amber-400 font-bold uppercase tracking-widest">
+                    {e.targetDays} dias em {e.daysLeft} dia{e.daysLeft !== 1 ? 's' : ''} — {new Date(new Date(e.admissionDate).getTime() + (e.targetDays * 24 * 60 * 60 * 1000)).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 px-4 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[11px] font-black uppercase tracking-widest relative z-10 transition-all active:scale-95"
+                onClick={() => window.location.href = '/employees'}
+              >
+                Avaliar
               </Button>
             </div>
           ))}
