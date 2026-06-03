@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, addDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { BirthdayPosterGenerator } from './BirthdayPosterGenerator';
 
 interface BirthdayEmployee {
   id: string;
@@ -273,19 +274,22 @@ export function BirthdaysWidget() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleSendWhatsApp(emp)}
-                  disabled={sendingId === emp.id}
-                  className="h-9 gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                >
-                  {sendingId === emp.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  Parabenizar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} />
+                  <Button
+                    size="sm"
+                    onClick={() => handleSendWhatsApp(emp)}
+                    disabled={sendingId === emp.id}
+                    className="h-9 gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl font-black text-[10px] uppercase tracking-widest"
+                  >
+                    {sendingId === emp.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    Parabenizar
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -326,6 +330,7 @@ export function BirthdaysWidget() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} />
                     <button
                       onClick={() => handleSendWhatsApp(emp)}
                       disabled={sendingId === emp.id}

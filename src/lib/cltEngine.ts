@@ -142,6 +142,47 @@ export function monthsBetween(start: Date, end: Date): number {
   return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
 }
 
+// ── HELPER: Avos Férias Proporcionais (regra 15 dias) ────────
+export function calcAvosFerias(admission: Date, termination: Date): number {
+  let anniversary = new Date(admission);
+  anniversary.setFullYear(termination.getFullYear());
+  if (anniversary > termination) anniversary.setFullYear(termination.getFullYear() - 1);
+  
+  let months = 0;
+  let current = new Date(anniversary);
+  
+  while (true) {
+    let nextMonth = new Date(current);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    if (nextMonth <= termination) {
+      months++;
+      current = nextMonth;
+    } else {
+      const daysLeft = Math.floor((termination.getTime() - current.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include termination day
+      if (daysLeft >= 15) months++;
+      break;
+    }
+  }
+  return months;
+}
+
+// ── HELPER: Avos 13º Salário (regra 15 dias) ─────────────────
+export function calcAvos13(admission: Date, termination: Date): number {
+  const startYear = termination.getFullYear();
+  const start = new Date(Math.max(admission.getTime(), new Date(startYear, 0, 1).getTime()));
+  
+  let months = 0;
+  for (let m = start.getMonth(); m <= termination.getMonth(); m++) {
+    const monthStart = new Date(startYear, m, 1);
+    const monthEnd = new Date(startYear, m + 1, 0);
+    const actualStart = monthStart < start ? start : monthStart;
+    const actualEnd = monthEnd > termination ? termination : monthEnd;
+    const days = Math.floor((actualEnd.getTime() - actualStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (days >= 15) months++;
+  }
+  return months;
+}
+
 // ── HELPER: Days in month ────────────────────────────────────
 export function daysInMonth(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -397,8 +438,8 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     tercoFeriasVencidas = round(feriasVencidas / 3);
   }
 
-  // Férias proporcionais + 1/3
-  const feriesPropMonths = completedMonths % 12;
+  // Férias proporcionais + 1/3 (usando a regra de 15 dias)
+  const feriesPropMonths = calcAvosFerias(admissionDate, terminationDate);
   let feriasProporcionais = 0;
   let tercoFeriasProporcionais = 0;
   if (!['COM_JUSTA_CAUSA', 'PEDIDO_DEMISSAO'].includes(type) || type === 'ACORDO') {
@@ -410,8 +451,8 @@ export function calculateRescission(input: RescissionInput): RescissionResult {
     tercoFeriasProporcionais = round(feriasProporcionais / 3);
   }
 
-  // 13º proporcional
-  const thirteenthMonths = terminationDate.getMonth() + 1; // Jan=1..Dez=12
+  // 13º proporcional (usando a regra de 15 dias no ano da rescisão)
+  const thirteenthMonths = calcAvos13(admissionDate, terminationDate);
   const hasThirteenth = !['COM_JUSTA_CAUSA', 'PEDIDO_DEMISSAO'].includes(type);
   const decimoTerceiroProporcional = hasThirteenth
     ? round((baseRemuneration / 12) * thirteenthMonths)
