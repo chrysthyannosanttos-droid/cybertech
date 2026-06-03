@@ -17,7 +17,7 @@ import { UserMinus, Calculator, Trophy, Medal, Zap, LayoutDashboard, Search } fr
 import { BirthdaysWidget } from '@/components/dashboard/BirthdaysWidget';
 
 
-function KpiCard({ icon: Icon, label, value, sub, delay, onClick, trend }: { icon: any; label: string; value: string; sub?: string; delay: number; onClick?: () => void; trend?: string }) {
+function KpiCard({ icon: Icon, label, value, sub, delay, onClick, trend }: { icon: any; label: string; value: string; sub?: React.ReactNode; delay: number; onClick?: () => void; trend?: string }) {
   return (
     <div 
       onClick={onClick}
@@ -42,10 +42,10 @@ function KpiCard({ icon: Icon, label, value, sub, delay, onClick, trend }: { ico
       <div className="relative z-10">
         <span className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.15em]">{label}</span>
         <p className="text-3xl font-black tabular-nums tracking-tighter text-white mt-1 group-hover:text-primary transition-colors">{value}</p>
-        {sub && <p className="text-[10px] text-muted-foreground/70 font-bold uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
-          <div className="w-1 h-1 rounded-full bg-primary/50" />
-          {sub}
-        </p>}
+        {sub && <div className="text-[10px] text-muted-foreground/70 font-bold uppercase tracking-widest mt-1.5 flex items-start gap-1.5">
+          <div className="w-1 h-1 rounded-full bg-primary/50 mt-1 shrink-0" />
+          <div className="flex-1 truncate overflow-hidden">{sub}</div>
+        </div>}
       </div>
     </div>
   );
@@ -579,6 +579,23 @@ export default function Dashboard() {
           sub="Tempo Economizado" 
           delay={6} 
           trend="ROI"
+        />
+        <KpiCard 
+          icon={Briefcase} 
+          label="Vence em 7 dias" 
+          value={String(expiringEmployeeContracts.filter(e => e.daysLeft <= 7 && e.daysLeft >= 0).length)} 
+          sub={
+            expiringEmployeeContracts.filter(e => e.daysLeft <= 7 && e.daysLeft >= 0).length > 0 
+              ? <div className="flex flex-col gap-0.5 w-full">
+                  {expiringEmployeeContracts.filter(e => e.daysLeft <= 7 && e.daysLeft >= 0).slice(0,2).map(e => (
+                    <span key={e.id} className="truncate w-full block">{e.name.split(' ')[0]} - {e.storeName || 'Loja'}</span>
+                  ))}
+                  {expiringEmployeeContracts.filter(e => e.daysLeft <= 7 && e.daysLeft >= 0).length > 2 && <span className="text-primary">e mais {expiringEmployeeContracts.filter(e => e.daysLeft <= 7 && e.daysLeft >= 0).length - 2}</span>}
+                </div>
+              : 'Nenhum contrato'
+          } 
+          delay={7} 
+          trend="Alerta"
         />
       </div>
 
