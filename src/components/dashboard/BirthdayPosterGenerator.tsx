@@ -15,16 +15,27 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  const firstName = employeeName.split(' ')[0];
+  const firstName = (employeeName || 'Colaborador').split(' ')[0];
 
   useEffect(() => {
+    let isActive = true;
+
     if (isOpen && canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
+      // Set canvas size
       canvas.width = 1080;
       canvas.height = 1080;
+
+      // Draw loading state
+      ctx.fillStyle = '#0a0f1e';
+      ctx.fillRect(0, 0, 1080, 1080);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '40px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Gerando arte...', 540, 540);
 
       const drawContent = () => {
         // Textos centrais
@@ -48,9 +59,10 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
         // Reset sombra
         ctx.shadowColor = 'transparent';
 
+        const safeRole = (employeeRole || 'Colaborador').toUpperCase();
         ctx.font = '600 40px "Inter", sans-serif';
         ctx.fillStyle = '#9ca3af';
-        ctx.fillText(employeeRole.toUpperCase(), 540, 790);
+        ctx.fillText(safeRole, 540, 790);
 
         ctx.font = 'italic 35px "Inter", sans-serif';
         ctx.fillStyle = '#e5e7eb';
@@ -72,9 +84,11 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
 
         try {
           const bgImg = await loadImg('/bg-birthday.png.png', false);
+          if (!isActive) return;
           ctx.drawImage(bgImg, 0, 0, 1080, 1080);
         } catch (e) {
-          console.error(e);
+          console.error("Failed to load background", e);
+          if (!isActive) return;
           const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
           gradient.addColorStop(0, '#0f172a');
           gradient.addColorStop(0.5, '#1e3a8a');
@@ -86,6 +100,7 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
         if (employeePhoto) {
           try {
             const photoImg = await loadImg(employeePhoto, true);
+            if (!isActive) return;
             ctx.save();
             ctx.beginPath();
             ctx.arc(540, 470, 150, 0, Math.PI * 2, true);
@@ -111,11 +126,16 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
           }
         }
 
+        if (!isActive) return;
         drawContent();
       };
 
       loadImages();
     }
+
+    return () => {
+      isActive = false;
+    };
   }, [isOpen, firstName, employeeRole, employeePhoto]);
 
   const handleDownload = () => {
