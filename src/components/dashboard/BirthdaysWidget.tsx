@@ -16,6 +16,7 @@ interface BirthdayEmployee {
   phone?: string;
   email?: string;
   birth_date: string;
+  photo_reference_url?: string;
   daysUntil: number; // 0 = today, 1 = tomorrow, etc.
 }
 
@@ -41,7 +42,7 @@ export function BirthdaysWidget() {
     try {
       const { data: employees } = await supabase
         .from('employees')
-        .select('id, name, role, phone, email, birth_date')
+        .select('id, name, role, phone, email, birth_date, photo_reference_url')
         .eq('tenant_id', user.tenantId)
         .eq('status', 'ACTIVE')
         .not('birth_date', 'is', null);
@@ -275,7 +276,7 @@ export function BirthdaysWidget() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} />
+                  <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} employeePhoto={emp.photo_reference_url} />
                   <Button
                     size="sm"
                     onClick={() => handleSendWhatsApp(emp)}
@@ -330,7 +331,7 @@ export function BirthdaysWidget() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} />
+                    <BirthdayPosterGenerator employeeName={emp.name} employeeRole={emp.role} employeePhoto={emp.photo_reference_url} />
                     <button
                       onClick={() => handleSendWhatsApp(emp)}
                       disabled={sendingId === emp.id}

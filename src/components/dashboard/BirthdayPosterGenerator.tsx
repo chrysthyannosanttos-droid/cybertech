@@ -7,9 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 interface BirthdayPosterGeneratorProps {
   employeeName: string;
   employeeRole: string;
+  employeePhoto?: string;
 }
 
-export function BirthdayPosterGenerator({ employeeName, employeeRole }: BirthdayPosterGeneratorProps) {
+export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePhoto }: BirthdayPosterGeneratorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
@@ -29,12 +30,12 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole }: Birthday
         // Textos centrais
         ctx.textAlign = 'center';
         
-        ctx.font = 'bold 90px "Inter", sans-serif';
+        ctx.font = 'bold 80px "Inter", sans-serif';
         ctx.fillStyle = '#fcd34d';
-        ctx.fillText('FELIZ', 540, 320);
-        ctx.fillText('ANIVERSÁRIO!', 540, 430);
+        ctx.fillText('FELIZ', 540, 150);
+        ctx.fillText('ANIVERSÁRIO!', 540, 250);
 
-        ctx.font = '900 130px "Inter", sans-serif';
+        ctx.font = '900 110px "Inter", sans-serif';
         ctx.fillStyle = '#ffffff';
         
         // Efeito de sombra no texto
@@ -42,48 +43,80 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole }: Birthday
         ctx.shadowBlur = 20;
         ctx.shadowOffsetX = 5;
         ctx.shadowOffsetY = 5;
-        ctx.fillText(firstName.toUpperCase(), 540, 620);
+        ctx.fillText(firstName.toUpperCase(), 540, 720);
         
         // Reset sombra
         ctx.shadowColor = 'transparent';
 
-        ctx.font = '600 45px "Inter", sans-serif';
+        ctx.font = '600 40px "Inter", sans-serif';
         ctx.fillStyle = '#9ca3af';
-        ctx.fillText(employeeRole.toUpperCase(), 540, 710);
+        ctx.fillText(employeeRole.toUpperCase(), 540, 790);
 
-        ctx.font = 'italic 40px "Inter", sans-serif';
+        ctx.font = 'italic 35px "Inter", sans-serif';
         ctx.fillStyle = '#e5e7eb';
-        ctx.fillText('Desejamos muito sucesso, paz e alegria!', 540, 860);
+        ctx.fillText('Desejamos muito sucesso, paz e alegria!', 540, 910);
         
-        ctx.font = 'bold 35px "Inter", sans-serif';
+        ctx.font = 'bold 30px "Inter", sans-serif';
         ctx.fillStyle = '#60a5fa';
-        ctx.fillText('Equipe CyberTech RH', 540, 930);
+        ctx.fillText('Equipe CyberTech RH', 540, 970);
       };
 
-      const bgImage = new Image();
-      bgImage.crossOrigin = 'anonymous';
+      const loadImages = async () => {
+        const loadImg = (src: string, isCors: boolean) => new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          if (isCors) img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`Failed to load ${src}`));
+          img.src = src;
+        });
 
-      bgImage.onload = () => {
-        ctx.drawImage(bgImage, 0, 0, 1080, 1080);
+        try {
+          const bgImg = await loadImg('/bg-birthday.png.png', false);
+          ctx.drawImage(bgImg, 0, 0, 1080, 1080);
+        } catch (e) {
+          console.error(e);
+          const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+          gradient.addColorStop(0, '#0f172a');
+          gradient.addColorStop(0.5, '#1e3a8a');
+          gradient.addColorStop(1, '#0f172a');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, 1080, 1080);
+        }
+
+        if (employeePhoto) {
+          try {
+            const photoImg = await loadImg(employeePhoto, true);
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(540, 470, 150, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+            
+            // object-fit cover logic for drawing photo in circle
+            const size = Math.min(photoImg.width, photoImg.height);
+            const x = (photoImg.width - size) / 2;
+            const y = (photoImg.height - size) / 2;
+            ctx.drawImage(photoImg, x, y, size, size, 540 - 150, 470 - 150, 300, 300);
+            
+            ctx.restore();
+            
+            // Draw a border around the photo
+            ctx.beginPath();
+            ctx.arc(540, 470, 150, 0, Math.PI * 2, true);
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = '#fcd34d';
+            ctx.stroke();
+          } catch (e) {
+            console.error("Failed to load employee photo", e);
+          }
+        }
+
         drawContent();
       };
 
-      bgImage.onerror = () => {
-        console.error("Failed to load /bg-birthday.png.png");
-        // Fundo fallback
-        const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-        gradient.addColorStop(0, '#0f172a');
-        gradient.addColorStop(0.5, '#1e3a8a');
-        gradient.addColorStop(1, '#0f172a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1080, 1080);
-        
-        drawContent();
-      };
-
-      bgImage.src = '/bg-birthday.png.png';
+      loadImages();
     }
-  }, [isOpen, firstName, employeeRole]);
+  }, [isOpen, firstName, employeeRole, employeePhoto]);
 
   const handleDownload = () => {
     if (!canvasRef.current) return;
