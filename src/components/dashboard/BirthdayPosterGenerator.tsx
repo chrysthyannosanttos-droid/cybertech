@@ -11,17 +11,15 @@ interface BirthdayPosterGeneratorProps {
 }
 
 export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePhoto }: BirthdayPosterGeneratorProps) {
-  const [isOpen, setIsOpen] = useState(false);
+function InnerCanvas({ firstName, employeeRole, employeePhoto, onCanvasReady }: { firstName: string, employeeRole: string, employeePhoto?: string, onCanvasReady: (c: HTMLCanvasElement) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { toast } = useToast();
-
-  const firstName = (employeeName || 'Colaborador').split(' ')[0];
 
   useEffect(() => {
     let isActive = true;
 
-    if (isOpen && canvasRef.current) {
+    if (canvasRef.current) {
       const canvas = canvasRef.current;
+      onCanvasReady(canvas);
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -136,11 +134,21 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
     return () => {
       isActive = false;
     };
-  }, [isOpen, firstName, employeeRole, employeePhoto]);
+  }, [firstName, employeeRole, employeePhoto, onCanvasReady]);
+
+  return <canvas ref={canvasRef} className="w-full h-full object-contain" />;
+}
+
+export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePhoto }: BirthdayPosterGeneratorProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [readyCanvas, setReadyCanvas] = useState<HTMLCanvasElement | null>(null);
+  const { toast } = useToast();
+
+  const firstName = (employeeName || 'Colaborador').split(' ')[0];
 
   const handleDownload = () => {
-    if (!canvasRef.current) return;
-    const dataUrl = canvasRef.current.toDataURL('image/png');
+    if (!readyCanvas) return;
+    const dataUrl = readyCanvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = `Parabens_${firstName}.png`;
     link.href = dataUrl;
@@ -167,7 +175,14 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
             A IA gerou este cartaz automaticamente com base no perfil.
           </p>
           <div className="relative w-full aspect-square bg-black/50 rounded-xl overflow-hidden border border-white/10">
-            <canvas ref={canvasRef} className="w-full h-full object-contain" />
+            {isOpen && (
+              <InnerCanvas 
+                firstName={firstName} 
+                employeeRole={employeeRole} 
+                employeePhoto={employeePhoto} 
+                onCanvasReady={setReadyCanvas}
+              />
+            )}
           </div>
           <Button onClick={handleDownload} className="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white font-bold gap-2 text-[13px] uppercase tracking-wider rounded-xl">
             <Download className="w-4 h-4" /> Baixar Cartaz (PNG)
