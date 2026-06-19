@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ServiceProviders() {
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -61,6 +62,7 @@ export default function ServiceProviders() {
     phone: '',
     startDate: '',
     endDate: '',
+    isIndefinite: false,
     contractValue: '',
     duties: '',
     observations: '',
@@ -82,6 +84,7 @@ export default function ServiceProviders() {
       phone: '', 
       startDate: '', 
       endDate: '', 
+      isIndefinite: false,
       contractValue: '', 
       duties: '', 
       observations: '', 
@@ -98,7 +101,8 @@ export default function ServiceProviders() {
       email: p.email,
       phone: p.phone,
       startDate: p.startDate,
-      endDate: p.endDate,
+      endDate: p.endDate || '',
+      isIndefinite: !p.endDate,
       contractValue: p.contractValue.toString(),
       duties: p.duties || '',
       observations: p.observations || '',
@@ -131,8 +135,8 @@ export default function ServiceProviders() {
       cnpj: form.cnpj,
       email: form.email,
       phone: form.phone,
-      start_date: form.startDate,
-      end_date: form.endDate,
+      start_date: form.startDate || null,
+      end_date: form.isIndefinite ? null : form.endDate || null,
       contract_value: Number(form.contractValue) || 0,
       duties: form.duties,
       observations: form.observations,
@@ -253,9 +257,15 @@ export default function ServiceProviders() {
                 <label className="text-[12px] font-medium text-muted-foreground">Início do Contrato</label>
                 <Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="h-9 text-[13px]" />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">Término do Contrato</label>
-                <Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="h-9 text-[13px]" />
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-muted-foreground">Término do Contrato</label>
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox id="indefinite" checked={form.isIndefinite} onCheckedChange={(c) => setForm(f => ({...f, isIndefinite: !!c, endDate: c ? '' : f.endDate}))} />
+                    <label htmlFor="indefinite" className="text-[10px] text-muted-foreground cursor-pointer hover:text-white leading-none mb-0">Indefinido</label>
+                  </div>
+                </div>
+                <Input type="date" disabled={form.isIndefinite} value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="h-9 text-[13px] disabled:opacity-50" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[12px] font-medium text-muted-foreground">Valor do Contrato (Mensal R$)</label>
@@ -345,9 +355,10 @@ export default function ServiceProviders() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {filtered.map(p => {
-                const daysLeft = getDaysRemaining(p.endDate);
-                const isExpiringSoon = daysLeft <= 10 && daysLeft >= 0;
-                const isExpired = daysLeft < 0;
+                const isIndefinite = !p.endDate;
+                const daysLeft = isIndefinite ? 9999 : getDaysRemaining(p.endDate);
+                const isExpiringSoon = !isIndefinite && daysLeft <= 10 && daysLeft >= 0;
+                const isExpired = !isIndefinite && daysLeft < 0;
 
                 return (
                   <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
@@ -376,7 +387,7 @@ export default function ServiceProviders() {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-[12px] text-white/90">
                           <Calendar className="w-3.5 h-3.5 text-primary" />
-                          <span className="font-bold">{new Date(p.endDate).toLocaleDateString('pt-BR')}</span>
+                          <span className="font-bold">{p.endDate ? new Date(p.endDate).toLocaleDateString('pt-BR') : 'Indefinido'}</span>
                         </div>
                         <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest pl-5">Vencimento</span>
                       </div>

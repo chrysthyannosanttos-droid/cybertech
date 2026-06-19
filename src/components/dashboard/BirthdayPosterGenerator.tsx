@@ -10,7 +10,6 @@ interface BirthdayPosterGeneratorProps {
   employeePhoto?: string;
 }
 
-export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePhoto }: BirthdayPosterGeneratorProps) {
 function InnerCanvas({ firstName, employeeRole, employeePhoto, onCanvasReady }: { firstName: string, employeeRole: string, employeePhoto?: string, onCanvasReady: (c: HTMLCanvasElement) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
