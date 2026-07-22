@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SpeedInsights } from '@vercel/speed-insights/react';
 // Sync Trigger: 2026-05-01 17:10 - Final Production Refinement
 import { HashRouter, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
@@ -116,6 +117,7 @@ const App = () => (
         </HashRouter>
       </AuthProvider>
     </TooltipProvider>
+    <SpeedInsights />
   </QueryClientProvider>
 );
 
