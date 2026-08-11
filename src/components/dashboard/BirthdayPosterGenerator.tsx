@@ -91,27 +91,46 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
           ctx.fillText('FELIZ ANIVERSÁRIO!', centerX, height * 0.15);
         }
 
-        // --- DRAW EMPLOYEE PHOTO & NAME ---
-        // Calculate dynamic dimensions relative to canvas size
-        const photoRadius = Math.round(width * 0.12); // ~130px on 1080 width
-        const photoY = Math.round(height * 0.44);     // Center area of poster
+        // --- DRAW CRISP BADGE CARD FOR EMPLOYEE DETAILS ---
+        const badgeY = Math.round(height * 0.45);
+        const badgeWidth = Math.round(width * 0.82);
+        const badgeHeight = employeePhoto ? Math.round(height * 0.28) : Math.round(height * 0.17);
+        const badgeX = centerX - badgeWidth / 2;
+        const badgeTop = badgeY - badgeHeight / 2;
+        const borderRadius = 24;
+
+        // Draw shadow for badge card
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 20, 60, 0.35)';
+        ctx.shadowBlur = 25;
+        ctx.shadowOffsetY = 8;
+
+        // Draw solid white rounded rectangle card
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeTop, badgeWidth, badgeHeight, borderRadius);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+
+        // Draw elegant blue border on badge card
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeTop, badgeWidth, badgeHeight, borderRadius);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#003399';
+        ctx.stroke();
+        ctx.restore();
+
+        // --- DRAW EMPLOYEE PHOTO & TEXT INSIDE/OVER BADGE ---
+        ctx.textAlign = 'center';
 
         if (employeePhoto) {
+          const photoRadius = Math.round(width * 0.08); // ~85px radius
+          const photoY = badgeTop + photoRadius + 18;
+
           try {
             const photoImg = await loadImg(employeePhoto, true);
             if (!isActive) return;
-
-            // Draw outer glow / shadow for photo
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 51, 153, 0.35)';
-            ctx.shadowBlur = 25;
-
-            // Draw white background circle behind photo
-            ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius + 6, 0, Math.PI * 2, true);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-            ctx.restore();
 
             // Clip circular photo
             ctx.save();
@@ -127,38 +146,45 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
             ctx.drawImage(photoImg, sx, sy, size, size, centerX - photoRadius, photoY - photoRadius, photoRadius * 2, photoRadius * 2);
             ctx.restore();
 
-            // Outer gold/blue ring border
+            // Border around photo
             ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius + 2, 0, Math.PI * 2, true);
-            ctx.lineWidth = Math.round(width * 0.007);
+            ctx.arc(centerX, photoY, photoRadius + 1, 0, Math.PI * 2, true);
+            ctx.lineWidth = 4;
             ctx.strokeStyle = '#003399';
             ctx.stroke();
+
+            // Employee Name below photo
+            const nameY = photoY + photoRadius + Math.round(height * 0.045);
+            const nameFontSize = Math.round(width * 0.065); // ~70px
+            ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
+            ctx.fillStyle = '#003399'; // Deep Navy Blue
+            ctx.fillText(firstName.toUpperCase(), centerX, nameY);
+
+            // Employee Role below name
+            const roleY = nameY + Math.round(height * 0.035);
+            const roleFontSize = Math.round(width * 0.032); // ~34px
+            const safeRole = (employeeRole || 'Colaborador').toUpperCase();
+            ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
+            ctx.fillStyle = '#c8102e'; // Accent Red
+            ctx.fillText(safeRole, centerX, roleY);
           } catch (e) {
             console.error("Failed to load employee photo", e);
           }
+        } else {
+          // Without Photo: Center Name and Role inside badge card
+          const nameY = badgeTop + Math.round(badgeHeight * 0.48);
+          const nameFontSize = Math.round(width * 0.075); // ~80px
+          ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
+          ctx.fillStyle = '#003399';
+          ctx.fillText(firstName.toUpperCase(), centerX, nameY);
+
+          const roleY = nameY + Math.round(height * 0.04);
+          const roleFontSize = Math.round(width * 0.034);
+          const safeRole = (employeeRole || 'Colaborador').toUpperCase();
+          ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
+          ctx.fillStyle = '#c8102e';
+          ctx.fillText(safeRole, centerX, roleY);
         }
-
-        // Draw Employee Name & Role in high-impact typography
-        ctx.textAlign = 'center';
-
-        const nameY = employeePhoto ? photoY + photoRadius + Math.round(height * 0.05) : Math.round(height * 0.50);
-
-        // Employee Name
-        const nameFontSize = Math.round(width * 0.075); // ~80px
-        ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
-        ctx.fillStyle = '#003399'; // Brand Navy/Blue
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-        ctx.shadowBlur = 10;
-        ctx.fillText(firstName.toUpperCase(), centerX, nameY);
-        ctx.shadowColor = 'transparent';
-
-        // Employee Role
-        const roleY = nameY + Math.round(height * 0.035);
-        const roleFontSize = Math.round(width * 0.032); // ~35px
-        const safeRole = (employeeRole || 'Colaborador').toUpperCase();
-        ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
-        ctx.fillStyle = '#c8102e'; // Brand Red accent
-        ctx.fillText(safeRole, centerX, roleY);
       };
 
       renderPoster();
