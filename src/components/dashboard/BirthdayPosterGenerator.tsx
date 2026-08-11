@@ -65,9 +65,9 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
 
         if (!isActive) return;
 
-        // Set canvas resolution matching image or high res 1080x1440
-        const width = loadedBgImg?.naturalWidth || 1080;
-        const height = loadedBgImg?.naturalHeight || 1440;
+        // Standard high-resolution poster dimensions (1080 x 1440)
+        const width = 1080;
+        const height = 1440;
         canvas.width = width;
         canvas.height = height;
 
@@ -76,61 +76,78 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
         if (loadedBgImg) {
           ctx.drawImage(loadedBgImg, 0, 0, width, height);
         } else {
-          // Fallback gradient background
+          // Festive fallback gradient background
           const gradient = ctx.createLinearGradient(0, 0, width, height);
-          gradient.addColorStop(0, '#0f172a');
-          gradient.addColorStop(0.5, '#1e3a8a');
-          gradient.addColorStop(1, '#0f172a');
+          gradient.addColorStop(0, '#f8fafc');
+          gradient.addColorStop(0.5, '#eff6ff');
+          gradient.addColorStop(1, '#dbeafe');
           ctx.fillStyle = gradient;
           ctx.fillRect(0, 0, width, height);
-
-          // Draw fallback title if no background image loaded
-          ctx.textAlign = 'center';
-          ctx.font = `bold ${Math.round(width * 0.07)}px "Inter", sans-serif`;
-          ctx.fillStyle = '#fcd34d';
-          ctx.fillText('FELIZ ANIVERSÁRIO!', centerX, height * 0.15);
         }
 
-        // --- DRAW CRISP BADGE CARD FOR EMPLOYEE DETAILS ---
-        const badgeY = Math.round(height * 0.45);
-        const badgeWidth = Math.round(width * 0.82);
-        const badgeHeight = employeePhoto ? Math.round(height * 0.28) : Math.round(height * 0.17);
-        const badgeX = centerX - badgeWidth / 2;
-        const badgeTop = badgeY - badgeHeight / 2;
-        const borderRadius = 24;
-
-        // Draw shadow for badge card
-        ctx.save();
-        ctx.shadowColor = 'rgba(0, 20, 60, 0.35)';
-        ctx.shadowBlur = 25;
-        ctx.shadowOffsetY = 8;
-
-        // Draw solid white rounded rectangle card
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeTop, badgeWidth, badgeHeight, borderRadius);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.restore();
-
-        // Draw elegant blue border on badge card
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeTop, badgeWidth, badgeHeight, borderRadius);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#003399';
-        ctx.stroke();
-        ctx.restore();
-
-        // --- DRAW EMPLOYEE PHOTO & TEXT INSIDE/OVER BADGE ---
         ctx.textAlign = 'center';
 
-        if (employeePhoto) {
-          const photoRadius = Math.round(width * 0.08); // ~85px radius
-          const photoY = badgeTop + photoRadius + 18;
+        // --- 1. HEADER LOGO & TITLE ---
+        // Super Atacado Brand Header
+        ctx.font = 'bold 36px "Inter", sans-serif';
+        ctx.fillStyle = '#002b80';
+        ctx.fillText('SUPER ATACADO', centerX, height * 0.08);
 
+        // "FELIZ" Subheader
+        ctx.font = 'bold 56px "Inter", italic, sans-serif';
+        ctx.fillStyle = '#002b80';
+        ctx.fillText('Feliz', centerX, height * 0.14);
+
+        // "ANIVERSÁRIO!" Big 3D Red Title
+        ctx.save();
+        const titleY = height * 0.21;
+        ctx.font = '900 88px "Inter", sans-serif';
+
+        // Shadow behind title
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetY = 6;
+
+        // White outline for title crispness
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeText('ANIVERSÁRIO!', centerX, titleY);
+
+        // Red Fill
+        ctx.fillStyle = '#c8102e';
+        ctx.fillText('ANIVERSÁRIO!', centerX, titleY);
+        ctx.restore();
+
+        // Decorative underline
+        ctx.beginPath();
+        ctx.moveTo(centerX - 180, height * 0.23);
+        ctx.lineTo(centerX + 180, height * 0.23);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#002b80';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // --- 2. EMPLOYEE PHOTO ---
+        const photoY = height * 0.40;
+        const photoRadius = 120; // 240px diameter
+
+        if (employeePhoto) {
           try {
             const photoImg = await loadImg(employeePhoto, true);
             if (!isActive) return;
+
+            // Soft shadow behind photo
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 43, 128, 0.3)';
+            ctx.shadowBlur = 30;
+            ctx.shadowOffsetY = 8;
+
+            // White base circle
+            ctx.beginPath();
+            ctx.arc(centerX, photoY, photoRadius + 6, 0, Math.PI * 2, true);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.restore();
 
             // Clip circular photo
             ctx.save();
@@ -146,45 +163,103 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
             ctx.drawImage(photoImg, sx, sy, size, size, centerX - photoRadius, photoY - photoRadius, photoRadius * 2, photoRadius * 2);
             ctx.restore();
 
-            // Border around photo
+            // Double border: Outer Gold, Inner Navy
             ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius + 1, 0, Math.PI * 2, true);
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#003399';
+            ctx.arc(centerX, photoY, photoRadius + 4, 0, Math.PI * 2, true);
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#fcd34d'; // Gold accent
             ctx.stroke();
 
-            // Employee Name below photo
-            const nameY = photoY + photoRadius + Math.round(height * 0.045);
-            const nameFontSize = Math.round(width * 0.065); // ~70px
-            ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
-            ctx.fillStyle = '#003399'; // Deep Navy Blue
-            ctx.fillText(firstName.toUpperCase(), centerX, nameY);
-
-            // Employee Role below name
-            const roleY = nameY + Math.round(height * 0.035);
-            const roleFontSize = Math.round(width * 0.032); // ~34px
-            const safeRole = (employeeRole || 'Colaborador').toUpperCase();
-            ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
-            ctx.fillStyle = '#c8102e'; // Accent Red
-            ctx.fillText(safeRole, centerX, roleY);
+            ctx.beginPath();
+            ctx.arc(centerX, photoY, photoRadius, 0, Math.PI * 2, true);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#002b80'; // Navy border
+            ctx.stroke();
           } catch (e) {
             console.error("Failed to load employee photo", e);
           }
-        } else {
-          // Without Photo: Center Name and Role inside badge card
-          const nameY = badgeTop + Math.round(badgeHeight * 0.48);
-          const nameFontSize = Math.round(width * 0.075); // ~80px
-          ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
-          ctx.fillStyle = '#003399';
-          ctx.fillText(firstName.toUpperCase(), centerX, nameY);
-
-          const roleY = nameY + Math.round(height * 0.04);
-          const roleFontSize = Math.round(width * 0.034);
-          const safeRole = (employeeRole || 'Colaborador').toUpperCase();
-          ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
-          ctx.fillStyle = '#c8102e';
-          ctx.fillText(safeRole, centerX, roleY);
         }
+
+        // --- 3. EMPLOYEE NAME & ROLE ---
+        const nameY = employeePhoto ? photoY + photoRadius + 85 : height * 0.48;
+
+        // Employee Name with high-contrast white halo outline
+        ctx.save();
+        ctx.font = '900 82px "Inter", sans-serif';
+
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+        ctx.shadowBlur = 12;
+
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeText(firstName.toUpperCase(), centerX, nameY);
+
+        ctx.fillStyle = '#002b80';
+        ctx.fillText(firstName.toUpperCase(), centerX, nameY);
+        ctx.restore();
+
+        // Employee Role Pill Tag
+        const safeRole = (employeeRole || 'Colaborador').toUpperCase();
+        const roleY = nameY + 25;
+        const pillWidth = Math.max(280, safeRole.length * 22 + 60);
+        const pillHeight = 46;
+        const pillX = centerX - pillWidth / 2;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(200, 16, 46, 0.3)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetY = 4;
+
+        ctx.beginPath();
+        ctx.roundRect(pillX, roleY, pillWidth, pillHeight, 23);
+        ctx.fillStyle = '#c8102e'; // Red Pill Background
+        ctx.fill();
+        ctx.restore();
+
+        // Role Text inside Pill Tag
+        ctx.font = 'bold 24px "Inter", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(safeRole, centerX, roleY + 31);
+
+        // --- 4. CONGRATULATORY MESSAGE ---
+        const msgY = roleY + 110;
+        ctx.font = '600 28px "Inter", sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText('Que este dia seja especial e cheio de alegrias!', centerX, msgY);
+
+        ctx.font = '500 24px "Inter", sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.fillText('Desejamos saúde, paz, felicidade e muito sucesso.', centerX, msgY + 40);
+
+        ctx.font = 'bold 36px "Inter", italic, sans-serif';
+        ctx.fillStyle = '#c8102e';
+        ctx.fillText('Parabéns! ❤', centerX, msgY + 95);
+
+        // --- 5. CORPORATE TEAM BANNER ---
+        const bannerY = height * 0.84;
+        const bannerW = 820;
+        const bannerH = 64;
+        const bannerX = centerX - bannerW / 2;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 43, 128, 0.25)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetY = 6;
+
+        ctx.beginPath();
+        ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 16);
+        ctx.fillStyle = '#002b80';
+        ctx.fill();
+        ctx.restore();
+
+        ctx.font = 'bold 24px "Inter", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('Você faz parte do nosso time e é muito importante para nós!', centerX, bannerY + 40);
+
+        // --- 6. FOOTER SIGNATURE ---
+        ctx.font = 'bold 22px "Inter", sans-serif';
+        ctx.fillStyle = '#002b80';
+        ctx.fillText('SUPER ATACADO • Conte sempre com a gente! ❤', centerX, height * 0.94);
       };
 
       renderPoster();
@@ -309,4 +384,5 @@ export function BirthdayPosterGenerator({ employeeName, employeeRole, employeePh
     </Dialog>
   );
 }
+
 
