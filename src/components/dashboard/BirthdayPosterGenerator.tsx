@@ -65,201 +65,40 @@ function InnerCanvas({ firstName, employeeRole, employeePhoto, customBg, onCanva
 
         if (!isActive) return;
 
-        // Standard high-resolution poster dimensions (1080 x 1440)
-        const width = 1080;
-        const height = 1440;
+        // Use the natural resolution of the background image
+        const width = loadedBgImg?.naturalWidth || 1080;
+        const height = loadedBgImg?.naturalHeight || 1350;
         canvas.width = width;
         canvas.height = height;
-
         const centerX = width / 2;
 
+        // Draw background (the image already contains all design elements)
         if (loadedBgImg) {
           ctx.drawImage(loadedBgImg, 0, 0, width, height);
         } else {
-          // Festive fallback gradient background
-          const gradient = ctx.createLinearGradient(0, 0, width, height);
-          gradient.addColorStop(0, '#f8fafc');
-          gradient.addColorStop(0.5, '#eff6ff');
-          gradient.addColorStop(1, '#dbeafe');
-          ctx.fillStyle = gradient;
+          ctx.fillStyle = '#e8edf5';
           ctx.fillRect(0, 0, width, height);
         }
 
+        // --- ONLY draw employee NAME + ROLE in the white space area ---
+        // The white "PARA VOCÊ" box is approximately at 60-68% of image height
         ctx.textAlign = 'center';
 
-        // --- 1. HEADER LOGO & TITLE ---
-        // Super Atacado Brand Header
-        ctx.font = 'bold 36px "Inter", sans-serif';
-        ctx.fillStyle = '#002b80';
-        ctx.fillText('SUPER ATACADO', centerX, height * 0.08);
-
-        // "FELIZ" Subheader
-        ctx.font = 'bold 56px "Inter", italic, sans-serif';
-        ctx.fillStyle = '#002b80';
-        ctx.fillText('Feliz', centerX, height * 0.14);
-
-        // "ANIVERSÁRIO!" Big 3D Red Title
-        ctx.save();
-        const titleY = height * 0.21;
-        ctx.font = '900 88px "Inter", sans-serif';
-
-        // Shadow behind title
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetY = 6;
-
-        // White outline for title crispness
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = '#ffffff';
-        ctx.strokeText('ANIVERSÁRIO!', centerX, titleY);
-
-        // Red Fill
-        ctx.fillStyle = '#c8102e';
-        ctx.fillText('ANIVERSÁRIO!', centerX, titleY);
-        ctx.restore();
-
-        // Decorative underline
-        ctx.beginPath();
-        ctx.moveTo(centerX - 180, height * 0.23);
-        ctx.lineTo(centerX + 180, height * 0.23);
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = '#002b80';
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // --- 2. EMPLOYEE PHOTO ---
-        const photoY = height * 0.40;
-        const photoRadius = 120; // 240px diameter
-
-        if (employeePhoto) {
-          try {
-            const photoImg = await loadImg(employeePhoto, true);
-            if (!isActive) return;
-
-            // Soft shadow behind photo
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 43, 128, 0.3)';
-            ctx.shadowBlur = 30;
-            ctx.shadowOffsetY = 8;
-
-            // White base circle
-            ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius + 6, 0, Math.PI * 2, true);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-            ctx.restore();
-
-            // Clip circular photo
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.clip();
-
-            // Object-fit cover math
-            const size = Math.min(photoImg.width, photoImg.height);
-            const sx = (photoImg.width - size) / 2;
-            const sy = (photoImg.height - size) / 2;
-            ctx.drawImage(photoImg, sx, sy, size, size, centerX - photoRadius, photoY - photoRadius, photoRadius * 2, photoRadius * 2);
-            ctx.restore();
-
-            // Double border: Outer Gold, Inner Navy
-            ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius + 4, 0, Math.PI * 2, true);
-            ctx.lineWidth = 8;
-            ctx.strokeStyle = '#fcd34d'; // Gold accent
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(centerX, photoY, photoRadius, 0, Math.PI * 2, true);
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#002b80'; // Navy border
-            ctx.stroke();
-          } catch (e) {
-            console.error("Failed to load employee photo", e);
-          }
-        }
-
-        // --- 3. EMPLOYEE NAME & ROLE ---
-        const nameY = employeePhoto ? photoY + photoRadius + 85 : height * 0.48;
-
-        // Employee Name with high-contrast white halo outline
-        ctx.save();
-        ctx.font = '900 82px "Inter", sans-serif';
-
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
-        ctx.shadowBlur = 12;
-
-        ctx.lineWidth = 10;
-        ctx.strokeStyle = '#ffffff';
-        ctx.strokeText(firstName.toUpperCase(), centerX, nameY);
-
+        // Employee Name — big, bold, navy blue
+        // Centered inside the blank dashed rectangle (below "PARA VOCÊ,")
+        const nameY = Math.round(height * 0.73);
+        const nameFontSize = Math.round(width * 0.065);
+        ctx.font = `900 ${nameFontSize}px "Inter", sans-serif`;
         ctx.fillStyle = '#002b80';
         ctx.fillText(firstName.toUpperCase(), centerX, nameY);
-        ctx.restore();
 
-        // Employee Role Pill Tag
+        // Employee Role — smaller, red accent, right below name
         const safeRole = (employeeRole || 'Colaborador').toUpperCase();
-        const roleY = nameY + 25;
-        const pillWidth = Math.max(280, safeRole.length * 22 + 60);
-        const pillHeight = 46;
-        const pillX = centerX - pillWidth / 2;
-
-        ctx.save();
-        ctx.shadowColor = 'rgba(200, 16, 46, 0.3)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetY = 4;
-
-        ctx.beginPath();
-        ctx.roundRect(pillX, roleY, pillWidth, pillHeight, 23);
-        ctx.fillStyle = '#c8102e'; // Red Pill Background
-        ctx.fill();
-        ctx.restore();
-
-        // Role Text inside Pill Tag
-        ctx.font = 'bold 24px "Inter", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(safeRole, centerX, roleY + 31);
-
-        // --- 4. CONGRATULATORY MESSAGE ---
-        const msgY = roleY + 110;
-        ctx.font = '600 28px "Inter", sans-serif';
-        ctx.fillStyle = '#1e293b';
-        ctx.fillText('Que este dia seja especial e cheio de alegrias!', centerX, msgY);
-
-        ctx.font = '500 24px "Inter", sans-serif';
-        ctx.fillStyle = '#475569';
-        ctx.fillText('Desejamos saúde, paz, felicidade e muito sucesso.', centerX, msgY + 40);
-
-        ctx.font = 'bold 36px "Inter", italic, sans-serif';
+        const roleY = nameY + Math.round(height * 0.03);
+        const roleFontSize = Math.round(width * 0.028);
+        ctx.font = `700 ${roleFontSize}px "Inter", sans-serif`;
         ctx.fillStyle = '#c8102e';
-        ctx.fillText('Parabéns! ❤', centerX, msgY + 95);
-
-        // --- 5. CORPORATE TEAM BANNER ---
-        const bannerY = height * 0.84;
-        const bannerW = 820;
-        const bannerH = 64;
-        const bannerX = centerX - bannerW / 2;
-
-        ctx.save();
-        ctx.shadowColor = 'rgba(0, 43, 128, 0.25)';
-        ctx.shadowBlur = 20;
-        ctx.shadowOffsetY = 6;
-
-        ctx.beginPath();
-        ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 16);
-        ctx.fillStyle = '#002b80';
-        ctx.fill();
-        ctx.restore();
-
-        ctx.font = 'bold 24px "Inter", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('Você faz parte do nosso time e é muito importante para nós!', centerX, bannerY + 40);
-
-        // --- 6. FOOTER SIGNATURE ---
-        ctx.font = 'bold 22px "Inter", sans-serif';
-        ctx.fillStyle = '#002b80';
-        ctx.fillText('SUPER ATACADO • Conte sempre com a gente! ❤', centerX, height * 0.94);
+        ctx.fillText(safeRole, centerX, roleY);
       };
 
       renderPoster();
