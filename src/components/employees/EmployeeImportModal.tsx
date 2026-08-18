@@ -78,7 +78,7 @@ const MAPPING_FIELDS: MappingField[] = [
   },
   { 
     key: 'cbo', label: 'CBO', type: 'string',
-    synonyms: ['cod ocupação', 'classificação brasileira de ocupações'] 
+    synonyms: ['cod ocupação', 'classificação brasileira de ocupações', 'cbo'] 
   },
   { 
     key: 'department', label: 'Setor', type: 'string',
@@ -91,6 +91,10 @@ const MAPPING_FIELDS: MappingField[] = [
   { 
     key: 'email', label: 'E-mail', type: 'string',
     synonyms: ['e-mail', 'mail', 'endereço eletrônico'] 
+  },
+  { 
+    key: 'phone', label: 'Telefone', type: 'string',
+    synonyms: ['telefone', 'celular', 'fone', 'tel', 'whatsapp', 'contato'] 
   },
   { 
     key: 'salary', label: 'Salário', type: 'number',
@@ -128,10 +132,12 @@ const MAPPING_FIELDS: MappingField[] = [
     key: 'mobilidade', label: 'Mobilidade', type: 'number',
     synonyms: ['ajuda mobilidade', 'transporte extra'] 
   },
-  { key: 'birth_date', label: 'Data de Nascimento', type: 'date', synonyms: ['nascimento', 'aniversario'] },
-  { key: 'status', label: 'Status', type: 'enum', options: ['ACTIVE', 'INACTIVE'] },
-  { key: 'conta_itau', label: 'Conta Itaú', type: 'string', synonyms: ['itau', 'conta bancaria'] },
-  { key: 'gratificacao', label: 'Gratificação', type: 'number' },
+  { key: 'birth_date', label: 'Data de Nascimento', type: 'date', synonyms: ['nascimento', 'aniversario', 'data nascimento'] },
+  { key: 'status', label: 'Status', type: 'enum', options: ['ACTIVE', 'INACTIVE'], synonyms: ['situacao', 'situação', 'estado'] },
+  { key: 'conta_itau', label: 'Conta Itaú', type: 'string', synonyms: ['itau', 'conta bancaria', 'conta'] },
+  { key: 'gratificacao', label: 'Gratificação', type: 'number', synonyms: ['gratificacao', 'gratificação', 'premio', 'premiação'] },
+  { key: 'adicional_noturno', label: 'Adicional Noturno', type: 'number', synonyms: ['adicional noturno', 'noturno'] },
+  { key: 'vale_flexivel', label: 'Vale Flexível', type: 'number', synonyms: ['vale flexivel', 'vale flexível'] },
 ];
 
 export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tenantId, stores }: EmployeeImportModalProps) {
@@ -143,7 +149,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importProgress, setImportProgress] = useState(0);
-  const [importSummary, setImportSummary] = useState({ success: 0, error: 0, total: 0 });
+  const [importSummary, setImportSummary] = useState({ success: 0, error: 0, inserted: 0, updated: 0, total: 0 });
   const [errorFileRows, setErrorFileRows] = useState<any[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.id || '');
   const [conflictResolution, setConflictResolution] = useState<'update' | 'skip'>('update');
@@ -164,7 +170,7 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
       setMapping({});
       setImportRows([]);
       setImportProgress(0);
-      setImportSummary({ success: 0, error: 0, total: 0 });
+      setImportSummary({ success: 0, error: 0, inserted: 0, updated: 0, total: 0 });
       setErrorFileRows([]);
     }
   }, [open]);
@@ -189,6 +195,69 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
     setFile(selectedFile);
     setFileName(selectedFile.name);
     processFile(selectedFile);
+  };
+
+  const parseRowData = (row: any, currentMapping: Record<string, string>, currentHeaders: string[], index: number) => {
+    const rowData: any = { _originalIndex: index + 1, _errors: {} };
+    const custom_fields: any = {};
+
+    MAPPING_FIELDS.forEach(f => {
+      const fileCol = currentMapping[f.key];
+      // Se não mapeado ou campo vazio na linha, deixa null para não sobrescrever dados existentes
+      if (!fileCol || row[fileCol] === undefined || row[fileCol] === null || String(row[fileCol]).trim() === '') {
+        rowData[f.key] = null;
+        return;
+      }
+
+      const rawVal = row[fileCol];
+      let val: any = rawVal;
+
+      if (f.type === 'number') {
+        val = parseNumeric(rawVal);
+      } else if (f.type === 'date') {
+        val = parseExcelDate(rawVal);
+      } else if (f.type === 'string') {
+        val = String(rawVal).trim();
+        if (f.key !== 'email') val = val.toUpperCase();
+      } else if (f.type === 'enum') {
+        const strVal = String(rawVal).trim().toUpperCase();
+        if (f.key === 'gender') {
+          if (strVal.startsWith('F') || strVal === 'FEMININO' || strVal === 'MULHER') val = 'F';
+          else if (strVal.startsWith('M') || strVal === 'MASCULINO' || strVal === 'HOMEM') val = 'M';
+          else val = 'OTHER';
+        } else if (f.key === 'status') {
+          if (strVal.startsWith('A') || strVal === 'ATIVO') val = 'ACTIVE';
+          else if (strVal.startsWith('I') || strVal === 'INATIVO' || strVal === 'DESLIGADO') val = 'INACTIVE';
+          else val = 'ACTIVE';
+        } else {
+          val = strVal;
+        }
+      }
+
+      if (f.key === 'email' && val) val = String(val).trim().toLowerCase();
+      if (f.key === 'cpf' && val) val = String(val).replace(/\D/g, '');
+
+      rowData[f.key] = val;
+    });
+
+    // Colunas não mapeadas viram custom_fields
+    const mappedCols = Object.values(currentMapping).filter(Boolean);
+    currentHeaders.forEach(h => {
+      if (!mappedCols.includes(h)) {
+        const val = row[h];
+        if (val !== undefined && val !== null && String(val).trim() !== '') {
+          custom_fields[h] = val;
+        }
+      }
+    });
+    rowData.custom_fields = custom_fields;
+
+    // Validações básicas
+    if (!rowData.name || rowData.name.length < 2) rowData._errors.name = 'Nome inválido ou ausente';
+    if (!rowData.cpf || !isValidCPF(rowData.cpf)) rowData._errors.cpf = 'CPF inválido';
+    if (currentMapping.admission_date && !rowData.admission_date) rowData._errors.admission_date = 'Data de admissão obrigatória';
+
+    return rowData;
   };
 
   const processFile = (file: File) => {
@@ -293,27 +362,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
           description: 'A IA identificou todos os campos necessários.',
           icon: <Sparkles className="w-4 h-4 text-emerald-400" />
         });
-        // We simulate handleNextToPreview with the new initialMapping
-        const processed = rows.map((row, index) => {
-          const rowData: any = { _originalIndex: index + 1, _errors: {} };
-          const custom_fields: any = {};
-          MAPPING_FIELDS.forEach(f => {
-            const fileCol = initialMapping[f.key];
-            let val = fileCol ? row[fileCol] : null;
-            if (f.type === 'number') val = parseNumeric(val);
-            if (f.type === 'date') val = parseExcelDate(val);
-            if (f.type === 'string' && val) val = String(val).trim().toUpperCase();
-            if (f.key === 'email' && val) val = String(val).trim().toLowerCase();
-            if (f.key === 'cpf' && val) val = String(val).replace(/\D/g, '');
-            rowData[f.key] = val;
-          });
-          fileHeaders.forEach(h => { if (!Object.values(initialMapping).includes(h)) custom_fields[h] = row[h]; });
-          rowData.custom_fields = custom_fields;
-          if (!rowData.name || rowData.name.length < 2) rowData._errors.name = 'Nome inválido';
-          if (!rowData.cpf || !isValidCPF(rowData.cpf)) rowData._errors.cpf = 'CPF inválido';
-          if (!rowData.admission_date) rowData._errors.admission_date = 'Data de admissão obrigatória';
-          return rowData;
-        }).filter(r => r.name || r.cpf || r.email || r.role || r.department);
+        const processed = rows
+          .map((row, index) => parseRowData(row, initialMapping, fileHeaders, index))
+          .filter(r => r.name || r.cpf || r.email || r.role || r.department);
         setImportRows(processed);
         setStep('PREVIEW');
       } else {
@@ -333,40 +384,9 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
     }
 
     // Process and validate rows
-    const processed = rawRows.map((row, index) => {
-      const data: any = { _originalIndex: index + 1, _errors: {} };
-      const custom_fields: any = {};
-
-      // Map mapped fields
-      MAPPING_FIELDS.forEach(f => {
-        const fileCol = mapping[f.key];
-        let val = fileCol ? row[fileCol] : null;
-
-        if (f.type === 'number') val = parseNumeric(val);
-        if (f.type === 'date') val = parseExcelDate(val);
-        if (f.type === 'string' && val) val = String(val).trim().toUpperCase();
-        if (f.key === 'email' && val) val = String(val).trim().toLowerCase();
-        if (f.key === 'cpf' && val) val = String(val).replace(/\D/g, '');
-
-        data[f.key] = val;
-      });
-
-      // Map unmapped fields to custom_fields
-      headers.forEach(h => {
-        const isMapped = Object.values(mapping).includes(h);
-        if (!isMapped) {
-          custom_fields[h] = row[h];
-        }
-      });
-      data.custom_fields = custom_fields;
-
-      // Validation
-      if (!data.name || data.name.length < 2) data._errors.name = 'Nome inválido';
-      if (!data.cpf || !isValidCPF(data.cpf)) data._errors.cpf = 'CPF inválido';
-      if (!data.admission_date) data._errors.admission_date = 'Data de admissão obrigatória';
-      
-      return data;
-    }).filter(r => r.name || r.cpf || r.email || r.role || r.department);
+    const processed = rawRows
+      .map((row, index) => parseRowData(row, mapping, headers, index))
+      .filter(r => r.name || r.cpf || r.email || r.role || r.department);
 
     setImportRows(processed);
     setStep('PREVIEW');
@@ -387,58 +407,154 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
 
     setStep('IMPORTING');
     setImportProgress(0);
-    setImportSummary({ success: 0, error: 0, total: validRows.length });
+    setImportSummary({ success: 0, error: 0, inserted: 0, updated: 0, total: validRows.length });
     setErrorFileRows(bypassValidation ? [] : errorRows);
 
     let successCount = 0;
     let failCount = 0;
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    // Obter tenant_id definitivo
+    let finalTenantId = tenantId;
+    if (!finalTenantId) {
+      const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
+      if (tData?.id) finalTenantId = tData.id;
+    }
 
     for (let i = 0; i < validRows.length; i++) {
-        const row = validRows[i];
-        const { _originalIndex, _errors, ...dbRow } = row;
-        
-        // Robust tenant_id detection for each row insert
-        let finalTenantId = tenantId;
-        if (!finalTenantId) {
-            const { data: tData } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
-            if (tData?.id) finalTenantId = tData.id;
+      const row = validRows[i];
+      const { _originalIndex, _errors, ...dbRow } = row;
+      const cleanCpf = String(dbRow.cpf || '').replace(/\D/g, '');
+      const formattedCpf = formatCPF(cleanCpf);
+
+      try {
+        // 1. Verifica se o colaborador já existe no banco por CPF
+        let query = supabase.from('employees').select('*');
+        if (finalTenantId) {
+          query = query.eq('tenant_id', finalTenantId);
         }
+        const { data: existingList, error: searchErr } = await query.in('cpf', [formattedCpf, cleanCpf]).limit(1);
+        if (searchErr) throw searchErr;
 
-        // Prepare DB object
-        const finalRow = {
-            ...dbRow,
-            status: 'ACTIVE',
-            tenant_id: finalTenantId,
-            store_id: selectedStoreId,
-            cpf: formatCPF(dbRow.cpf),
-        };
+        const existing = existingList && existingList.length > 0 ? existingList[0] : null;
 
-        try {
-            const { error } = await supabase
-                .from('employees')
-                .upsert(finalRow, { 
-                    onConflict: 'cpf', 
-                    ignoreDuplicates: conflictResolution === 'skip' 
-                });
-
-            if (error) throw error;
+        if (existing) {
+          // --- FUNCIONÁRIO JÁ CADASTRADO ---
+          if (conflictResolution === 'skip') {
+            // Pular registro se configurado para ignorar
             successCount++;
-        } catch (err: any) {
-            console.error('Import error at row', row._originalIndex, err);
-            failCount++;
-            setErrorFileRows(prev => [...prev, { ...row, _importError: err.message }]);
+          } else {
+            // REGRA: Atualizar APENAS os campos novos/diferentes informados na planilha,
+            // PRESERVANDO todos os outros dados anteriores existentes no cadastro (foto, jornada, benefícios, etc.).
+            const updatePayload: Record<string, any> = {};
+
+            MAPPING_FIELDS.forEach(f => {
+              const key = f.key;
+              // Apenas atualiza se a coluna foi mapeada no arquivo E a célula não está nula/vazia
+              if (mapping[key] && dbRow[key] !== null && dbRow[key] !== undefined) {
+                const val = dbRow[key];
+                if (f.type === 'number') {
+                  if (typeof val === 'number' && !isNaN(val)) {
+                    updatePayload[key] = val;
+                  }
+                } else if (f.type === 'string') {
+                  if (String(val).trim() !== '') {
+                    updatePayload[key] = String(val).trim();
+                  }
+                } else {
+                  updatePayload[key] = val;
+                }
+              }
+            });
+
+            // Garante o CPF formatado
+            updatePayload.cpf = formattedCpf;
+
+            // Mesclar campos customizados (mantém os que já existiam e adiciona os novos)
+            if (dbRow.custom_fields && Object.keys(dbRow.custom_fields).length > 0) {
+              const existingCustom = existing.custom_fields && typeof existing.custom_fields === 'object'
+                ? existing.custom_fields
+                : {};
+              updatePayload.custom_fields = {
+                ...existingCustom,
+                ...dbRow.custom_fields
+              };
+            }
+
+            // Se o funcionário não tinha loja cadastrada, atribui a loja selecionada
+            if (!existing.store_id && selectedStoreId) {
+              updatePayload.store_id = selectedStoreId;
+            }
+
+            // Executa a atualização parcial apenas com os campos fornecidos
+            const { error: updateErr } = await supabase
+              .from('employees')
+              .update(updatePayload)
+              .eq('id', existing.id);
+
+            if (updateErr) throw updateErr;
+
+            updatedCount++;
+            successCount++;
+          }
+        } else {
+          // --- NOVO FUNCIONÁRIO ---
+          const newPayload: Record<string, any> = {
+            tenant_id: finalTenantId,
+            store_id: selectedStoreId || null,
+            status: dbRow.status || 'ACTIVE',
+            cpf: formattedCpf,
+            name: dbRow.name || 'SEM NOME',
+            admission_date: dbRow.admission_date || new Date().toISOString().split('T')[0],
+            salary: typeof dbRow.salary === 'number' ? dbRow.salary : 0,
+          };
+
+          MAPPING_FIELDS.forEach(f => {
+            const key = f.key;
+            if (!['cpf', 'name', 'admission_date', 'status', 'salary'].includes(key)) {
+              const val = dbRow[key];
+              if (val !== null && val !== undefined) {
+                newPayload[key] = val;
+              }
+            }
+          });
+
+          if (dbRow.custom_fields && Object.keys(dbRow.custom_fields).length > 0) {
+            newPayload.custom_fields = dbRow.custom_fields;
+          }
+
+          const { error: insertErr } = await supabase
+            .from('employees')
+            .insert([newPayload]);
+
+          if (insertErr) throw insertErr;
+
+          insertedCount++;
+          successCount++;
         }
-        
-        setImportProgress(Math.round(((i + 1) / validRows.length) * 100));
-        setImportSummary(prev => ({ ...prev, success: successCount, error: failCount }));
+      } catch (err: any) {
+        console.error('Import error at row', row._originalIndex, err);
+        failCount++;
+        setErrorFileRows(prev => [...prev, { ...row, _importError: err.message || 'Erro ao processar linha' }]);
+      }
+
+      setImportProgress(Math.round(((i + 1) / validRows.length) * 100));
+      setImportSummary({ 
+        success: successCount, 
+        error: failCount, 
+        inserted: insertedCount, 
+        updated: updatedCount, 
+        total: validRows.length 
+      });
     }
 
     addAuditLog({
-        userId: currentUser?.id || 'unknown',
-        userName: currentUser?.name || 'Sistema',
-        action: 'IMPORT_EMPLOYEES',
-        details: `Importação premium: ${successCount} sucesso, ${failCount + errorRows.length} erros.`,
-        tenantId: tenantId || undefined
+      userId: currentUser?.id || 'unknown',
+      userName: currentUser?.name || 'Sistema',
+      action: 'IMPORT_EMPLOYEES',
+      details: `Importação segura: ${insertedCount} novos colaboradores, ${updatedCount} atualizados (mesclagem de dados), ${failCount + errorRows.length} erros.`,
+      tenantId: tenantId || undefined
     });
 
     setStep('SUMMARY');
@@ -675,15 +791,15 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="space-y-1.5">
-                        <Label className="text-[10px] uppercase text-muted-foreground font-bold">Conflito de CPF</Label>
+                    <div className="space-y-1.5 flex-1 min-w-[240px]">
+                        <Label className="text-[10px] uppercase text-muted-foreground font-bold">Colaboradores já cadastrados (CPF)</Label>
                         <Select value={conflictResolution} onValueChange={(v: any) => setConflictResolution(v)}>
-                            <SelectTrigger className="h-10 w-32 bg-background/50">
+                            <SelectTrigger className="h-10 w-full bg-background/50 text-xs">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="update">Atualizar</SelectItem>
-                                <SelectItem value="skip">Ignorar</SelectItem>
+                                <SelectItem value="update">Atualizar dados da planilha (manter o restante)</SelectItem>
+                                <SelectItem value="skip">Ignorar se já existir (pular)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -817,13 +933,17 @@ export function EmployeeImportModal({ open, onOpenChange, onImportComplete, tena
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-                <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col items-center gap-1">
-                    <span className="text-[10px] uppercase font-bold text-emerald-500">Sucesso</span>
-                    <span className="text-2xl font-bold">{importSummary.success}</span>
+              <div className="grid grid-cols-3 gap-3 w-full max-w-lg">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex flex-col items-center gap-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400">Novos Cadastros</span>
+                    <span className="text-2xl font-bold text-emerald-400">{importSummary.inserted}</span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-cyan-500/5 border border-cyan-500/20 flex flex-col items-center gap-1">
+                    <span className="text-[10px] uppercase font-bold text-cyan-400">Atualizados</span>
+                    <span className="text-2xl font-bold text-cyan-400">{importSummary.updated}</span>
                 </div>
                 <div className={cn(
-                    "p-4 rounded-2xl border flex flex-col items-center gap-1",
+                    "p-3.5 rounded-2xl border flex flex-col items-center gap-1",
                     importSummary.error > 0 ? "bg-rose-500/5 border-rose-500/20" : "bg-muted/30 border-transparent opacity-50"
                 )}>
                     <span className={cn("text-[10px] uppercase font-bold", importSummary.error > 0 ? "text-rose-500" : "text-muted-foreground")}>Falhas</span>

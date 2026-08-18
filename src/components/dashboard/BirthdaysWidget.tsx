@@ -50,7 +50,7 @@ export function BirthdaysWidget() {
       if (!employees) { setLoading(false); return; }
 
       const today = new Date();
-      const results: BirthdayEmployee[] = [];
+      let results: BirthdayEmployee[] = [];
 
       for (let daysAhead = 0; daysAhead <= 3; daysAhead++) {
         const checkDate = addDays(today, daysAhead);
