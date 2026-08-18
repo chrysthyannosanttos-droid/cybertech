@@ -1,8 +1,27 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { addAuditLog } from '@/data/mockData';
 import { supabase } from '@/lib/supabase';
 import { ServiceProvider } from '@/types';
-import { Briefcase, Plus, Search, Mail, Phone, Calendar, AlertCircle, FileText, Upload, Edit2, CheckCircle2, Trash2, DollarSign } from 'lucide-react';
+import { 
+  Briefcase, 
+  Plus, 
+  Search, 
+  Mail, 
+  Phone, 
+  Calendar, 
+  AlertCircle, 
+  FileText, 
+  Upload, 
+  Edit2, 
+  CheckCircle2, 
+  Trash2, 
+  DollarSign, 
+  Eye, 
+  ExternalLink,
+  Download,
+  Loader2,
+  Paperclip
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 
 export default function ServiceProviders() {
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -18,10 +38,32 @@ export default function ServiceProviders() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'superadmin' || currentUser?.email === 'cristiano';
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [contractUrl, setContractUrl] = useState<string>('');
+  const [contractFileName, setContractFileName] = useState<string>('');
+
+  const [form, setForm] = useState({
+    name: '',
+    cnpj: '',
+    email: '',
+    phone: '',
+    startDate: '',
+    endDate: '',
+    isIndefinite: false,
+    contractValue: '',
+    duties: '',
+    observations: '',
+    additionalCosts: [] as { desc: string; value: number; date: string }[],
+  });
+
+  const [newCost, setNewCost] = useState({ desc: '', value: '', date: '' });
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -46,6 +88,8 @@ export default function ServiceProviders() {
         duties: p.duties || '',
         observations: p.observations || '',
         additionalCosts: p.additional_costs || [],
+        contractUrl: p.contract_url || '',
+        contractFileName: p.contract_file_name || '',
       })));
     }
     setIsLoading(false);
@@ -55,28 +99,16 @@ export default function ServiceProviders() {
     fetchData();
   }, []);
 
-  const [form, setForm] = useState({
-    name: '',
-    cnpj: '',
-    email: '',
-    phone: '',
-    startDate: '',
-    endDate: '',
-    isIndefinite: false,
-    contractValue: '',
-    duties: '',
-    observations: '',
-    additionalCosts: [] as { desc: string; value: number; date: string }[],
-  });
-
-  const [newCost, setNewCost] = useState({ desc: '', value: '', date: '' });
-
   const filtered = providers.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) || p.cnpj.includes(search)
   );
 
   const handleOpenAdd = () => {
     setEditingId(null);
+    setSelectedFile(null);
+    setContractUrl('');
+    setContractFileName('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setForm({ 
       name: '', 
       cnpj: '', 
@@ -95,6 +127,10 @@ export default function ServiceProviders() {
 
   const handleOpenEdit = (p: ServiceProvider) => {
     setEditingId(p.id);
+    setSelectedFile(null);
+    setContractUrl(p.contractUrl || '');
+    setContractFileName(p.contractFileName || '');
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setForm({
       name: p.name,
       cnpj: p.cnpj,
@@ -109,6 +145,58 @@ export default function ServiceProviders() {
       additionalCosts: p.additionalCosts || [],
     });
     setOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) { // 15MB limit
+      toast({ title: 'Arquivo muito grande', description: 'O tamanho máximo do documento é 15MB.', variant: 'destructive' });
+      return;
+    }
+
+    setSelectedFile(file);
+    setContractFileName(file.name);
+  };
+
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFile(null);
+    setContractUrl('');
+    setContractFileName('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const uploadContractFile = async (file: File, providerId: string): Promise<string> => {
+    try {
+      const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `service_providers/${providerId}_${Date.now()}_${cleanName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, { contentType: file.type || 'application/pdf', upsert: true });
+
+      if (uploadError) {
+        console.warn('Storage upload error, falling back to base64:', uploadError.message);
+        return await fileToBase64(file);
+      }
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      return urlData?.publicUrl || (await fileToBase64(file));
+    } catch (err) {
+      console.warn('Storage upload exception, falling back to base64:', err);
+      return await fileToBase64(file);
+    }
   };
 
   const handleAddCost = () => {
@@ -128,64 +216,80 @@ export default function ServiceProviders() {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.cnpj) return;
-
-    const dbData = {
-      name: form.name,
-      cnpj: form.cnpj,
-      email: form.email,
-      phone: form.phone,
-      start_date: form.startDate || null,
-      end_date: form.isIndefinite ? null : form.endDate || null,
-      contract_value: Number(form.contractValue) || 0,
-      duties: form.duties,
-      observations: form.observations,
-      additional_costs: form.additionalCosts,
-      tenant_id: tenantId
-    };
-
-    if (editingId) {
-      const { error } = await supabase
-        .from('service_providers')
-        .update(dbData)
-        .eq('id', editingId);
-
-      if (error) {
-        toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
-        return;
-      }
-
-      addAuditLog({
-        userId: currentUser?.id || 'unknown',
-        userName: currentUser?.name || 'Sistema',
-        action: 'EDIT_SERVICE_PROVIDER',
-        details: `[ServiceProviders] Editou prestador ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: tenantId || undefined
-      });
-      toast({ title: 'Prestador atualizado', description: `${form.name} atualizado com sucesso.` });
-    } else {
-      const { error } = await supabase
-        .from('service_providers')
-        .insert([{ ...dbData, id: crypto.randomUUID() }]);
-
-      if (error) {
-        toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' });
-        return;
-      }
-
-      addAuditLog({
-        userId: currentUser?.id || 'unknown',
-        userName: currentUser?.name || 'Sistema',
-        action: 'CREATE_SERVICE_PROVIDER',
-        details: `[ServiceProviders] Criou prestador ${form.name} (CNPJ: ${form.cnpj})`,
-        tenantId: tenantId || undefined
-      });
-      toast({ title: 'Prestador cadastrado', description: `${form.name} adicionada com sucesso.` });
+    if (!form.name || !form.cnpj) {
+      toast({ title: 'Campos obrigatórios', description: 'Informe o Nome da Empresa e o CNPJ.', variant: 'destructive' });
+      return;
     }
-    
-    await fetchData();
-    setOpen(false);
-    setTimeout(() => window.location.reload(), 500);
+
+    setIsUploading(true);
+
+    try {
+      const targetId = editingId || crypto.randomUUID();
+      let finalContractUrl = contractUrl;
+      let finalContractFileName = contractFileName;
+
+      if (selectedFile) {
+        finalContractUrl = await uploadContractFile(selectedFile, targetId);
+        finalContractFileName = selectedFile.name;
+      }
+
+      const dbData = {
+        name: form.name,
+        cnpj: form.cnpj,
+        email: form.email,
+        phone: form.phone,
+        start_date: form.startDate || null,
+        end_date: form.isIndefinite ? null : form.endDate || null,
+        contract_value: Number(form.contractValue) || 0,
+        duties: form.duties,
+        observations: form.observations,
+        additional_costs: form.additionalCosts,
+        tenant_id: tenantId,
+        contract_url: finalContractUrl || null,
+        contract_file_name: finalContractFileName || null
+      };
+
+      if (editingId) {
+        const { error } = await supabase
+          .from('service_providers')
+          .update(dbData)
+          .eq('id', editingId);
+
+        if (error) throw error;
+
+        addAuditLog({
+          userId: currentUser?.id || 'unknown',
+          userName: currentUser?.name || 'Sistema',
+          action: 'EDIT_SERVICE_PROVIDER',
+          details: `[ServiceProviders] Editou prestador ${form.name} (CNPJ: ${form.cnpj})`,
+          tenantId: tenantId || undefined
+        });
+        toast({ title: 'Prestador atualizado', description: `${form.name} atualizado com sucesso.` });
+      } else {
+        const { error } = await supabase
+          .from('service_providers')
+          .insert([{ ...dbData, id: targetId }]);
+
+        if (error) throw error;
+
+        addAuditLog({
+          userId: currentUser?.id || 'unknown',
+          userName: currentUser?.name || 'Sistema',
+          action: 'CREATE_SERVICE_PROVIDER',
+          details: `[ServiceProviders] Criou prestador ${form.name} (CNPJ: ${form.cnpj})`,
+          tenantId: tenantId || undefined
+        });
+        toast({ title: 'Prestador cadastrado', description: `${form.name} adicionado com sucesso.` });
+      }
+      
+      await fetchData();
+      setOpen(false);
+    } catch (err: any) {
+      console.error('Error saving provider:', err);
+      toast({ title: 'Erro ao salvar', description: err.message || 'Falha na operação.', variant: 'destructive' });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDeleteProvider = async (id: string, name: string) => {
@@ -208,7 +312,6 @@ export default function ServiceProviders() {
     
     await fetchData();
     toast({ title: 'Prestador removido' });
-    setTimeout(() => window.location.reload(), 500);
   };
 
   const getDaysRemaining = (dateStr: string) => {
@@ -217,6 +320,39 @@ export default function ServiceProviders() {
     today.setHours(0, 0, 0, 0);
     const diffTime = end.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const [viewingDocProvider, setViewingDocProvider] = useState<ServiceProvider | null>(null);
+
+  const downloadFile = async (url: string, filename: string) => {
+    if (!url) return;
+    try {
+      if (url.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename || 'contrato.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: 'Download iniciado', description: filename });
+        return;
+      }
+
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename || 'contrato.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast({ title: 'Download iniciado', description: filename });
+    } catch (e) {
+      // Fallback para abrir link
+      window.open(url, '_blank');
+    }
   };
 
   return (
@@ -271,25 +407,110 @@ export default function ServiceProviders() {
                 <label className="text-[12px] font-medium text-muted-foreground">Valor do Contrato (Mensal R$)</label>
                 <Input type="number" value={form.contractValue} onChange={e => setForm(f => ({ ...f, contractValue: e.target.value }))} className="h-9 text-[13px]" placeholder="0.00" />
               </div>
+
+              {/* Upload de Contrato / Documento PDF */}
               <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-muted-foreground">Documento (PDF/Foto)</label>
-                <Button variant="outline" className="h-9 w-full text-[12px] border-dashed border-2 gap-2">
-                  <Upload className="w-3.5 h-3.5" /> Importar
-                </Button>
+                <label className="text-[12px] font-medium text-muted-foreground flex items-center justify-between">
+                  <span>Documento (PDF/Foto)</span>
+                  {(contractFileName || contractUrl) && (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Anexado
+                    </span>
+                  )}
+                </label>
+
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept=".pdf, image/*, .doc, .docx" 
+                  onChange={handleFileChange} 
+                />
+
+                {contractFileName || contractUrl ? (
+                  <div className="flex items-center justify-between p-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-[12px]">
+                    <div className="flex items-center gap-2 overflow-hidden mr-2">
+                      <FileText className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span className="text-white text-xs truncate max-w-[130px]" title={contractFileName || 'Documento anexado'}>
+                        {contractFileName || 'Documento anexado'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {contractUrl && (
+                        <>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10" 
+                            title="Visualizar"
+                            onClick={() => {
+                              setViewingDocProvider({
+                                id: editingId || 'temp',
+                                tenantId: tenantId || '',
+                                name: form.name || 'Prestador',
+                                cnpj: form.cnpj || '',
+                                email: form.email,
+                                phone: form.phone,
+                                startDate: form.startDate,
+                                endDate: form.endDate,
+                                contractValue: Number(form.contractValue) || 0,
+                                additionalCosts: form.additionalCosts,
+                                contractUrl: contractUrl,
+                                contractFileName: contractFileName || 'contrato.pdf'
+                              });
+                            }}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10" 
+                            title="Baixar arquivo"
+                            onClick={() => downloadFile(contractUrl, contractFileName || 'contrato.pdf')}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </Button>
+                        </>
+                      )}
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" 
+                        title="Remover anexo"
+                        onClick={handleRemoveFile}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-9 w-full text-[12px] border-dashed border-2 gap-2 hover:bg-primary/5 hover:border-primary/50"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-primary" /> Anexar PDF / Contrato
+                  </Button>
+                )}
               </div>
 
-              <div className="col-span-2 space-y-1.5 text-black">
+              <div className="col-span-2 space-y-1.5">
                 <label className="text-[12px] font-medium text-muted-foreground">Atribuições</label>
                 <Textarea value={form.duties} onChange={e => setForm(f => ({ ...f, duties: e.target.value }))} className="text-[13px] min-h-[80px]" placeholder="Descreva as responsabilidades do prestador..." />
               </div>
 
-              <div className="col-span-2 space-y-1.5 text-black">
+              <div className="col-span-2 space-y-1.5">
                 <label className="text-[12px] font-medium text-muted-foreground">Observações</label>
                 <Textarea value={form.observations} onChange={e => setForm(f => ({ ...f, observations: e.target.value }))} className="text-[13px] min-h-[60px]" placeholder="Notas adicionais..." />
               </div>
 
               {/* Dynamic Additional Costs */}
-              <div className="col-span-2 border-t pt-4 mt-2">
+              <div className="col-span-2 border-t border-white/10 pt-4 mt-2">
                 <h4 className="text-[13px] font-semibold mb-3">Custos Adicionais</h4>
                 <div className="flex gap-2 items-end mb-4">
                   <div className="flex-1 space-y-1">
@@ -317,9 +538,9 @@ export default function ServiceProviders() {
                           <span className="font-medium">{cost.desc}</span>
                           <span className="text-[10px] text-muted-foreground">{new Date(cost.date).toLocaleDateString('pt-BR')}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-black">
+                        <div className="flex items-center gap-3">
                           <span className="font-semibold text-primary">R$ {cost.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleRemoveCost(idx)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveCost(idx)}>
                             <Trash2 className="w-3" />
                           </Button>
                         </div>
@@ -329,7 +550,19 @@ export default function ServiceProviders() {
                 )}
               </div>
 
-              <Button onClick={handleSave} className="col-span-2 h-9 text-[13px] mt-2">{editingId ? 'Salvar Alterações' : 'Cadastrar Prestador'}</Button>
+              <Button 
+                onClick={handleSave} 
+                disabled={isUploading}
+                className="col-span-2 h-10 text-[13px] mt-2 font-bold gap-2 bg-primary hover:bg-primary/90 text-white"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Salvando Prestador e Documento...
+                  </>
+                ) : (
+                  editingId ? 'Salvar Alterações' : 'Cadastrar Prestador'
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -350,7 +583,7 @@ export default function ServiceProviders() {
                 <th className="px-6 py-4">Vigência</th>
                 <th className="px-6 py-4 text-right">Valor Contrato</th>
                 <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Ação</th>
+                <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -376,10 +609,10 @@ export default function ServiceProviders() {
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-[12px] text-muted-foreground group-hover:text-white/70 transition-colors">
-                          <Mail className="w-3 h-3" /> {p.email}
+                          <Mail className="w-3 h-3" /> {p.email || 'Sem e-mail'}
                         </div>
                         <div className="flex items-center gap-2 text-[12px] text-muted-foreground group-hover:text-white/70 transition-colors">
-                          <Phone className="w-3 h-3" /> {p.phone}
+                          <Phone className="w-3 h-3" /> {p.phone || 'Sem telefone'}
                         </div>
                       </div>
                     </td>
@@ -420,10 +653,51 @@ export default function ServiceProviders() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/40 hover:text-white hover:bg-white/10" title="Ver Detalhes/Contrato">
-                          <FileText className="w-4 h-4" />
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Botão de Visualizar PDF / Contrato */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className={cn(
+                            "h-8 w-8 rounded-lg transition-all",
+                            p.contractUrl 
+                              ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]" 
+                              : "text-white/20 hover:text-white/40 hover:bg-white/5 opacity-40 cursor-not-allowed"
+                          )} 
+                          title={p.contractUrl ? `Visualizar Contrato: ${p.contractFileName || 'PDF'}` : 'Nenhum contrato anexado'}
+                          onClick={() => {
+                            if (p.contractUrl) {
+                              setViewingDocProvider(p);
+                            } else {
+                              toast({ title: 'Sem documento', description: 'Este prestador ainda não possui contrato anexado.', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
                         </Button>
+
+                        {/* Botão de Baixar PDF / Contrato */}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className={cn(
+                            "h-8 w-8 rounded-lg transition-all",
+                            p.contractUrl 
+                              ? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20" 
+                              : "text-white/20 hover:text-white/40 hover:bg-white/5 opacity-40 cursor-not-allowed"
+                          )} 
+                          title={p.contractUrl ? `Baixar Contrato: ${p.contractFileName || 'PDF'}` : 'Nenhum contrato anexado'}
+                          onClick={() => {
+                            if (p.contractUrl) {
+                              downloadFile(p.contractUrl, p.contractFileName || `${p.name.replace(/\s+/g, '_')}_contrato.pdf`);
+                            } else {
+                              toast({ title: 'Sem documento', description: 'Este prestador ainda não possui contrato anexado.', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-white/40 hover:text-white hover:bg-white/10" onClick={() => handleOpenEdit(p)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
@@ -441,6 +715,70 @@ export default function ServiceProviders() {
           </table>
         </div>
       </div>
+
+      {/* Modal de Visualização Completa e Download do Contrato */}
+      <Dialog open={!!viewingDocProvider} onOpenChange={(isOpen) => { if (!isOpen) setViewingDocProvider(null); }}>
+        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-background/95 backdrop-blur-2xl border-white/10 shadow-2xl">
+          <DialogHeader className="p-6 pb-3 border-b border-white/5 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                Contrato — {viewingDocProvider?.name}
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground font-mono-data mt-0.5">
+                CNPJ: {viewingDocProvider?.cnpj} • Arquivo: <span className="text-white font-medium">{viewingDocProvider?.contractFileName || 'Documento'}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pr-6">
+              {viewingDocProvider?.contractUrl && (
+                <>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-8 px-3 text-xs gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                    onClick={() => downloadFile(viewingDocProvider.contractUrl!, viewingDocProvider.contractFileName || 'contrato.pdf')}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Baixar Arquivo
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-8 px-3 text-xs gap-1.5 border-white/10 hover:bg-white/10"
+                    onClick={() => window.open(viewingDocProvider.contractUrl, '_blank')}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Nova Aba
+                  </Button>
+                </>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-[500px] p-4 bg-muted/20 flex flex-col items-center justify-center overflow-hidden">
+            {viewingDocProvider?.contractUrl ? (
+              viewingDocProvider.contractUrl.includes('image') || /\.(png|jpe?g|webp|gif)$/i.test(viewingDocProvider.contractFileName || '') ? (
+                <div className="w-full h-full flex items-center justify-center p-2 overflow-auto">
+                  <img 
+                    src={viewingDocProvider.contractUrl} 
+                    alt="Documento do Prestador" 
+                    className="max-h-[68vh] max-w-full object-contain rounded-xl shadow-2xl border border-white/10" 
+                  />
+                </div>
+              ) : (
+                <iframe 
+                  src={viewingDocProvider.contractUrl} 
+                  title="Documento do Prestador"
+                  className="w-full h-[68vh] rounded-xl border border-white/10 bg-white" 
+                />
+              )
+            ) : (
+              <div className="text-center space-y-3 p-8">
+                <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+                <p className="text-sm font-semibold">Nenhum documento disponível para visualização.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
