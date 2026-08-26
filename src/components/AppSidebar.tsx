@@ -46,7 +46,7 @@ const ALL_LINKS: Array<{ to: string; module: AppModule; icon: React.ComponentTyp
   { to: '/logs',              module: 'logs',              icon: History,         label: 'Logs de Auditoria',   superadminOnly: true },
   { to: '/portal',            module: 'dashboard',         icon: UserCog,         label: 'Portal do Colaborador' },
   { to: '/commercial',        module: 'dashboard',         icon: FileText,        label: 'Proposta Comercial', superadminOnly: true, cristianoOnly: true },
-  { to: '/users',             module: 'settings',          icon: UserCog,         label: 'Usuários' },
+  { to: '/users',             module: 'users',             icon: UserCog,         label: 'Usuários' },
   { to: '/settings/email',    module: 'dashboard',         icon: Mail,            label: 'Automações' },
   { to: '/settings',          module: 'settings',          icon: Settings,        label: 'Configurações', superadminOnly: true },
 ];
@@ -88,6 +88,12 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
 
     // Links exclusivos de superadmin só aparecem para cristiano/superadmin
     if (link.superadminOnly && !isSuperAdmin) return false;
+
+    // Link de Usuários: visível se superadmin, canManageUsers, ou se tem permissão do módulo 'users'
+    if (link.to === '/users') {
+      return isSuperAdmin || !!user?.canManageUsers || !!user?.appPermissions?.canManageUsers || (Array.isArray(currentPermissions) && currentPermissions.includes('users'));
+    }
+
     // Se cristiano ou superadmin: acesso total a todos os módulos
     if (isCristiano || currentPermissions === undefined) return true;
     // Para outros: verificar permissões

@@ -181,6 +181,9 @@ export default function Tenants() {
     name: '', 
     email: '', 
     password: '123',
+    canEditEmployees: false,
+    canDeleteEmployees: false,
+    canManageUsers: false,
     appPermissions: { 'ponto': true } as Record<string, boolean>
   });
   
@@ -194,7 +197,8 @@ export default function Tenants() {
     { module: 'rescissions',       label: 'Rescisões',      description: 'Registro de rescisões contratuais' },
     { module: 'stores',            label: 'Lojas',          description: 'Gestão de unidades/lojas' },
     { module: 'attendance',        label: 'Ponto Eletrônico', description: 'Configuração de relógios e histórico' },
-    { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e usuários' },
+    { module: 'users',             label: 'Usuários',       description: 'Criar e gerenciar usuários da empresa' },
+    { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e configurações' },
   ];
 
   const DEFAULT_PERMISSIONS: AppModule[] = MODULE_OPTIONS.map(m => m.module);
@@ -475,18 +479,34 @@ export default function Tenants() {
     const existingRecord = editingEmail ? currentAllUsers.find(u => u.email === editingEmail) : undefined;
     const passwordToSave = (editingEmail && !userForm.password) ? (existingRecord?.password || '123') : userForm.password;
 
+    let finalPerms = selectedUserPermissions;
+    if (userForm.canManageUsers && !finalPerms.includes('users')) {
+      finalPerms = [...finalPerms, 'users'];
+    } else if (!userForm.canManageUsers && finalPerms.includes('users')) {
+      finalPerms = finalPerms.filter(p => p !== 'users');
+    }
+
     const newUserData: ManagedUser = {
       email: userForm.email,
       password: passwordToSave,
       mustChangePassword: isNew ? true : existingRecord?.mustChangePassword,
-      permissions: selectedUserPermissions,
-      appPermissions: userForm.appPermissions,
+      permissions: finalPerms,
+      appPermissions: {
+        ...userForm.appPermissions,
+        canManageUsers: userForm.canManageUsers
+      },
+      canEditEmployees: userForm.canEditEmployees,
+      canDeleteEmployees: userForm.canDeleteEmployees,
+      canManageUsers: userForm.canManageUsers,
       user: {
         id: userId,
         email: userForm.email,
         name: userForm.name,
         role: 'tenant',
         tenantId: selectedTenant.id,
+        canEditEmployees: userForm.canEditEmployees,
+        canDeleteEmployees: userForm.canDeleteEmployees,
+        canManageUsers: userForm.canManageUsers,
       },
     };
 
@@ -497,7 +517,7 @@ export default function Tenants() {
     }
     setManagedUsers(await getAllUsers());
     
-    setUserForm({ name: '', email: '', password: '123', appPermissions: { 'ponto': true } });
+    setUserForm({ name: '', email: '', password: '123', canEditEmployees: false, canDeleteEmployees: false, canManageUsers: false, appPermissions: { 'ponto': true } });
     setSelectedUserPermissions(DEFAULT_PERMISSIONS);
     setAddUserOpen(false);
     setEditingEmail(null);
@@ -505,11 +525,15 @@ export default function Tenants() {
   };
 
   const handleEditUser = (u: ManagedUser) => {
+    const userCanManage = !!(u.canManageUsers || u.appPermissions?.canManageUsers || u.user?.canManageUsers || u.permissions?.includes('users'));
     setEditingEmail(u.email);
     setUserForm({
       name: u.user.name,
       email: u.email,
       password: '',
+      canEditEmployees: u.canEditEmployees || u.user?.canEditEmployees || false,
+      canDeleteEmployees: u.canDeleteEmployees || u.user?.canDeleteEmployees || false,
+      canManageUsers: userCanManage,
       appPermissions: u.appPermissions || { 'ponto': true }
     });
     setSelectedUserPermissions(u.permissions ?? DEFAULT_PERMISSIONS);
@@ -807,6 +831,49 @@ export default function Tenants() {
                             <Switch checked={selectedUserPermissions.includes(module)} onCheckedChange={() => {}} onClick={e => e.stopPropagation()} />
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/10 space-y-3">
+                      <label className="text-[13px] font-bold text-white block">Permissões de Gestão</label>
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
+                          <div>
+                            <p className="text-[12px] font-bold">Editar Dados</p>
+                            <p className="text-[10px] text-muted-foreground">Permitir editar funcionários</p>
+                          </div>
+                          <Switch 
+                            checked={userForm.canEditEmployees} 
+                            onCheckedChange={(c) => setUserForm(f => ({ ...f, canEditEmployees: c }))} 
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
+                          <div>
+                            <p className="text-[12px] font-bold text-rose-400">Excluir Registro</p>
+                            <p className="text-[10px] text-muted-foreground">Permitir excluir funcionários</p>
+                          </div>
+                          <Switch 
+                            checked={userForm.canDeleteEmployees} 
+                            onCheckedChange={(c) => setUserForm(f => ({ ...f, canDeleteEmployees: c }))} 
+                          />
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-xl border border-primary/20 bg-primary/5">
+                          <div>
+                            <p className="text-[12px] font-bold text-primary">Criar Novos Usuários</p>
+                            <p className="text-[10px] text-muted-foreground">Permitir cadastrar e gerenciar usuários da empresa</p>
+                          </div>
+                          <Switch 
+                            checked={userForm.canManageUsers} 
+                            onCheckedChange={(c) => {
+                              setUserForm(f => ({ ...f, canManageUsers: c }));
+                              if (c && !selectedUserPermissions.includes('users')) {
+                                setSelectedUserPermissions(p => [...p, 'users']);
+                              } else if (!c && selectedUserPermissions.includes('users')) {
+                                setSelectedUserPermissions(p => p.filter(x => x !== 'users'));
+                              }
+                            }} 
+                          />
+                        </div>
                       </div>
                     </div>
 

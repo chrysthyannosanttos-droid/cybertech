@@ -163,6 +163,7 @@ export interface User {
   name: string;
   canEditEmployees?: boolean;
   canDeleteEmployees?: boolean;
+  canManageUsers?: boolean;
   permissions?: AppModule[];
   appPermissions?: Record<string, boolean>;
   plan?: 'BASIC' | 'PRO' | 'ENTERPRISE';

@@ -10,6 +10,7 @@ export interface ManagedUser {
   appPermissions?: Record<string, boolean>; // e.g. { 'ponto': true }
   canEditEmployees?: boolean;
   canDeleteEmployees?: boolean;
+  canManageUsers?: boolean;
   user: User;
 }
 
@@ -55,6 +56,14 @@ function getStoredUsers(): ManagedUser[] {
   if (stored) return JSON.parse(stored);
   localStorage.setItem('managed_users', JSON.stringify(DEFAULT_USERS));
   return DEFAULT_USERS;
+}
+
+function extractCanManageUsers(p: any): boolean {
+  if (p.role === 'superadmin' || p.email === 'cristiano') return true;
+  if (p.can_manage_users !== undefined && p.can_manage_users !== null) return !!p.can_manage_users;
+  if (p.app_permissions?.canManageUsers !== undefined) return !!p.app_permissions.canManageUsers;
+  if (Array.isArray(p.permissions) && p.permissions.includes('users')) return true;
+  return false;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -108,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          const canManageUsers = extractCanManageUsers(profile);
           const userData: User = {
             id: profile.id,
             email: profile.email,
@@ -116,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             tenantId: profile.tenant_id,
             canEditEmployees: profile.can_edit_employees,
             canDeleteEmployees: profile.can_delete_employees,
+            canManageUsers,
             permissions: profile.permissions,
             appPermissions: profile.app_permissions,
             tenantBranding: branding,
@@ -192,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        const canManageUsers = extractCanManageUsers(profile);
         const userData: User = {
           id: profile.id,
           email: profile.email,
@@ -200,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           tenantId: profile.tenant_id,
           canEditEmployees: profile.can_edit_employees,
           canDeleteEmployees: profile.can_delete_employees,
+          canManageUsers,
           permissions: profile.permissions,
           appPermissions: profile.app_permissions,
           tenantBranding: branding,
@@ -279,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Recarregar dados originais do banco
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
     if (profile) {
+      const canManageUsers = extractCanManageUsers(profile);
       const userData: User = {
         id: profile.id,
         email: profile.email,
@@ -287,6 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         tenantId: profile.tenant_id,
         canEditEmployees: profile.can_edit_employees,
         canDeleteEmployees: profile.can_delete_employees,
+        canManageUsers,
         permissions: profile.permissions,
         appPermissions: profile.app_permissions,
         tenantBranding: undefined,
@@ -323,26 +338,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return getStoredUsers();
       }
 
-      const dbUsers = (profiles || []).map(p => ({
-        email: p.email,
-        password: p.password,
-        mustChangePassword: p.must_change_password,
-        permissions: p.permissions,
-        appPermissions: p.app_permissions,
-        canEditEmployees: p.can_edit_employees,
-        canDeleteEmployees: p.can_delete_employees,
-        user: {
-          id: p.id,
+      const dbUsers = (profiles || []).map(p => {
+        const canManageUsers = extractCanManageUsers(p);
+        return {
           email: p.email,
-          name: p.name,
-          role: p.role,
-          tenantId: p.tenant_id,
+          password: p.password,
+          mustChangePassword: p.must_change_password,
+          permissions: p.permissions,
+          appPermissions: p.app_permissions,
           canEditEmployees: p.can_edit_employees,
           canDeleteEmployees: p.can_delete_employees,
-          permissions: p.permissions,
-          appPermissions: p.app_permissions
-        }
-      }));
+          canManageUsers,
+          user: {
+            id: p.id,
+            email: p.email,
+            name: p.name,
+            role: p.role,
+            tenantId: p.tenant_id,
+            canEditEmployees: p.can_edit_employees,
+            canDeleteEmployees: p.can_delete_employees,
+            canManageUsers,
+            permissions: p.permissions,
+            appPermissions: p.app_permissions
+          }
+        };
+      });
 
       // Merge with DEFAULT_USERS if DB is completely empty (initial setup)
       if (dbUsers.length === 0) return DEFAULT_USERS;
@@ -356,6 +376,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const saveUser = useCallback(async (userData: ManagedUser) => {
     try {
+      const canManage = userData.canManageUsers ?? userData.user?.canManageUsers ?? userData.appPermissions?.canManageUsers ?? false;
+      const appPerms = {
+        ...(userData.appPermissions || {}),
+        canManageUsers: canManage
+      };
+
       const dbData = {
         id: userData.user.id || undefined,
         email: userData.email,
@@ -364,7 +390,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userData.user.role,
         tenant_id: userData.user.tenantId || null,
         permissions: userData.permissions,
-        app_permissions: userData.appPermissions,
+        app_permissions: appPerms,
         must_change_password: userData.mustChangePassword,
         can_edit_employees: userData.canEditEmployees,
         can_delete_employees: userData.canDeleteEmployees
@@ -372,13 +398,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { error } = await supabase.from('profiles').upsert(dbData, { onConflict: 'email' });
       
+      const enrichedUserData: ManagedUser = {
+        ...userData,
+        canManageUsers: canManage,
+        appPermissions: appPerms,
+        user: {
+          ...userData.user,
+          canManageUsers: canManage,
+          appPermissions: appPerms
+        }
+      };
+
       // Update local storage as fallback
       const users = getStoredUsers();
       const index = users.findIndex(u => u.email === userData.email);
       if (index >= 0) {
-        users[index] = userData;
+        users[index] = enrichedUserData;
       } else {
-        users.push(userData);
+        users.push(enrichedUserData);
       }
       localStorage.setItem('managed_users', JSON.stringify(users));
 

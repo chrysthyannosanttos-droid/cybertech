@@ -24,7 +24,8 @@ const MODULE_OPTIONS: Array<{ module: AppModule; label: string; description: str
   { module: 'rescissions',       label: 'Rescisões',      description: 'Registro de rescisões contratuais' },
   { module: 'stores',            label: 'Lojas',          description: 'Gestão de unidades/lojas' },
   { module: 'attendance',        label: 'Ponto Eletrônico', description: 'Configuração de relógios e histórico' },
-  { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e usuários' },
+  { module: 'users',             label: 'Usuários',       description: 'Criar e gerenciar usuários da empresa' },
+  { module: 'settings',          label: 'Configurações',  description: 'Gestão de acessos e configurações' },
 ];
 
 const DEFAULT_PERMISSIONS: AppModule[] = MODULE_OPTIONS.map(m => m.module);
@@ -36,8 +37,9 @@ export default function UserManagement() {
   const isCristiano = currentUser?.email === 'cristiano' || currentUser?.name?.toLowerCase() === 'cristiano';
   const isSuperAdmin = currentUser?.role === 'superadmin' || isCristiano;
   const isTenantAdmin = currentUser?.role === 'tenant';
+  const canManageUsers = isSuperAdmin || !!currentUser?.canManageUsers || !!currentUser?.appPermissions?.canManageUsers || (currentUser?.permissions?.includes('users') ?? false);
 
-  if (!isSuperAdmin && !isTenantAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isSuperAdmin && !isTenantAdmin && !canManageUsers) return <Navigate to="/dashboard" replace />;
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -87,6 +89,7 @@ export default function UserManagement() {
     appPermissions: { 'ponto': true } as Record<string, boolean>,
     canEditEmployees: false,
     canDeleteEmployees: false,
+    canManageUsers: false,
   });
   const [selectedPermissions, setSelectedPermissions] = useState<AppModule[]>(DEFAULT_PERMISSIONS);
 
@@ -99,7 +102,8 @@ export default function UserManagement() {
       tenantId: '', 
       appPermissions: { 'ponto': true },
       canEditEmployees: false,
-      canDeleteEmployees: false
+      canDeleteEmployees: false,
+      canManageUsers: false,
     });
     setSelectedPermissions(DEFAULT_PERMISSIONS);
     setEditingEmail(null);
@@ -108,6 +112,7 @@ export default function UserManagement() {
 
   const handleOpen = (userData?: ManagedUser) => {
     if (userData) {
+      const userCanManage = !!(userData.canManageUsers || userData.appPermissions?.canManageUsers || (userData.permissions?.includes('users')));
       setEditingEmail(userData.email);
       setForm({
         email: userData.email,
@@ -118,6 +123,7 @@ export default function UserManagement() {
         appPermissions: userData.appPermissions || { 'ponto': true },
         canEditEmployees: userData.canEditEmployees || false,
         canDeleteEmployees: userData.canDeleteEmployees || false,
+        canManageUsers: userCanManage,
       });
       setSelectedPermissions(userData.permissions ?? DEFAULT_PERMISSIONS);
     } else {
@@ -131,9 +137,14 @@ export default function UserManagement() {
   };
 
   const togglePermission = (module: AppModule) => {
-    setSelectedPermissions(prev =>
-      prev.includes(module) ? prev.filter(p => p !== module) : [...prev, module]
-    );
+    setSelectedPermissions(prev => {
+      const exists = prev.includes(module);
+      const next = exists ? prev.filter(p => p !== module) : [...prev, module];
+      if (module === 'users') {
+        setForm(f => ({ ...f, canManageUsers: !exists }));
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -157,11 +168,25 @@ export default function UserManagement() {
     const existingRecord = editingEmail ? existingUsers.find(u => u.email === editingEmail) : undefined;
     const passwordToSave = (editingEmail && !form.password) ? (existingRecord?.password || '123') : form.password;
 
+    // Garante que o módulo 'users' esteja nas permissões se canManageUsers estiver ativo
+    let finalPerms = selectedPermissions;
+    if (form.role !== 'superadmin') {
+      if (form.canManageUsers && !finalPerms.includes('users')) {
+        finalPerms = [...finalPerms, 'users'];
+      } else if (!form.canManageUsers && finalPerms.includes('users')) {
+        finalPerms = finalPerms.filter(p => p !== 'users');
+      }
+    }
+
     const newUserData: ManagedUser = {
       email: form.email,
       password: passwordToSave,
       mustChangePassword: isNew ? true : existingRecord?.mustChangePassword,
-      permissions: form.role === 'superadmin' ? undefined : selectedPermissions,
+      permissions: form.role === 'superadmin' ? undefined : finalPerms,
+      appPermissions: {
+        ...form.appPermissions,
+        canManageUsers: form.role === 'superadmin' ? true : form.canManageUsers
+      },
       user: {
         id,
         email: form.email,
@@ -170,9 +195,11 @@ export default function UserManagement() {
         ...(form.role === 'tenant' && form.tenantId ? { tenantId: form.tenantId } : {}),
         canEditEmployees: form.role === 'superadmin' ? true : form.canEditEmployees,
         canDeleteEmployees: form.role === 'superadmin' ? true : form.canDeleteEmployees,
+        canManageUsers: form.role === 'superadmin' ? true : form.canManageUsers,
       },
       canEditEmployees: form.role === 'superadmin' ? true : form.canEditEmployees,
       canDeleteEmployees: form.role === 'superadmin' ? true : form.canDeleteEmployees,
+      canManageUsers: form.role === 'superadmin' ? true : form.canManageUsers,
     };
 
     const { error } = await saveUser(newUserData);
@@ -188,7 +215,7 @@ export default function UserManagement() {
       userId: currentUser?.id || 'unknown',
       userName: currentUser?.name || 'Cristiano',
       action: isNew ? 'CREATE_USER' : 'EDIT_USER',
-      details: `[Usuários] ${isNew ? 'Criou' : 'Editou'} usuário "${form.name}" (login: ${form.email}) — ${selectedPermissions.length} módulos liberados`,
+      details: `[Usuários] ${isNew ? 'Criou' : 'Editou'} usuário "${form.name}" (login: ${form.email}) — ${finalPerms.length} módulos liberados (Gerenciar Usuários: ${form.canManageUsers ? 'SIM' : 'NÃO'})`,
     });
 
     toast({ title: isNew ? 'Usuário criado!' : 'Usuário atualizado!' });
@@ -448,15 +475,15 @@ export default function UserManagement() {
               </div>
             )}
 
-            {/* Permissões de Gestão de Funcionários */}
+            {/* Permissões de Gestão de Funcionários e Usuários */}
             {form.role !== 'superadmin' && (
               <div className="pt-2 pb-2 space-y-3">
                 <Label className="text-[13px] font-bold text-white block">Permissões de Gestão</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
                     <div>
                       <p className="text-[12px] font-bold">Editar Dados</p>
-                      <p className="text-[10px] text-muted-foreground">Permitir editar funcionários</p>
+                      <p className="text-[10px] text-muted-foreground">Editar colaboradores</p>
                     </div>
                     <Switch 
                       checked={form.canEditEmployees} 
@@ -466,11 +493,28 @@ export default function UserManagement() {
                   <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/3">
                     <div>
                       <p className="text-[12px] font-bold text-rose-400">Excluir Registro</p>
-                      <p className="text-[10px] text-muted-foreground">Permitir excluir funcionários</p>
+                      <p className="text-[10px] text-muted-foreground">Excluir colaboradores</p>
                     </div>
                     <Switch 
                       checked={form.canDeleteEmployees} 
                       onCheckedChange={(c) => setForm(f => ({ ...f, canDeleteEmployees: c }))} 
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl border border-primary/20 bg-primary/5">
+                    <div>
+                      <p className="text-[12px] font-bold text-primary">Criar Usuários</p>
+                      <p className="text-[10px] text-muted-foreground">Gerenciar usuários da empresa</p>
+                    </div>
+                    <Switch 
+                      checked={form.canManageUsers} 
+                      onCheckedChange={(c) => {
+                        setForm(f => ({ ...f, canManageUsers: c }));
+                        if (c && !selectedPermissions.includes('users')) {
+                          setSelectedPermissions(p => [...p, 'users']);
+                        } else if (!c && selectedPermissions.includes('users')) {
+                          setSelectedPermissions(p => p.filter(x => x !== 'users'));
+                        }
+                      }} 
                     />
                   </div>
                 </div>
