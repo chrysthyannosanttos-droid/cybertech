@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogOut, ShieldAlert, Menu } from 'lucide-react';
+import { ReleaseNotesModal } from '@/components/ReleaseNotesModal';
 
 export default function DashboardLayout() {
   const { user, isImpersonating, stopImpersonating } = useAuth();
@@ -62,6 +63,7 @@ export default function DashboardLayout() {
           <Outlet />
         </div>
       </main>
+      <ReleaseNotesModal />
     </div>
   );
 }
