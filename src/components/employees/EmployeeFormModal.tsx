@@ -36,7 +36,8 @@ import {
   Zap,
   Star,
   TrendingUp,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 
 interface EmployeeFormModalProps {
@@ -59,6 +60,7 @@ export function EmployeeFormModal({
   onSaveSuccess,
 }: EmployeeFormModalProps) {
   const [activeTab, setActiveTab] = useState("perfil");
+  const [rolesList, setRolesList] = useState(ROLES);
   const [form, setForm] = useState<Partial<Employee>>({
     status: 'ACTIVE',
     gender: 'M',
@@ -108,6 +110,17 @@ export function EmployeeFormModal({
     est += Number(form.adicionalNoturno || 0);
     return est;
   }, [form]);
+
+  const handleAddRole = () => {
+    const newRole = window.prompt("Nome do novo cargo:");
+    if (newRole && newRole.trim()) {
+      const roleUpper = newRole.trim().toUpperCase();
+      if (!rolesList.includes(roleUpper)) {
+        setRolesList(prev => [...prev, roleUpper]);
+      }
+      setForm(f => ({ ...f, role: roleUpper }));
+    }
+  };
 
   const handleSave = async () => {
     if (!form.name || !form.cpf || !form.storeId) {
@@ -268,13 +281,24 @@ export function EmployeeFormModal({
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Cargo Oficial</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest">Cargo Oficial</Label>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-4 w-4 hover:bg-white/10 text-white/40 hover:text-white rounded"
+                          onClick={handleAddRole}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
                       <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
                         <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#0a0f1e] border-white/10">
-                          {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        <SelectContent className="bg-[#0a0f1e] border-white/10 max-h-[300px]">
+                          {rolesList.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
