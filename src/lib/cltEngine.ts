@@ -314,7 +314,7 @@ export interface VacationInput {
   unhealthyPay?: number;
   bonus?: number;
   vacationDays?: number;   // 30, 20 ou 15
-  sellBonus?: boolean;     // Abono pecuniário (venda de 10 dias)
+  bonusDays?: number;      // Dias de abono pecuniário (ex: 0, 5, 10)
   dependents?: number;
 }
 
@@ -325,14 +325,13 @@ export function calculateVacations(input: VacationInput): VacationResult {
     unhealthyPay = 0,
     bonus = 0,
     vacationDays = 30,
-    sellBonus = false,
+    bonusDays = 0,
     dependents = 0,
   } = input;
 
   const baseRemuneration = baseSalary + hazardPay + unhealthyPay + bonus;
   const dailyRate = baseRemuneration / 30;
 
-  const bonusDays = sellBonus ? 10 : 0;
   const effectiveDays = vacationDays - bonusDays;
 
   // Remuneração de férias

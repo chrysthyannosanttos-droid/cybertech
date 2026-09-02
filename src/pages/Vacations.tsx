@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 
 interface Employee { id: string; name: string; salary: number; periculosidade?: number; insalubridade?: number; gratificacao?: number; admission_date?: string; storeName?: string; }
-interface Vacation { id: string; employee_name: string; store_name?: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
+interface Vacation { id: string; employee_name: string; store_name?: string; vacation_start: string; vacation_end: string; vacation_days: number; net_total: number; gross_total: number; status: string; sell_bonus: boolean; bonus_days: number; acquisitive_start: string; acquisitive_end: string; payment_deadline: string; vacation_pay: number; one_third: number; bonus_pay: number; inss_deduction: number; irrf_deduction: number; }
 
 const fmt = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
@@ -35,7 +35,10 @@ export default function Vacations() {
     employeeId: '',
     vacationDays: 30 as 30 | 20 | 15,
     sellBonus: false,
+    bonusDays: 10,
     vacationStart: '',
+    acquisitiveStart: '',
+    acquisitiveEnd: '',
     dependents: 0,
   });
 
@@ -46,12 +49,16 @@ export default function Vacations() {
     unhealthyPay: selectedEmp.insalubridade || 0,
     bonus: selectedEmp.gratificacao || 0,
     vacationDays: form.vacationDays,
-    sellBonus: form.sellBonus,
+    bonusDays: form.sellBonus ? form.bonusDays : 0,
     dependents: form.dependents,
   }) : null;
 
   const vacationEnd = form.vacationStart
-    ? format(addDays(new Date(form.vacationStart), form.vacationDays - 1), 'yyyy-MM-dd')
+    ? format(addDays(new Date(form.vacationStart), (form.vacationDays - (form.sellBonus ? form.bonusDays : 0)) - 1), 'yyyy-MM-dd')
+    : '';
+
+  const paymentDeadline = form.vacationStart
+    ? format(addDays(new Date(form.vacationStart), -2), 'yyyy-MM-dd')
     : '';
 
   const filteredEmps = employees.filter(e => e.name.toLowerCase().includes(empSearch.toLowerCase()));
@@ -107,6 +114,10 @@ export default function Vacations() {
       vacation_end: vacationEnd,
       vacation_days: form.vacationDays,
       sell_bonus: form.sellBonus,
+      bonus_days: form.sellBonus ? form.bonusDays : 0,
+      acquisitive_start: form.acquisitiveStart || null,
+      acquisitive_end: form.acquisitiveEnd || null,
+      payment_deadline: paymentDeadline || null,
       vacation_pay: preview.vacationPay,
       one_third: preview.oneThird,
       bonus_pay: preview.bonusPay,
@@ -124,7 +135,7 @@ export default function Vacations() {
 
     toast({ title: '✅ Férias registradas!', description: `${emp.name} — Líquido: ${fmt(preview.netTotal)}` });
     setIsOpen(false);
-    setForm({ employeeId: '', vacationDays: 30, sellBonus: false, vacationStart: '', dependents: 0 });
+    setForm({ employeeId: '', vacationDays: 30, sellBonus: false, bonusDays: 10, vacationStart: '', acquisitiveStart: '', acquisitiveEnd: '', dependents: 0 });
     setTimeout(() => window.location.reload(), 500);
   };
 
@@ -149,8 +160,10 @@ export default function Vacations() {
       </style></head><body>
       <h1>RECIBO DE FÉRIAS</h1>
       <div class="row"><span>Funcionário</span><strong>${v.employee_name}</strong></div>
+      <div class="row"><span>Período Aquisitivo</span><span>${v.acquisitive_start ? new Date(v.acquisitive_start).toLocaleDateString('pt-BR') : '---'} até ${v.acquisitive_end ? new Date(v.acquisitive_end).toLocaleDateString('pt-BR') : '---'}</span></div>
       <div class="row"><span>Período de Gozo</span><span>${new Date(v.vacation_start).toLocaleDateString('pt-BR')} até ${new Date(v.vacation_end).toLocaleDateString('pt-BR')}</span></div>
-      <div class="row"><span>Dias de Férias</span><span>${v.vacation_days} dias${v.sell_bonus ? ' (+ 10 dias abono pecuniário)' : ''}</span></div>
+      <div class="row"><span>Dias de Férias</span><span>${v.vacation_days} dias${v.sell_bonus ? ` (+ ${v.bonus_days} dias abono pecuniário)` : ''}</span></div>
+      <div class="row"><span>Data Limite Pagamento (Art. 145)</span><strong>${v.payment_deadline ? new Date(v.payment_deadline).toLocaleDateString('pt-BR') : '---'}</strong></div>
       <div class="row"><span>Remuneração de Férias</span><span>${(v.vacation_pay||0).toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>
       <div class="row"><span>1/3 Constitucional</span><span>${(v.one_third||0).toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>
       ${v.bonus_pay > 0 ? `<div class="row"><span>Abono Pecuniário</span><span>${v.bonus_pay.toLocaleString('pt-BR', {style:'currency',currency:'BRL'})}</span></div>` : ''}
@@ -261,11 +274,28 @@ export default function Vacations() {
                 </Select>
               </div>
 
+              {/* Período Aquisitivo */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Aquisitivo Início</Label>
+                  <Input type="date" value={form.acquisitiveStart} onChange={e => setForm(f => ({ ...f, acquisitiveStart: e.target.value }))} className="bg-white/5 border-white/10 h-10" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Aquisitivo Fim</Label>
+                  <Input type="date" value={form.acquisitiveEnd} onChange={e => setForm(f => ({ ...f, acquisitiveEnd: e.target.value }))} className="bg-white/5 border-white/10 h-10" />
+                </div>
+              </div>
+
               {/* Início das férias */}
               <div className="space-y-1.5">
                 <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Início das Férias</Label>
                 <Input type="date" value={form.vacationStart} onChange={e => setForm(f => ({ ...f, vacationStart: e.target.value }))} className="bg-white/5 border-white/10 h-10" />
-                {vacationEnd && <p className="text-[11px] text-emerald-400 font-medium">Retorno: {new Date(vacationEnd + 'T12:00:00').toLocaleDateString('pt-BR')}</p>}
+                {vacationEnd && (
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-[11px] text-emerald-400 font-medium">Retorno: {new Date(vacationEnd + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                    {paymentDeadline && <p className="text-[11px] text-amber-400 font-bold">Limite Pgto: {new Date(paymentDeadline + 'T12:00:00').toLocaleDateString('pt-BR')}</p>}
+                  </div>
+                )}
               </div>
 
               {/* Dependentes */}
@@ -275,12 +305,27 @@ export default function Vacations() {
               </div>
 
               {/* Abono pecuniário */}
-              <div className="flex items-center justify-between rounded-xl bg-amber-500/5 border border-amber-500/20 p-4">
-                <div>
-                  <p className="text-[13px] font-bold text-amber-400">Abono Pecuniário</p>
-                  <p className="text-[11px] text-muted-foreground">Venda de 10 dias de férias em dinheiro</p>
+              <div className="space-y-3 rounded-xl bg-amber-500/5 border border-amber-500/20 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[13px] font-bold text-amber-400">Abono Pecuniário</p>
+                    <p className="text-[11px] text-muted-foreground">Venda de férias em dinheiro</p>
+                  </div>
+                  <Switch checked={form.sellBonus} onCheckedChange={v => setForm(f => ({ ...f, sellBonus: v, bonusDays: v ? 10 : 0 }))} />
                 </div>
-                <Switch checked={form.sellBonus} onCheckedChange={v => setForm(f => ({ ...f, sellBonus: v }))} />
+                {form.sellBonus && (
+                  <div className="pt-3 border-t border-amber-500/10 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                    <Label className="text-[11px] font-bold text-amber-400/80 uppercase tracking-widest">Quantos dias vender?</Label>
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      max={Math.floor(form.vacationDays / 3)} 
+                      value={form.bonusDays} 
+                      onChange={e => setForm(f => ({ ...f, bonusDays: Number(e.target.value) }))} 
+                      className="bg-black/20 border-amber-500/20 h-8 w-20 text-center text-amber-400 font-bold" 
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Preview do cálculo */}
