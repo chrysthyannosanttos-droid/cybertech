@@ -10,16 +10,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 
-export const CURRENT_VERSION = '1.1.0'; // Atualize esta versão para mostrar o modal novamente
+export const CURRENT_VERSION = '1.2.0'; // Atualize esta versão para mostrar o modal novamente
 
 const RELEASE_NOTES = [
   {
-    version: '1.1.0',
+    version: '1.2.0',
     date: '01/09/2026',
-    title: 'Melhorias Recentes',
+    title: '🎉 Novidades da versão 1.2.0',
     features: [
-      'Novo botão "+" para adicionar cargos rápidos diretamente no formulário de funcionário.',
-      'Sistema de avisos (este balão flutuante) adicionado para manter você informado sobre as novidades do sistema.'
+      'Novo botão "+" no cadastro de funcionário para adicionar cargos personalizados na hora.',
+      'Módulo de Férias aprimorado: agora você pode registrar o Período Aquisitivo (início e fim) de cada férias.',
+      'Abono Pecuniário flexível: ao vender férias, agora é possível escolher exatamente quantos dias vender (não mais fixo em 10).',
+      'Data Limite de Pagamento calculada automaticamente (2 dias antes do início — Art. 145 CLT) e exibida na tela e no recibo de impressão.',
+      'Recibo de Férias atualizado com Período Aquisitivo, dias de abono e data limite de pagamento.',
     ],
   }
 ];
@@ -30,8 +33,14 @@ export function ReleaseNotesModal() {
   useEffect(() => {
     // Adicionamos um pequeno delay para a animação ficar mais fluida ao carregar a página
     const timer = setTimeout(() => {
-      const lastSeen = localStorage.getItem('hrhub_last_seen_version');
-      if (lastSeen !== CURRENT_VERSION) {
+      const lastSeenVersion = localStorage.getItem('hrhub_last_seen_version');
+      const seenCount = parseInt(localStorage.getItem('hrhub_version_seen_count') || '0', 10);
+
+      if (lastSeenVersion !== CURRENT_VERSION) {
+        // Nova versão: ainda não viu
+        setOpen(true);
+      } else if (seenCount < 3) {
+        // Mesma versão, mas viu menos de 3 vezes
         setOpen(true);
       }
     }, 500);
@@ -40,7 +49,18 @@ export function ReleaseNotesModal() {
 
   const handleClose = () => {
     setOpen(false);
-    localStorage.setItem('hrhub_last_seen_version', CURRENT_VERSION);
+    
+    const lastSeenVersion = localStorage.getItem('hrhub_last_seen_version');
+    const seenCount = parseInt(localStorage.getItem('hrhub_version_seen_count') || '0', 10);
+
+    if (lastSeenVersion !== CURRENT_VERSION) {
+      // Primeira vez fechando a nova versão
+      localStorage.setItem('hrhub_last_seen_version', CURRENT_VERSION);
+      localStorage.setItem('hrhub_version_seen_count', '1');
+    } else {
+      // Já tinha fechado antes, incrementamos o contador
+      localStorage.setItem('hrhub_version_seen_count', (seenCount + 1).toString());
+    }
   };
 
   const currentNotes = RELEASE_NOTES.find(r => r.version === CURRENT_VERSION) || RELEASE_NOTES[0];
