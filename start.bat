@@ -4,7 +4,7 @@ title Executor - CyberTech RH
 
 echo ==================================================
 echo      EXECUTOR CYBERTECH RH - HR-HUB PLUS
-echo      IP REDE: 192.168.70.60
+echo      IP REDE: 192.168.18.19
 echo ==================================================
 echo.
 
@@ -19,7 +19,7 @@ if not exist "node_modules\" (
 echo [✓] Servidor pronto!
 echo.
 echo Para acessar de OUTRAS MAQUINAS na mesma rede, use:
-echo >> Local (Wi-Fi): http://192.168.70.60:5173
+echo >> Local (Wi-Fi): http://192.168.18.19:5173
 echo >> Radmin VPN:   http://26.205.25.209:5173
 echo.
 echo O sistema abrira automaticamente no seu navegador local em:

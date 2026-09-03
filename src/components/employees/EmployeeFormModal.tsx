@@ -108,6 +108,7 @@ export function EmployeeFormModal({
     est += Number(form.gratificacao || 0);
     est += Number(form.valeFlexivel || 0);
     est += Number(form.adicionalNoturno || 0);
+    est += Number(form.premiacao || 0);
     return est;
   }, [form]);
 
@@ -164,6 +165,10 @@ export function EmployeeFormModal({
       geofence_radius: Number(form.geofenceRadius || 0),
       email: form.email?.toLowerCase(),
       phone: form.phone,
+      custom_fields: {
+        ...(form.customFields || {}),
+        premiacao: Number(form.premiacao || 0),
+      },
     };
 
     try {
@@ -185,23 +190,23 @@ export function EmployeeFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-[#020408] border-white/5 shadow-2xl rounded-[2rem] flex flex-col max-h-[90vh]">
+      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-card text-card-foreground border-border shadow-2xl rounded-[2rem] flex flex-col max-h-[90vh]">
         {/* Header Fixo */}
-        <div className="p-6 bg-gradient-to-br from-primary/10 to-transparent border-b border-white/5 flex items-center justify-between">
+        <div className="p-6 bg-gradient-to-br from-primary/10 to-transparent border-b border-border flex items-center justify-between">
            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-primary/20 flex items-center justify-center overflow-hidden shadow-xl">
+              <div className="w-16 h-16 rounded-2xl bg-muted/40 border border-primary/20 flex items-center justify-center overflow-hidden shadow-xl">
                  {form.photo_reference_url ? (
                    <img src={form.photo_reference_url} className="w-full h-full object-cover" />
                  ) : (
-                   <User className="w-8 h-8 text-primary/30" />
+                   <User className="w-8 h-8 text-primary/40" />
                  )}
               </div>
               <div>
-                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight">{form.name || 'Novo Cadastro'}</h2>
+                 <h2 className="text-xl font-black text-foreground uppercase italic tracking-tight">{form.name || 'Novo Cadastro'}</h2>
                  <p className="text-[10px] font-bold text-primary uppercase tracking-[0.3em]">{form.role || 'Cargo não definido'}</p>
               </div>
            </div>
-           <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl hover:bg-white/5 text-white/40">
+           <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl hover:bg-accent text-muted-foreground">
              <X className="w-5 h-5" />
            </Button>
         </div>
@@ -209,7 +214,7 @@ export function EmployeeFormModal({
         {/* Área de Conteúdo Rolável */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="px-6 sticky top-0 bg-[#020408] z-20 border-b border-white/5">
+            <div className="px-6 sticky top-0 bg-card z-20 border-b border-border">
               <TabsList className="h-12 bg-transparent gap-6 p-0">
                 <TabsTrigger value="perfil" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Perfil</TabsTrigger>
                 <TabsTrigger value="contratual" className="data-[state=active]:bg-transparent data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none px-0 h-full text-[10px] font-black uppercase tracking-widest gap-2">Contrato</TabsTrigger>
@@ -245,7 +250,7 @@ export function EmployeeFormModal({
                           <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#0a0f1e] border-white/10">
+                          <SelectContent className="bg-popover border-border text-popover-foreground">
                             <SelectItem value="M">MASCULINO</SelectItem>
                             <SelectItem value="F">FEMININO</SelectItem>
                           </SelectContent>
@@ -275,7 +280,7 @@ export function EmployeeFormModal({
                         <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#0a0f1e] border-white/10">
+                        <SelectContent className="bg-popover border-border text-popover-foreground">
                           {dbStores.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
@@ -297,7 +302,7 @@ export function EmployeeFormModal({
                         <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#0a0f1e] border-white/10 max-h-[300px]">
+                        <SelectContent className="bg-popover border-border text-popover-foreground max-h-[300px]">
                           {rolesList.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                         </SelectContent>
                       </Select>
@@ -331,6 +336,10 @@ export function EmployeeFormModal({
                     { id: 'periculosidade', label: 'Periculosidade' },
                     { id: 'flexivel', label: 'Ajuda de Custo' },
                     { id: 'gratificacao', label: 'Gratificação' },
+                    { id: 'valeFlexivel', label: 'Vale Flexível' },
+                    { id: 'mobilidade', label: 'Mobilidade' },
+                    { id: 'adicionalNoturno', label: 'Adicional Noturno' },
+                    { id: 'premiacao', label: 'Premiação' },
                   ].map(item => (
                     <div key={item.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
                       <Label className="text-[9px] font-black uppercase text-white/40 tracking-widest">{item.label}</Label>
@@ -360,14 +369,14 @@ export function EmployeeFormModal({
         </div>
 
         {/* Footer Fixo */}
-        <div className="p-8 border-t border-white/5 bg-white/[0.01] flex flex-col sm:flex-row items-center gap-6">
+        <div className="p-8 border-t border-border bg-muted/20 flex flex-col sm:flex-row items-center gap-6">
           <div className="flex-1">
-             <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Custo Total Estimado</p>
-             <p className="text-2xl font-black text-emerald-400">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Custo Total Estimado</p>
+             <p className="text-2xl font-black text-emerald-500">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
           <div className="flex gap-4 w-full sm:w-auto">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none h-14 px-8 rounded-2xl font-black uppercase text-[11px] tracking-widest text-white/40">Cancelar</Button>
-            <Button onClick={handleSave} className="flex-1 sm:flex-none h-14 px-10 rounded-2xl bg-primary text-white font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 italic hover:scale-105 transition-all">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none h-14 px-8 rounded-2xl font-black uppercase text-[11px] tracking-widest text-muted-foreground hover:text-foreground">Cancelar</Button>
+            <Button onClick={handleSave} className="flex-1 sm:flex-none h-14 px-10 rounded-2xl bg-primary text-primary-foreground font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 italic hover:scale-105 transition-all">
               {editingId ? 'Salvar Alterações' : 'Finalizar Cadastro'}
             </Button>
           </div>

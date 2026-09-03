@@ -304,13 +304,15 @@ export default function Dashboard() {
       const days = Math.floor((new Date().getTime() - new Date(e.admissionDate).getTime()) / (1000 * 60 * 60 * 24));
       const targetDays = days <= 45 ? 45 : 90;
       const daysLeft = targetDays - days;
+      const store = stores.find(s => s.id === e.storeId);
       return {
         ...e,
         daysLeft,
-        targetDays
+        targetDays,
+        storeName: store?.name ? store.name.trim() : 'Sem Loja'
       };
     }).sort((a, b) => a.daysLeft - b.daysLeft);
-  }, [filteredEmployees]);
+  }, [filteredEmployees, stores]);
 
   const providerCosts = useMemo(() => {
     return providers
@@ -518,8 +520,16 @@ export default function Dashboard() {
                   <Briefcase className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-black text-white uppercase tracking-tighter">Fim de Experiência: {e.name.split(' ')[0]}</h4>
-                  <p className="text-[11px] text-amber-400 font-bold uppercase tracking-widest">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-[13px] font-black text-white uppercase tracking-tighter">Fim de Experiência: {e.name.split(' ')[0]}</h4>
+                    {e.storeName && (
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30 uppercase tracking-wider flex items-center gap-1">
+                        <Store className="w-2.5 h-2.5 text-amber-400" />
+                        {e.storeName}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-amber-400 font-bold uppercase tracking-widest mt-0.5">
                     {e.targetDays} dias em {e.daysLeft} dia{e.daysLeft !== 1 ? 's' : ''} — {new Date(new Date(e.admissionDate).getTime() + (e.targetDays * 24 * 60 * 60 * 1000)).toLocaleDateString('pt-BR')}
                   </p>
                 </div>

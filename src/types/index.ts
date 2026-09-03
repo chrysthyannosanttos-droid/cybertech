@@ -53,6 +53,7 @@ export interface Employee {
   mobilidade?: number;
   valeFlexivel?: number; // Added to match "FLEXIVEL" in the user request
   adicionalNoturno?: number;
+  premiacao?: number;
   flexivelSelo?: boolean; // Premiação Virtual
   email?: string;
   phone?: string;

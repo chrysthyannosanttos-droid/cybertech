@@ -43,6 +43,8 @@ export function useEmployees(tenantId: string | null) {
         flexivelSelo: emp.flexivel_selo,
         email: emp.email,
         phone: emp.phone,
+        customFields: emp.custom_fields || {},
+        premiacao: emp.custom_fields?.premiacao,
       })) as Employee[];
     },
     enabled: !!tenantId,
