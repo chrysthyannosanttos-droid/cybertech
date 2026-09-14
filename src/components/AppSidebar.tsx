@@ -101,17 +101,26 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
   });
 
   return (
-    <aside className={cn(
-      "relative flex flex-col w-[240px] min-h-screen glass border-r border-white/5 shadow-2xl z-50",
-      isMobile && "h-full border-none shadow-none"
-    )}>
+    <aside
+      style={{
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid var(--sidebar-border)',
+      }}
+      className={cn(
+        "relative flex flex-col w-[240px] min-h-screen shadow-2xl z-50",
+        isMobile && "h-full border-none shadow-none"
+      )}
+    >
       {/* Background Glow */}
       <div className="absolute top-0 left-0 w-full h-32 bg-primary/5 blur-[100px] pointer-events-none" />
       {/* Logo */}
-      <NavLink 
-        to="/dashboard" 
+      <NavLink
+        to="/dashboard"
         onClick={onNavigate}
-        className="flex items-center gap-3 px-5 h-16 border-b border-white/5 hover:bg-white/5 transition-colors"
+        style={{ borderBottom: '1px solid var(--sidebar-border)' }}
+        className="flex items-center gap-3 px-5 h-16 transition-colors"
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--sidebar-hover-bg)')}
+        onMouseLeave={e => (e.currentTarget.style.background = '')}
       >
         <div className="w-12 h-12 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(31,180,243,0.2)] bg-transparent p-1 flex items-center justify-center">
           {user?.tenantBranding?.logo_url ? (
@@ -120,16 +129,16 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
             <img src="/logo-cybertech.png" alt="Logo" className="w-full h-full object-contain" />
           )}
         </div>
-        <span className="font-bold text-[16px] tracking-tighter text-white drop-shadow-sm min-h-[1em]">
+        <span className="font-bold text-[16px] tracking-tighter drop-shadow-sm min-h-[1em]" style={{ color: 'var(--sidebar-text)' }}>
           {user?.tenantBranding?.system_name || "CyberTech RH"}
         </span>
       </NavLink>
 
       {/* Role badge */}
       <div className="px-5 py-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          {user?.email === 'teste' 
-            ? (isEmployeeView ? '👤 Colaborador (Teste)' : '⚡ Ambiente de Teste') 
+        <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--sidebar-text-muted)' }}>
+          {user?.email === 'teste'
+            ? (isEmployeeView ? '👤 Colaborador (Teste)' : '⚡ Ambiente de Teste')
             : user?.role === 'superadmin' ? 'Super Administrador' : 'Empresa'}
         </span>
       </div>
@@ -143,10 +152,13 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
             onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 group ${
-                isActive
-                  ? 'bg-primary/15 text-primary shadow-[inset_0_0_10px_rgba(31,180,243,0.1)] border border-primary/20'
-                  : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                isActive ? 'sidebar-nav-active' : 'sidebar-nav-item'
               }`
+            }
+            style={({ isActive }) =>
+              isActive
+                ? { background: 'var(--sidebar-active-bg)', color: 'var(--sidebar-active-text)', border: '1px solid var(--sidebar-active-border)' }
+                : { color: 'var(--sidebar-text-muted)', border: '1px solid transparent' }
             }
           >
             {({ isActive }) => (
@@ -160,33 +172,32 @@ export default function AppSidebar({ onNavigate, isMobile }: { onNavigate?: () =
       </nav>
 
       {/* User & Status & Logout */}
-      <div className="border-t border-border/50 p-4 space-y-4 bg-black/20">
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', background: 'rgba(0,0,0,0.25)' }} className="p-4 space-y-4">
         {/* Sync Status Box */}
-        <div className="px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-2">
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--sidebar-border)' }} className="px-3 py-2.5 rounded-xl space-y-2">
            <div className="flex items-center gap-2">
              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" />
              <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500/80">Sistema Online</span>
              <span className="ml-auto text-[9px] font-mono text-emerald-500">REALTIME</span>
            </div>
-           
            <div className="flex items-center gap-2">
              <div className={`w-1.5 h-1.5 rounded-full ${lastDataSync ? 'bg-primary' : 'bg-amber-500'} shadow-[0_0_8px_rgba(31,180,243,0.4)] animate-pulse`} />
              <span className="text-[9px] font-black uppercase tracking-widest text-primary/80">Sinc. Ponto</span>
-             <span className="ml-auto text-[9px] font-mono text-muted-foreground whitespace-nowrap">
+             <span className="ml-auto text-[9px] font-mono whitespace-nowrap" style={{ color: 'var(--sidebar-text-muted)' }}>
                {lastDataSync ? new Date(lastDataSync).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--/-- --:--'}
              </span>
            </div>
         </div>
 
-        <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-white/5 border border-white/5">
+        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--sidebar-border)' }} className="flex items-center gap-2.5 px-2 py-2 rounded-xl">
           <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[12px] border border-primary/20 shadow-[0_0_10px_rgba(31,180,243,0.1)]">
             {user?.name?.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-black text-white truncate leading-tight uppercase tracking-tighter">
+            <p className="text-[12px] font-black truncate leading-tight uppercase tracking-tighter" style={{ color: 'var(--sidebar-text)' }}>
               {user?.name} {isImpersonating && "(Simulação)"}
             </p>
-            <p className="text-[10px] text-muted-foreground truncate font-medium">
+            <p className="text-[10px] truncate font-medium" style={{ color: 'var(--sidebar-text-muted)' }}>
               {isImpersonating ? "Acesso Temporário" : (user?.role === 'superadmin' ? 'Super Administrador' : 'Administrador')}
             </p>
           </div>
